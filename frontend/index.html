@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QLM - QuantLogic Framework</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div id="app">
+        <aside class="sidebar-nav">
+            <div class="logo">
+                <i class="fa-solid fa-layer-group"></i> QLM
+                <small>QuantLogic</small>
+            </div>
+            <nav>
+                <button onclick="router.navigate('dashboard')" class="nav-btn" id="nav-dashboard">
+                    <i class="fa-solid fa-chart-line"></i> Dashboard
+                </button>
+                <button onclick="router.navigate('data')" class="nav-btn" id="nav-data">
+                    <i class="fa-solid fa-database"></i> Data
+                </button>
+                <button onclick="router.navigate('strategies')" class="nav-btn" id="nav-strategies">
+                    <i class="fa-solid fa-code"></i> Strategies
+                </button>
+                <button onclick="router.navigate('backtest')" class="nav-btn" id="nav-backtest">
+                    <i class="fa-solid fa-play"></i> Backtest
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                Version 0.1.0 Beta
+            </div>
+        </aside>
+
+        <main id="main-content">
+            <!-- Dashboard Page -->
+            <div id="page-dashboard" class="page">
+                <header class="page-header">
+                    <h2>Dashboard</h2>
+                    <span class="status-indicator online"><i class="fa-solid fa-circle"></i> System Online</span>
+                </header>
+
+                <div class="dashboard-grid">
+                    <div class="card stat-card">
+                        <h3>Active Strategies</h3>
+                        <div class="big-number">3</div>
+                    </div>
+                    <div class="card stat-card">
+                        <h3>Datasets Available</h3>
+                        <div class="big-number">5</div>
+                    </div>
+                    <div class="card stat-card">
+                        <h3>Last Backtest</h3>
+                        <div class="big-number result-good">+12.5%</div>
+                    </div>
+                </div>
+
+                <div class="card welcome-card">
+                    <h3>Welcome to QuantLogic Framework</h3>
+                    <p>Select a module from the sidebar to begin your quantitative research.</p>
+                </div>
+            </div>
+
+            <!-- Data Page -->
+            <div id="page-data" class="page" style="display:none">
+                <header class="page-header">
+                    <h2>Data Management</h2>
+                </header>
+
+                <div class="card">
+                    <h3><i class="fa-solid fa-upload"></i> Upload New Dataset</h3>
+                    <div class="form-row">
+                        <input type="file" id="upload-file" accept=".csv" class="file-input">
+                        <input type="text" id="upload-symbol" placeholder="Symbol (e.g. XAUUSD)">
+                        <input type="text" id="upload-tf" placeholder="Timeframe (e.g. 1H)">
+                        <button onclick="uploadDataset()" class="primary-btn">Upload</button>
+                    </div>
+                </div>
+
+                <div class="card no-padding">
+                    <div class="card-header">
+                        <h3>Available Datasets</h3>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Timeframe</th>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th>Rows</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Strategies Page -->
+            <div id="page-strategies" class="page" style="display:none">
+                <header class="page-header">
+                    <h2>Strategy Editor</h2>
+                </header>
+
+                <div class="split-view">
+                    <div class="strategy-sidebar">
+                        <div class="sidebar-header">
+                            <h3>Files</h3>
+                            <button
+                                onclick="currentStrategyCode=''; document.getElementById('strategy-name-input').value=''; if(editor) editor.setValue('# New Strategy');"
+                                class="icon-btn" title="New Strategy">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                        <ul id="strategy-list" class="file-list"></ul>
+                    </div>
+
+                    <div class="editor-area card no-padding">
+                        <div class="editor-toolbar">
+                            <div class="toolbar-group">
+                                <select id="template-select" onchange="applyTemplate()" class="select-input">
+                                    <option value="">-- Load Template --</option>
+                                </select>
+                            </div>
+                            <div class="toolbar-group">
+                                <input type="text" id="strategy-name-input" placeholder="Strategy Name"
+                                    class="text-input">
+                                <button onclick="validateStrategy()" class="icon-btn" title="Validate Code"
+                                    style="color:var(--success-color); border: 1px solid var(--border-color); margin-right: 0.5rem;">
+                                    <i class="fa-solid fa-check-double"></i> Validate
+                                </button>
+                                <button onclick="saveStrategy()" class="primary-btn"><i class="fa-solid fa-save"></i>
+                                    Save</button>
+                            </div>
+                        </div>
+                        <div id="editor-container"></div>
+                        <textarea id="strategy-editor-fallback" style="display:none"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backtest Page -->
+            <div id="page-backtest" class="page" style="display:none">
+                <header class="page-header">
+                    <h2>Backtest Runner</h2>
+                </header>
+
+                <div class="config-grid">
+                    <div class="card">
+                        <h3>Configuration</h3>
+                        <div class="form-group">
+                            <label>Dataset</label>
+                            <select id="bt-dataset" class="full-width"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Strategy</label>
+                            <select id="bt-strategy" class="full-width"></select>
+                        </div>
+                        <button onclick="runBacktest()" class="primary-btn full-width limit-btn"><i
+                                class="fa-solid fa-play"></i> Run Backtest</button>
+                    </div>
+
+                    <div class="card">
+                        <h3>Status</h3>
+                        <div class="progress-wrapper">
+                            <div class="progress-container">
+                                <div id="bt-progress-bar" class="progress-bar"></div>
+                            </div>
+                            <div id="bt-status" class="status-text">Ready to start</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="bt-results" class="results-area">
+                    <!-- Results injected here -->
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="/js/app.js"></script>
+</body>
+
+</html>
