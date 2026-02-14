@@ -1,7 +1,7 @@
 import logging
 import json
 import traceback
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable, Awaitable
 from backend.ai.client import AIClient
 from backend.ai.tools import AITools
 from backend.ai.store import ChatStore
@@ -72,9 +72,10 @@ class AIAgent:
     async def get_available_models(self) -> List[str]:
         return await self.client.list_models()
 
-    async def chat(self, user_message: str, session_id: str = None) -> str:
+    async def chat(self, user_message: str, session_id: str = None, on_status: Callable[[str, str], Awaitable[None]] = None) -> str:
         """
         Main chat loop with persistence and Brain integration.
+        on_status: async func(step_name, detail) for real-time feedback
         """
         if not session_id:
             session_id = self.store.create_session(title=user_message[:50])
@@ -82,7 +83,7 @@ class AIAgent:
         # Retrieve history
         history = self.store.get_history(session_id)
 
-        # Context management: Prepend system prompt
+        # Context management
         context = [{"role": "system", "content": SYSTEM_PROMPT}] + history
 
         # Add user message
@@ -91,40 +92,16 @@ class AIAgent:
         self.store.add_message(session_id, new_user_msg)
         
         try:
-            # Delegate to Brain for reasoning loop
-            # The Brain handles the loop of calls/results but we need to capture them to save to DB?
-            # Our current Brain implementation returns final string but doesn't return intermediate steps easily
-            # unless we modify it or it modifies the list passed to it.
-            # In Python, lists are mutable, so Brain modifying 'context' will reflect here?
-            # Yes, if Brain appends to current_history which is a copy, it won't.
-            # We need Brain to return the FULL history or we need to capture steps.
-            
-            # Let's Refactor Brain usage slightly or just inline logic?
-            # Better: Brain returns the final response AND the new messages generated.
-            
-            # For now, let's trust the Brain will do the ReAct loop and we just want the final answer?
-            # NO, we want to store the tool calls in the DB history so the context is preserved for next turn.
-
-            # Let's modify Brain to accept the store and session_id to save as it goes?
-            # Or return the delta.
-
-            # Simpler: Re-implement loop here using Brain concepts but keeping control for DB.
-            # actually, let's use the Brain class but pass a callback or just let it return the new history items.
-            
-            # Actually, `Brain.think` uses `current_history` copy.
-            # Let's just make `Brain` a helper that returns the final content,
-            # BUT we need the intermediate messages for the DB.
-
-            # Let's do the loop here to be safe and simple with DB integration.
-            # (effectively inlining Brain logic but with DB saves)
-
+            # Re-implement loop here to control persistence AND status updates
             current_history = context
             steps = 0
             max_steps = 5
-
             final_content = ""
 
             while steps < max_steps:
+                if on_status:
+                    await on_status("Thinking", f"Step {steps+1}: Consulting AI Model...")
+
                 response = await self.client.chat_completion(
                     messages=current_history,
                     tools=self.tools.get_definitions()
@@ -133,7 +110,7 @@ class AIAgent:
                 choice = response['choices'][0]
                 message = choice['message']
                 
-                # Save assistant message
+                # Save assistant message (Action thought)
                 self.store.add_message(session_id, message)
                 current_history.append(message)
                 
@@ -147,6 +124,9 @@ class AIAgent:
                     fn_name = tool_call['function']['name']
                     fn_args_str = tool_call['function']['arguments']
                     fn_args = json.loads(fn_args_str)
+
+                    if on_status:
+                        await on_status("Executing Tool", f"Running {fn_name}...")
 
                     logger.info(f"Agent executing: {fn_name}")
                     tool_result = await self.tools.execute(fn_name, fn_args)

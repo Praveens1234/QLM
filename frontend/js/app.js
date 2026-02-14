@@ -391,7 +391,38 @@ function updateProgress(msg) {
         status.innerText = "Completed";
         badge.innerText = "COMPLETED";
         badge.className = "bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
+    } else if (msg.type === 'ai_status') {
+        renderAIStatus(msg);
     }
+}
+
+function renderAIStatus(msg) {
+    if (msg.session_id !== currentSessionId) return;
+
+    const container = document.getElementById('chat-container');
+    // Check if last element is a status indicator
+    let statusEl = document.getElementById('ai-status-indicator');
+
+    if (!statusEl) {
+        const div = document.createElement('div');
+        div.id = 'ai-status-indicator';
+        div.className = "flex w-full mb-4 justify-start";
+        div.innerHTML = `
+            <div class="max-w-[85%] p-3 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 text-xs flex items-center gap-3 animate-pulse">
+                <i class="fa-solid fa-circle-notch fa-spin text-indigo-500"></i>
+                <div class="flex flex-col">
+                    <span class="font-bold uppercase tracking-wide text-[10px] text-indigo-400" id="ai-status-step">Thinking</span>
+                    <span id="ai-status-detail">Processing...</span>
+                </div>
+            </div>
+        `;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        statusEl = div;
+    }
+
+    document.getElementById('ai-status-step').innerText = msg.step;
+    document.getElementById('ai-status-detail').innerText = msg.detail;
 }
 
 function renderResults(results) {
@@ -608,8 +639,13 @@ async function sendChatMessage() {
         });
         const data = await res.json();
 
+        // Remove simple loading indicator if present
         const loadingEl = document.getElementById(loadingId);
         if(loadingEl) loadingEl.remove();
+
+        // Remove detailed status indicator if present
+        const statusEl = document.getElementById('ai-status-indicator');
+        if(statusEl) statusEl.remove();
 
         appendMessage('ai', data.response);
 

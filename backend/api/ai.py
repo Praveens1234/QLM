@@ -1,9 +1,11 @@
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from backend.ai.agent import AIAgent
+from backend.api.ws import manager
 import logging
+import asyncio
 
 logger = logging.getLogger("QLM.API.AI")
 
@@ -44,7 +46,21 @@ async def chat(request: ChatRequest):
         if not session_id:
             session_id = agent.create_session(title=request.message[:30] + "...")
 
-        response = await agent.chat(request.message, session_id=session_id)
+        # Define status callback to broadcast over WebSocket
+        # We need the loop to schedule the broadcast
+        loop = asyncio.get_running_loop()
+
+        async def status_callback(step: str, detail: str):
+            payload = {
+                "type": "ai_status",
+                "session_id": session_id,
+                "step": step,
+                "detail": detail
+            }
+            # Broadcast to all connected clients (simpler than targeting specific client without auth/session map)
+            await manager.broadcast(payload)
+
+        response = await agent.chat(request.message, session_id=session_id, on_status=status_callback)
         return {"response": response, "session_id": session_id}
         
     except Exception as e:
