@@ -1,13 +1,12 @@
 :root {
-  /* Scrollbar */
   --bg-color: #0f172a;
   --text-primary: #f8fafc;
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -15,40 +14,73 @@
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(100, 116, 139, 0.5); /* Slate 500 */
-    border-radius: 4px;
+    background: rgba(99, 102, 241, 0.2); /* Indigo 500/20 */
+    border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(148, 163, 184, 0.8); /* Slate 400 */
+    background: rgba(99, 102, 241, 0.5);
 }
 
-/* Monaco Editor Specific */
-.monaco-editor {
-    border-radius: 8px;
-    overflow: hidden;
+/* Glassmorphism Utilities */
+.glass-panel {
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-card {
+    background: linear-gradient(145deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.4));
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* Neon Glows */
+.glow-text-indigo {
+    text-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+}
+
+.glow-border-indigo {
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
 }
 
 /* Animations */
-@keyframes fadeIn {
+@keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 5px rgba(16, 185, 129, 0.5); }
+    50% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.8); }
+}
+
+.animate-pulse-glow {
+    animation: pulse-glow 2s infinite;
+}
+
+.animate-fade-in-up {
+    animation: fadeInUp 0.4s ease-out forwards;
+}
+
+@keyframes fadeInUp {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-.animate-fade-in {
-    animation: fadeIn 0.3s ease-out forwards;
+/* Monaco Editor */
+.monaco-editor {
+    border-radius: 0.75rem;
+    overflow: hidden;
 }
 
-/* Chat Bubbles (Tailwind doesn't easily do dynamic radius for role, custom class helps) */
+/* Chat Bubbles */
 .chat-bubble-user {
-    border-radius: 12px 12px 0 12px;
+    border-radius: 1.25rem 1.25rem 0.25rem 1.25rem;
 }
 .chat-bubble-ai {
-    border-radius: 12px 12px 12px 0;
+    border-radius: 1.25rem 1.25rem 1.25rem 0.25rem;
 }
 
-/* Progress Bar Striping */
-.progress-bar-striped {
-    background-image: linear-gradient(45deg,rgba(255,255,255,.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.15) 50%,rgba(255,255,255,.15) 75%,transparent 75%,transparent);
-    background-size: 1rem 1rem;
+/* Grid Pattern Background */
+.bg-grid-pattern {
+    background-image: linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 24px 24px;
 }
