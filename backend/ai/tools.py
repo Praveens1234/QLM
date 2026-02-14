@@ -3,9 +3,8 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 from backend.core.strategy import StrategyLoader
-from backend.core.data import DataManager
-# We might need to import the Engine, but running backtest might be complex if it's long running.
-# For now, let's implement strategy management tools first.
+from backend.core.store import MetadataStore
+from backend.core.engine import BacktestEngine
 
 logger = logging.getLogger("QLM.AI.Tools")
 
@@ -15,7 +14,7 @@ class AITools:
     """
     def __init__(self):
         self.strategy_loader = StrategyLoader()
-        self.data_manager = DataManager()
+        self.metadata_store = MetadataStore()
         
     def get_definitions(self) -> List[Dict]:
         """
@@ -67,9 +66,23 @@ class AITools:
                         "type": "object",
                         "properties": {
                             "name": {"type": "string", "description": "Name of the strategy"},
-                            "code": {"type": "string", "description": "Complete Python code for the strategy"}
+                            "code": {"type": "string", "description": "Complete Python code for the strategy. Must include define_variables, entry_long, entry_short, risk_model, exit, and optionally position_size."}
                         },
                         "required": ["name", "code"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "validate_strategy",
+                    "description": "Validate a trading strategy code without saving it.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "code": {"type": "string", "description": "Complete Python code for the strategy"}
+                        },
+                        "required": ["code"]
                     }
                 }
             },
@@ -83,9 +96,7 @@ class AITools:
                         "properties": {
                             "strategy_name": {"type": "string", "description": "Name of the strategy"},
                             "symbol": {"type": "string", "description": "Symbol to test (e.g. XAUUSD)"},
-                            "timeframe": {"type": "string", "description": "Timeframe (e.g. 1H)"},
-                            "start_date": {"type": "string", "description": "Start date (YYYY-MM-DD), optional"},
-                            "end_date": {"type": "string", "description": "End date (YYYY-MM-DD), optional"}
+                            "timeframe": {"type": "string", "description": "Timeframe (e.g. 1H)"}
                         },
                         "required": ["strategy_name", "symbol", "timeframe"]
                     }
@@ -97,11 +108,11 @@ class AITools:
         """
         Execute a tool by name with arguments.
         """
-        logger.info(f"Executing tool: {tool_name} with args: {args.keys()}")
+        logger.info(f"Executing tool: {tool_name} with args: {list(args.keys())}")
         
         try:
             if tool_name == "list_datasets":
-                return self.data_manager.list_datasets()
+                return self.metadata_store.list_datasets()
                 
             elif tool_name == "list_strategies":
                 return self.strategy_loader.list_strategies()
@@ -131,75 +142,40 @@ class AITools:
                 return self.strategy_loader.validate_strategy_code(code)
                 
             elif tool_name == "run_backtest":
-                from backend.core.engine import BacktestEngine
-                from backend.core.metrics import MetricEngine
-                import pandas as pd
-                
                 strat_name = args.get("strategy_name")
                 symbol = args.get("symbol")
                 tf = args.get("timeframe")
                 
-                # Load Strategy
-                strat_class = self.strategy_loader.load_strategy_class(strat_name, version=args.get("version", 0))
-                # For simplicity, if version is 0 (default in load_strategy_class logic?) or logic handles it.
-                # Actually StrategyLoader.load_strategy_class takes version. 
-                # If version is 0 or None, we need to find latest.
-                # Let's check StrategyLoader.load_strategy_class signature.
-                # It takes (name, version).
-                # Wait, if version is missing, we should look it up.
-                # But to keep it simple, let's assume latest if not provided.
-                if not strat_class:
-                     # Try to find latest version
-                     versions = self.strategy_loader._get_versions(strat_name)
-                     if not versions:
-                         return {"error": f"Strategy {strat_name} not found"}
-                     strat_class = self.strategy_loader.load_strategy_class(strat_name, versions[-1])
+                # Resolve Dataset ID
+                datasets = self.metadata_store.list_datasets()
+                # Case insensitive match for symbol and timeframe
+                dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
                 
-                if not strat_class:
-                    return {"error": f"Could not load strategy class for {strat_name}"}
-
-                # Load Data
-                # DataManager.load_dataset(symbol, timeframe) returns df
-                df = self.data_manager.load_dataset(symbol, tf)
-                if df is None:
-                    return {"error": f"Dataset {symbol} {tf} not found"}
+                if not dataset:
+                    available = [f"{d['symbol']} ({d['timeframe']})" for d in datasets]
+                    return {"error": f"Dataset {symbol} {tf} not found. Available: {', '.join(available)}"}
                 
-                # Filter by date if provided
-                if args.get("start_date"):
-                    df = df[df['datetime'] >= args.get("start_date")]
-                if args.get("end_date"):
-                    df = df[df['datetime'] <= args.get("end_date")]
-                    
-                if df.empty:
-                    return {"error": "Dataset is empty after filtering"}
-
-                # Run Backtest
                 engine = BacktestEngine()
-                strategy = strat_class()
                 
-                # We need a progress callback? For AI tool, probably not needed or just log.
-                trade_log = engine.run(df, strategy)
-                
-                # Calculate Metrics
-                metrics_engine = MetricEngine()
-                report = metrics_engine.calculate(trade_log)
-                
-                # Return Summary
-                return {
-                    "status": "success",
-                    "metrics": {
-                        "net_profit": report.get("net_profit", 0),
-                        "win_rate": report.get("win_rate", 0),
-                        "sharpe_ratio": report.get("sharpe_ratio", 0),
-                        "total_trades": report.get("total_trades", 0),
-                        "max_drawdown": report.get("max_drawdown_pct", 0)
-                    },
-                    "trade_count": len(trade_log)
-                }
+                try:
+                    # Run backtest (synchronous for now, but in async func)
+                    # Note: engine.run reads file, which is blocking, but it's fast enough for local or should be run in executor if needed.
+                    result = engine.run(dataset['id'], strat_name)
+
+                    # Return Summary Metrics
+                    return {
+                        "status": "success",
+                        "metrics": result['metrics'],
+                        "trade_count": len(result['trades'])
+                    }
+                except Exception as e:
+                    return {"error": f"Backtest runtime error: {str(e)}"}
             
             else:
                 return {"error": f"Tool '{tool_name}' not found."}
                 
         except Exception as e:
             logger.error(f"Tool execution failed: {e}")
+            import traceback
+            traceback.print_exc()
             return {"error": f"Execution failed: {str(e)}"}

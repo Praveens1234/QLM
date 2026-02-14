@@ -79,8 +79,8 @@ class DataManager:
             parquet_filename = f"{dataset_id}.parquet"
             parquet_path = os.path.join(self.data_dir, parquet_filename)
             
-            # Standardize logic: dtv, open, high, low, close, volume (all float64 except dtv)
-            final_df = df[['dtv', 'open', 'high', 'low', 'close', 'volume']].copy()
+            # Standardize logic: datetime, dtv, open, high, low, close, volume (all float64 except dtv/datetime)
+            final_df = df[['datetime', 'dtv', 'open', 'high', 'low', 'close', 'volume']].copy()
             for col in ['open', 'high', 'low', 'close', 'volume']:
                 final_df[col] = final_df[col].astype('float64')
                 

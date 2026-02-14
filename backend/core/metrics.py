@@ -43,8 +43,8 @@ class PerformanceEngine:
         # Peak equity
         peak = equity_curve.cummax()
         drawdown = (equity_curve - peak)
-        max_drawdown = drawdown.min() # This is a dollar amount
-        max_drawdown_pct = (drawdown / peak).min() * 100 if not peak.empty else 0
+        max_drawdown = abs(drawdown.min()) # This is a dollar amount (converted to positive)
+        max_drawdown_pct = abs((drawdown / peak).min() * 100) if not peak.empty else 0
 
         # Expectancy
         expectancy = net_profit / total_trades if total_trades > 0 else 0
