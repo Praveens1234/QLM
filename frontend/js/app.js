@@ -24,7 +24,17 @@ const router = {
         if (page === 'data') loadDatasets();
         if (page === 'strategies') {
             loadStrategies();
-            setTimeout(() => { if (editor) editor.layout(); }, 100);
+            // Ensure editor is visible before layout
+            setTimeout(() => {
+                if (editor) {
+                    editor.layout();
+                } else {
+                    // Try initializing if not yet done (failed lazy load?)
+                    // This is handled by window.onload but good to be safe.
+                    // A simple retry or just logging.
+                    console.log("Editor not ready yet on switch");
+                }
+            }, 200);
         }
         if (page === 'backtest') loadBacktestOptions();
     },
@@ -34,6 +44,81 @@ const router = {
     }
 };
 
+async function saveConfig() {
+    const apiKey = document.getElementById('cfg-api-key').value.trim();
+    const model = document.getElementById('cfg-model').value.trim();
+    const baseUrl = document.getElementById('cfg-base-url').value.trim();
+
+    if (!apiKey) {
+        alert("Please enter an API Key.");
+        return;
+    }
+
+    try {
+        const payload = {
+            api_key: apiKey,
+            model: model,
+            base_url: baseUrl
+        };
+
+        const res = await fetch(`${API_URL}/ai/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            alert(`Configuration Saved Successfully!`);
+        } else {
+            console.error("Config Error:", data);
+            alert(`Error saving config: ${data.detail}`);
+        }
+    } catch (e) {
+        console.error("Config Network Error:", e);
+        alert("Config save failed: " + e.message);
+    }
+}
+
+async function fetchModels() {
+    // First save current connection args
+    const apiKey = document.getElementById('cfg-api-key').value.trim();
+    const baseUrl = document.getElementById('cfg-base-url').value.trim();
+
+    if (!apiKey) {
+        alert("Please enter API Key first.");
+        return;
+    }
+
+    try {
+        // 1. Update Config on Server
+        await fetch(`${API_URL}/ai/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key: apiKey, base_url: baseUrl, model: "" }) // Model empty for now
+        });
+
+        // 2. Fetch Models
+        const res = await fetch(`${API_URL}/ai/models`);
+        const data = await res.json();
+
+        if (data.models && data.models.length > 0) {
+            const dataList = document.getElementById('model-list');
+            dataList.innerHTML = ''; // Clear existing
+            data.models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                dataList.appendChild(opt);
+            });
+            alert(`Loaded ${data.models.length} models into suggestions.`);
+        } else {
+            alert("No models found via API. Please enter Model ID manually.");
+        }
+    } catch (e) {
+        alert("Error fetching models: " + e + "\n\nPlease enter Model ID manually.");
+    }
+}
 async function updateDashboardStats() {
     // Simple verification stats - in real app would fetch from API
     // We can infer some from loaded data if we have it, or fetch it.
@@ -367,19 +452,138 @@ async function applyTemplate() {
     document.getElementById('strategy-name-input').value = `${name.toUpperCase()}_Strategy`;
 }
 
+// AI Chat Logic
+function initChat() {
+    const chatToggle = document.getElementById('chatToggle');
+    const closeChat = document.getElementById('closeChat');
+    const chatPanel = document.getElementById('ai-chat-panel');
+    const chatInput = document.getElementById('chatInput');
+    const sendMessageBtn = document.getElementById('sendMessage');
+    const chatHistory = document.getElementById('chatHistory');
+
+    if (!chatToggle || !chatPanel) return;
+
+    function toggleChat() {
+        const isVisible = chatPanel.classList.contains('visible');
+        if (isVisible) {
+            chatPanel.classList.remove('visible');
+            chatToggle.classList.remove('open');
+        } else {
+            chatPanel.classList.add('visible');
+            chatToggle.classList.add('open');
+            chatInput.focus();
+        }
+    }
+
+    chatToggle.addEventListener('click', toggleChat);
+    closeChat.addEventListener('click', toggleChat);
+
+    async function sendChatMessage() {
+        const message = chatInput.value.trim();
+        if (!message) return;
+
+        appendMessage('user', message);
+        chatInput.value = '';
+
+        // Show typing indicator
+        const typingId = appendMessage('ai', '<i class="fas fa-ellipsis-h fa-fade"></i>');
+
+        try {
+            const res = await fetch(`${API_URL}/ai/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message })
+            });
+            const data = await res.json();
+
+            // Remove typing indicator
+            const typingEl = document.getElementById(typingId);
+            if (typingEl) typingEl.remove();
+
+            if (res.ok) {
+                appendMessage('ai', data.response);
+            } else {
+                appendMessage('ai', `Error: ${data.detail || 'Failed to get response'}`);
+            }
+        } catch (err) {
+            // Remove typing indicator
+            const typingEl = document.getElementById(typingId);
+            if (typingEl) typingEl.remove();
+
+            appendMessage('ai', `Connection Error: ${err.message}`);
+        }
+    }
+
+    function appendMessage(role, text) {
+        const msgDiv = document.createElement('div');
+        const id = 'msg-' + Date.now();
+        msgDiv.id = id;
+        msgDiv.className = `chat-message ${role}`;
+
+        // Basic Markdown Support
+        // 1. Code blocks
+        text = text.replace(/```python([\s\S]*?)```/g, '<pre><code class="language-python">$1</code></pre>');
+        text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+
+        // 2. Bold / Italic
+        text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+        // 3. Newlines to breaks (if not in pre)
+        // Simple hack: if it contains <pre>, don't replace newlines globally securely. 
+        // For now, let's just do simple replacement for non-code parts.
+        // Or executing strategy?
+
+        msgDiv.innerHTML = text; // Warning: InnerHTML usage. In prod use DOMPurify.
+
+        chatHistory.appendChild(msgDiv);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+        return id;
+    }
+
+    sendMessageBtn.addEventListener('click', sendChatMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendChatMessage();
+    });
+}
+
 // Init
 window.onload = () => {
     initWS();
     router.init();
-    loadTemplates(); // Load templates on startup
+    loadTemplates();
+    initChat();
 
-    // Init Monaco (Lazy load if possible, or assume loaded script)
+    // Load config from Backend (Persistent)
+    fetch(`${API_URL}/ai/config`)
+        .then(res => res.json())
+        .then(config => {
+            if (config.api_key) document.getElementById('cfg-api-key').value = config.api_key;
+            if (config.base_url) document.getElementById('cfg-base-url').value = config.base_url;
+            if (config.model) document.getElementById('cfg-model').value = config.model;
+        })
+        .catch(e => console.error("Failed to load config", e));
+
+    // Init Monaco
     require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
     require(['vs/editor/editor.main'], function () {
-        editor = monaco.editor.create(document.getElementById('editor-container'), {
-            value: "# Select a strategy or create one",
-            language: 'python',
-            theme: 'vs-dark'
-        });
+        const container = document.getElementById('editor-container');
+        if (container) {
+            // Force strict height calculation to avoid flex collapse
+            container.style.height = 'calc(100vh - 220px)';
+            container.style.width = '100%';
+
+            editor = monaco.editor.create(container, {
+                value: "# Select a strategy or create one",
+                language: 'python',
+                theme: 'vs-dark',
+                automaticLayout: true,
+                scrollBeyondLastLine: false,
+                minimap: { enabled: false }
+            });
+
+            // Resize observer as backup
+            new ResizeObserver(() => editor.layout()).observe(container);
+        }
     });
 };

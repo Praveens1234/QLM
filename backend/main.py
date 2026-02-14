@@ -18,16 +18,16 @@ app.add_middleware(
 from backend.api import router as api_router
 app.include_router(api_router, prefix="/api")
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "system": "QLM"}
+
 # Serve Frontend
 # Ensure frontend directory exists
 if not os.path.exists("frontend"):
     os.makedirs("frontend")
 
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
-
-@app.get("/health")
-async def health_check():
-    return {"status": "ok", "system": "QLM"}
 
 if __name__ == "__main__":
     import uvicorn

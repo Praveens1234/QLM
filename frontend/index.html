@@ -31,6 +31,10 @@
                 <button onclick="router.navigate('backtest')" class="nav-btn" id="nav-backtest">
                     <i class="fa-solid fa-play"></i> Backtest
                 </button>
+                <div style="flex:1"></div> <!-- Spacer -->
+                <button onclick="router.navigate('settings')" class="nav-btn" id="nav-settings">
+                    <i class="fa-solid fa-cog"></i> Settings
+                </button>
             </nav>
             <div class="sidebar-footer">
                 Version 0.1.0 Beta
@@ -121,7 +125,7 @@
                         <ul id="strategy-list" class="file-list"></ul>
                     </div>
 
-                    <div class="editor-area card no-padding">
+                    <div class="editor-area">
                         <div class="editor-toolbar">
                             <div class="toolbar-group">
                                 <select id="template-select" onchange="applyTemplate()" class="select-input">
@@ -181,8 +185,72 @@
                     <!-- Results injected here -->
                 </div>
             </div>
+
+            <!-- Settings Page -->
+            <div id="page-settings" class="page" style="display:none">
+                <header class="page-header">
+                    <h2>Settings</h2>
+                </header>
+
+                <div class="card" style="max-width: 600px;">
+                    <h3>AI Configuration</h3>
+                    <div class="form-group">
+                        <label>OpenAI API Key (or compatible)</label>
+                        <input type="password" id="cfg-api-key" class="full-width" placeholder="sk-...">
+                    </div>
+                    <div class="form-group">
+                        <label>Base URL (Optional)</label>
+                        <div style="display:flex; gap:0.5rem;">
+                            <input type="text" id="cfg-base-url" class="full-width"
+                                placeholder="https://api.openai.com/v1">
+                            <button onclick="fetchModels()" class="icon-btn" title="Fetch Models"><i
+                                    class="fa-solid fa-sync"></i></button>
+                        </div>
+                        <small style="color:var(--text-secondary)">Use http://localhost:1234/v1 for local LLMs</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Analysis Model</label>
+                        <div style="display:flex; gap:0.5rem;">
+                            <input type="text" id="cfg-model" class="full-width" placeholder="gpt-4-turbo"
+                                list="model-list">
+                            <datalist id="model-list">
+                                <option value="gpt-4-turbo"></option>
+                                <option value="gpt-3.5-turbo"></option>
+                                <option value="meta/llama-3-70b-instruct"></option>
+                                <option value="nvidia/nemotron-4-340b-instruct"></option>
+                            </datalist>
+                        </div>
+                        <small style="color:var(--text-secondary)">Type manually or fetch to populate list</small>
+                    </div>
+                    <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
+                        <button onclick="saveConfig()" class="primary-btn">Save Configuration</button>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
+    <!-- AI Chat Interface -->
+    <button class="chat-toggle-btn" id="chatToggle" title="Ask AI Agent">
+        <i class="fas fa-robot"></i>
+    </button>
+
+    <div id="ai-chat-panel">
+        <div class="chat-header">
+            <h3><span class="ai-status-dot"></span> QLM Assistant</h3>
+            <button class="icon-btn" id="closeChat"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="chat-history" id="chatHistory">
+            <div class="chat-message ai">
+                Hello! I am your Quantitative Trading Assistant. I can help you create strategies, run backtests, or
+                analyze performance. How can I help?
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="chatInput" class="full-width" placeholder="Type a message..." autocomplete="off">
+            <button class="primary-btn" id="sendMessage"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+
     <script src="/js/app.js"></script>
 </body>
 

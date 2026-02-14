@@ -1,0 +1,5 @@
+{
+    "api_key": "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",
+    "base_url": "https://integrate.api.nvidia.com/v1",
+    "model": "z-ai/glm4.7"
+}
