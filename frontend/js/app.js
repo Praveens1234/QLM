@@ -14,26 +14,35 @@ let editor; // Monaco instance
 const router = {
     navigate: (page) => {
         document.querySelectorAll('.page').forEach(el => {
-            el.classList.remove('active');
-            el.style.display = 'none'; // Ensure hidden
+            el.classList.add('hidden');
         });
 
         const target = document.getElementById(`page-${page}`);
         if(target) {
-            target.style.display = 'block';
-            setTimeout(() => target.classList.add('active'), 10); // Trigger animation
+            target.classList.remove('hidden');
+            target.classList.add('animate-fade-in');
         }
 
         window.location.hash = page;
 
         // Update Nav Active State
-        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(btn => {
+            btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg', 'shadow-indigo-500/20');
+            btn.classList.add('text-slate-400', 'hover:bg-slate-800', 'hover:text-white');
+        });
+
         const activeBtn = document.getElementById(`nav-${page}`);
-        if (activeBtn) activeBtn.classList.add('active');
+        if (activeBtn) {
+            activeBtn.classList.remove('text-slate-400', 'hover:bg-slate-800');
+            activeBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-lg', 'shadow-indigo-500/20');
+        }
 
         // Close mobile sidebar if open
         const sidebar = document.getElementById('sidebar');
-        if (sidebar.classList.contains('open')) sidebar.classList.remove('open');
+        const overlay = document.getElementById('sidebar-overlay');
+        if (!sidebar.classList.contains('-translate-x-full')) {
+            toggleSidebar();
+        }
 
         // Page specific loads
         if (page === 'dashboard') updateDashboardStats();
@@ -54,7 +63,10 @@ const router = {
 // UI Toggles
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
-    sidebar.classList.toggle('open');
+    const overlay = document.getElementById('sidebar-overlay');
+
+    sidebar.classList.toggle('-translate-x-full');
+    overlay.classList.toggle('hidden');
 }
 
 // Config
@@ -138,7 +150,7 @@ async function updateDashboardStats() {
         const sRes = await fetch(`${API_URL}/strategies/`);
         const strategies = await sRes.json();
 
-        const cards = document.querySelectorAll('.stat-card .big-number');
+        const cards = document.querySelectorAll('.stat-value');
         if (cards.length >= 2) {
             cards[0].innerText = strategies.length;
             cards[1].innerText = datasets.length;
@@ -171,15 +183,26 @@ async function loadDatasets() {
 
 function renderDatasets() {
     const tbody = document.getElementById('data-table-body');
+    if (datasets.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-xs text-slate-500 uppercase tracking-wide">No Datasets Found</td></tr>`;
+        return;
+    }
     tbody.innerHTML = datasets.map(d => `
-        <tr>
-            <td>${d.symbol}</td>
-            <td>${d.timeframe}</td>
-            <td>${d.start_date.split('T')[0]}</td>
-            <td>${d.end_date.split('T')[0]}</td>
-            <td>${d.row_count}</td>
-            <td>
-                <button onclick="deleteDataset('${d.id}')" class="icon-btn" style="color:var(--danger-color)"><i class="fa-solid fa-trash"></i></button>
+        <tr class="hover:bg-slate-800/50 transition-colors group">
+            <td class="px-6 py-4 font-mono font-medium text-white">${d.symbol}</td>
+            <td class="px-6 py-4">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                    ${d.timeframe}
+                </span>
+            </td>
+            <td class="px-6 py-4 text-xs text-slate-500 font-mono">
+                ${d.start_date.split('T')[0]} <span class="text-slate-600">to</span> ${d.end_date.split('T')[0]}
+            </td>
+            <td class="px-6 py-4 text-right text-xs text-slate-400 font-mono">${d.row_count.toLocaleString()}</td>
+            <td class="px-6 py-4 text-right">
+                <button onclick="deleteDataset('${d.id}')" class="text-slate-500 hover:text-rose-500 transition-colors p-1 opacity-0 group-hover:opacity-100">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
             </td>
         </tr>
     `).join('');
@@ -220,13 +243,25 @@ async function loadStrategies() {
     const res = await fetch(`${API_URL}/strategies/`);
     strategies = await res.json();
     const list = document.getElementById('strategy-list');
+
+    if (strategies.length === 0) {
+        list.innerHTML = `<div class="p-4 text-center text-xs text-slate-500">No strategies yet</div>`;
+        return;
+    }
+
     list.innerHTML = strategies.map(s => `
-        <li class="session-item" onclick="loadStrategyCode('${s.name}', ${s.latest_version})">
-            <span>${s.name} <small>(v${s.latest_version})</small></span>
-            <button onclick="deleteStrategy('${s.name}'); event.stopPropagation();" class="icon-btn" style="color:var(--danger-color)">
-                <i class="fa-solid fa-trash"></i>
+        <div class="group flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700" onclick="loadStrategyCode('${s.name}', ${s.latest_version})">
+            <div class="flex items-center gap-3 overflow-hidden">
+                <div class="h-8 w-8 rounded bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-xs font-mono font-bold border border-indigo-500/20">PY</div>
+                <div class="overflow-hidden">
+                    <h4 class="text-sm font-medium text-slate-200 truncate">${s.name}</h4>
+                    <p class="text-[10px] text-slate-500">v${s.latest_version}</p>
+                </div>
+            </div>
+            <button onclick="deleteStrategy('${s.name}'); event.stopPropagation();" class="text-slate-600 hover:text-rose-500 p-1.5 rounded transition-colors opacity-0 group-hover:opacity-100">
+                <i class="fa-solid fa-trash-can text-xs"></i>
             </button>
-        </li>
+        </div>
     `).join('');
 }
 
@@ -319,6 +354,12 @@ async function runBacktest() {
     document.getElementById('bt-progress-bar').style.width = '0%';
     document.getElementById('bt-status').innerText = "Starting...";
 
+    // Show badge
+    const badge = document.getElementById('bt-status-badge');
+    badge.classList.remove('hidden');
+    badge.innerText = "STARTING";
+    badge.className = "bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
+
     const res = await fetch(`${API_URL}/backtest/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -328,20 +369,28 @@ async function runBacktest() {
     if (!res.ok) {
         alert("Backtest failed to start");
         document.getElementById('bt-status').innerText = "Failed";
+        badge.innerText = "FAILED";
+        badge.className = "bg-rose-500/10 text-rose-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
     }
 }
 
 function updateProgress(msg) {
     const bar = document.getElementById('bt-progress-bar');
     const status = document.getElementById('bt-status');
-    // Check if relevant
+    const badge = document.getElementById('bt-status-badge');
 
     if (msg.type === 'progress') {
         bar.style.width = `${msg.progress}%`;
-        status.innerText = `${msg.message} (${msg.progress}%) - ${msg.data.current_time}`;
+        status.innerText = `${msg.message} - ${msg.data.current_time}`;
+
+        badge.innerText = "RUNNING";
+        badge.className = "bg-indigo-500/10 text-indigo-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
+
     } else if (msg.type === 'finished') {
         bar.style.width = '100%';
         status.innerText = "Completed";
+        badge.innerText = "COMPLETED";
+        badge.className = "bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
     }
 }
 
@@ -349,80 +398,79 @@ function renderResults(results) {
     const container = document.getElementById('bt-results');
     const m = results.metrics;
 
-    // Helper for coloring
-    const pnlColor = m.net_profit >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
+    const pnlColor = m.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400';
 
     container.innerHTML = `
-        <div class="card no-padding" style="margin-bottom: 2rem;">
-            <div class="card-header">
-                <h3>Performance Metrics</h3>
-            </div>
-            <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); padding: 1.5rem; gap: 1rem; margin: 0;">
-                <div class="metric-item">
-                    <small>Net Profit</small>
-                    <div class="big-number" style="color:${pnlColor}">${m.net_profit}</div>
-                </div>
-                <div class="metric-item">
-                    <small>Total Trades</small>
-                    <div class="big-number">${m.total_trades}</div>
-                </div>
-                <div class="metric-item">
-                    <small>Win Rate</small>
-                    <div class="big-number">${m.win_rate}%</div>
-                </div>
-                <div class="metric-item">
-                    <small>Profit Factor</small>
-                    <div class="big-number">${m.profit_factor}</div>
-                </div>
-                <div class="metric-item">
-                    <small>Max Drawdown</small>
-                    <div class="big-number" style="color:var(--danger-color)">${m.max_drawdown} (${m.max_drawdown_pct}%)</div>
-                </div>
-                <div class="metric-item">
-                    <small>Avg Duration</small>
-                    <div class="big-number">${m.avg_duration} m</div>
-                </div>
-            </div>
+        <!-- Metrics Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Net Profit</span>
+                <div class="text-xl font-bold ${pnlColor} mt-1">$${m.net_profit}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Trades</span>
+                <div class="text-xl font-bold text-white mt-1">${m.total_trades}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Win Rate</span>
+                <div class="text-xl font-bold text-white mt-1">${m.win_rate}%</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Profit Factor</span>
+                <div class="text-xl font-bold text-white mt-1">${m.profit_factor}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Max DD</span>
+                <div class="text-xl font-bold text-rose-400 mt-1">$${m.max_drawdown}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Avg Duration</span>
+                <div class="text-xl font-bold text-white mt-1">${m.avg_duration}m</div>
+             </div>
         </div>
         
-        <div class="card no-padding">
-            <div class="card-header">
-                <h3>Trade Ledger</h3>
-            </div>
-            <div style="max-height: 500px; overflow-y: auto;">
-                <table class="data-table">
-                    <thead style="position: sticky; top: 0; background: var(--card-bg); z-index: 1;">
+        <!-- Trade Ledger -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+             <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+                <h3 class="text-sm font-semibold text-white">Trade Ledger</h3>
+             </div>
+             <div class="overflow-x-auto max-h-[400px]">
+                <table class="w-full text-left text-sm text-slate-400">
+                    <thead class="bg-slate-950 text-xs uppercase font-medium text-slate-500 sticky top-0">
                         <tr>
-                            <th>Entry Time (UTC)</th>
-                            <th>Dir</th>
-                            <th>Size</th>
-                            <th>Entry</th>
-                            <th>Exit Time (UTC)</th>
-                            <th>Exit</th>
-                            <th>PnL</th>
-                            <th>Reason</th>
+                            <th class="px-6 py-3">Entry Time (UTC)</th>
+                            <th class="px-6 py-3">Dir</th>
+                            <th class="px-6 py-3">Size</th>
+                            <th class="px-6 py-3 text-right">Entry</th>
+                            <th class="px-6 py-3">Exit Time (UTC)</th>
+                            <th class="px-6 py-3 text-right">Exit</th>
+                            <th class="px-6 py-3 text-right">PnL</th>
+                            <th class="px-6 py-3 text-right">Reason</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="divide-y divide-slate-800 font-mono">
                         ${results.trades.map(t => {
-                            const pnlClass = t.pnl >= 0 ? 'color:var(--success-color)' : 'color:var(--danger-color)';
-                            const size = t.size ? t.size.toFixed(2) : '1.00';
+                            const pnlClass = t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                            const dirClass = t.direction === 'long' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+
                             return `
-                            <tr>
-                                <td>${t.entry_time}</td>
-                                <td><span style="padding:2px 6px; border-radius:4px; font-size:0.8em; background:${t.direction==='long'?'rgba(16, 185, 129, 0.2)':'rgba(239, 68, 68, 0.2)'}; color:${t.direction==='long'?'var(--success-color)':'var(--danger-color)'}">${t.direction.toUpperCase()}</span></td>
-                                <td>${size}</td>
-                                <td>${t.entry_price.toFixed(2)}</td>
-                                <td>${t.exit_time}</td>
-                                <td>${t.exit_price.toFixed(2)}</td>
-                                <td style="${pnlClass}; font-weight:bold;">${t.pnl.toFixed(2)}</td>
-                                <td>${t.exit_reason}</td>
+                            <tr class="hover:bg-slate-800/50 transition-colors">
+                                <td class="px-6 py-3 text-xs">${t.entry_time}</td>
+                                <td class="px-6 py-3">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${dirClass}">${t.direction}</span>
+                                </td>
+                                <td class="px-6 py-3 text-xs">${t.size ? t.size.toFixed(2) : '1.00'}</td>
+                                <td class="px-6 py-3 text-right text-xs text-white">${t.entry_price.toFixed(2)}</td>
+                                <td class="px-6 py-3 text-xs">${t.exit_time}</td>
+                                <td class="px-6 py-3 text-right text-xs text-white">${t.exit_price.toFixed(2)}</td>
+                                <td class="px-6 py-3 text-right font-bold ${pnlClass}">${t.pnl.toFixed(2)}</td>
+                                <td class="px-6 py-3 text-right text-xs">${t.exit_reason}</td>
                             </tr>
                             `;
                         }).join('')}
                     </tbody>
                 </table>
-            </div>
+             </div>
         </div>
     `;
 }
@@ -432,7 +480,7 @@ async function loadTemplates() {
     const res = await fetch(`${API_URL}/strategies/templates/list`);
     const templates = await res.json();
     const select = document.getElementById('template-select');
-    select.innerHTML = `<option value="">-- Load Template --</option>` +
+    select.innerHTML = `<option value="">Load Template...</option>` +
         templates.map(t => `<option value="${t}">${t.toUpperCase()}</option>`).join('');
 }
 
@@ -473,9 +521,11 @@ async function loadSessions() {
 function renderSessions() {
     const list = document.getElementById('session-list');
     list.innerHTML = sessions.map(s => `
-        <li class="session-item ${s.id === currentSessionId ? 'active' : ''}" onclick="loadSession('${s.id}')">
-            <span>${s.title}</span>
-            <button onclick="deleteSession('${s.id}'); event.stopPropagation()" class="icon-btn" style="padding:2px"><i class="fa-solid fa-times"></i></button>
+        <li class="flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors text-sm ${s.id === currentSessionId ? 'bg-indigo-600/10 text-indigo-400 font-medium' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}" onclick="loadSession('${s.id}')">
+            <span class="truncate pr-2">${s.title}</span>
+            <button onclick="deleteSession('${s.id}'); event.stopPropagation()" class="text-slate-600 hover:text-rose-500 p-1 rounded opacity-60 hover:opacity-100">
+                <i class="fa-solid fa-times text-xs"></i>
+            </button>
         </li>
     `).join('');
 }
@@ -505,24 +555,26 @@ async function loadSession(id) {
     currentSessionId = id;
     renderSessions();
     const container = document.getElementById('chat-container');
-    container.innerHTML = '<div style="text-align:center; padding:1rem; color:var(--text-secondary)">Loading...</div>';
+    container.innerHTML = '<div class="text-center p-4 text-xs text-slate-500 animate-pulse">Loading History...</div>';
 
     try {
         const res = await fetch(`${API_URL}/ai/sessions/${id}/history`);
         const history = await res.json();
 
         container.innerHTML = '';
+        if(history.length === 0) {
+             appendMessage('system', "Started new session. How can I help?");
+        }
+
         history.forEach(msg => {
             if (msg.role === 'user') appendMessage('user', msg.content);
             if (msg.role === 'assistant') appendMessage('ai', msg.content);
             if (msg.role === 'tool') {
                 // Optional: Show tool outputs debug style?
-                // For now skip or show as subtle system msg
-                // appendMessage('system', `Tool Output: ${msg.name}`);
             }
         });
     } catch (e) {
-        container.innerHTML = 'Error loading history.';
+        container.innerHTML = '<div class="text-center p-4 text-xs text-rose-500">Error loading history.</div>';
     }
 }
 
@@ -541,12 +593,12 @@ async function sendChatMessage() {
     const message = input.value.trim();
     if (!message) return;
 
-    if (!currentSessionId) await newSession(); // Auto create if null
+    if (!currentSessionId) await newSession();
 
     input.value = '';
     appendMessage('user', message);
 
-    const loadingId = appendMessage('ai', '...');
+    const loadingId = appendMessage('ai', '<span class="animate-pulse">Thinking...</span>');
 
     try {
         const res = await fetch(`${API_URL}/ai/chat`, {
@@ -556,13 +608,14 @@ async function sendChatMessage() {
         });
         const data = await res.json();
 
-        document.getElementById(loadingId).remove();
+        const loadingEl = document.getElementById(loadingId);
+        if(loadingEl) loadingEl.remove();
+
         appendMessage('ai', data.response);
 
-        // Refresh session list (title might update or re-order?)
-        // Ideally we update title based on content if needed, but for now just keep simple.
     } catch (e) {
-        document.getElementById(loadingId).innerText = "Error: " + e.message;
+        const loadingEl = document.getElementById(loadingId);
+        if(loadingEl) loadingEl.innerHTML = `<span class="text-rose-400">Error: ${e.message}</span>`;
     }
 }
 
@@ -571,17 +624,28 @@ function appendMessage(role, text) {
     const div = document.createElement('div');
     const id = 'msg-' + Date.now();
     div.id = id;
-    div.className = `chat-message ${role}`;
+
+    // Style based on role
+    div.className = "flex w-full mb-4 " + (role === 'user' ? "justify-end" : "justify-start");
+
+    const bubbleClass = role === 'user'
+        ? "bg-indigo-600 text-white chat-bubble-user"
+        : (role === 'system' ? "bg-slate-800/50 text-slate-400 text-xs italic text-center w-full bg-transparent" : "bg-slate-800 border border-slate-700 text-slate-200 chat-bubble-ai");
+
+    const innerDiv = document.createElement('div');
+    innerDiv.className = `max-w-[85%] p-4 shadow-sm ${bubbleClass}`;
 
     // Markdown formatting
     let html = text
         .replace(/</g, "&lt;").replace(/>/g, "&gt;") // Escape HTML
-        .replace(/```python([\s\S]*?)```/g, '<pre><code class="language-python">$1</code></pre>')
-        .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/```python([\s\S]*?)```/g, '<div class="mt-2 mb-2 bg-slate-950 rounded-lg border border-slate-900 overflow-hidden"><div class="bg-slate-900 px-3 py-1 text-[10px] text-slate-500 font-mono uppercase border-b border-slate-800">Python</div><pre class="p-3 overflow-x-auto text-xs"><code class="language-python">$1</code></pre></div>')
+        .replace(/```([\s\S]*?)```/g, '<pre class="bg-slate-950 p-3 rounded-lg text-xs border border-slate-900 overflow-x-auto mt-2 mb-2"><code>$1</code></pre>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
         .replace(/\n/g, '<br>');
 
-    div.innerHTML = html;
+    innerDiv.innerHTML = html;
+    div.appendChild(innerDiv);
+
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
     return id;
@@ -619,7 +683,10 @@ window.onload = () => {
                 language: 'python',
                 theme: 'vs-dark',
                 automaticLayout: true,
-                minimap: { enabled: false }
+                minimap: { enabled: false },
+                padding: { top: 16, bottom: 16 },
+                fontSize: 13,
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace"
             });
             // Initial Layout
             setTimeout(() => editor.layout(), 100);
