@@ -4,8 +4,10 @@ from typing import List, Dict, Any, Optional
 from backend.core.strategy import StrategyLoader
 from backend.core.store import MetadataStore
 from backend.core.engine import BacktestEngine
+from backend.ai.analytics import calculate_market_structure, optimize_strategy
 import os
 import shutil
+import pandas as pd
 
 logger = logging.getLogger("QLM.AI.Tools")
 
@@ -161,6 +163,38 @@ class AITools:
                         "required": ["type", "id"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "analyze_market_structure",
+                    "description": "Analyze market structure metrics (trend, volatility, support/resistance) for a dataset.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "symbol": {"type": "string", "description": "Symbol"},
+                            "timeframe": {"type": "string", "description": "Timeframe"}
+                        },
+                        "required": ["symbol", "timeframe"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "optimize_parameters",
+                    "description": "Run a parameter optimization (simulation) for a strategy.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "strategy_name": {"type": "string", "description": "Name of the strategy"},
+                            "symbol": {"type": "string", "description": "Symbol"},
+                            "timeframe": {"type": "string", "description": "Timeframe"},
+                            "param_grid": {"type": "object", "description": "Dict of parameters to optimize (e.g., {'window': [10, 20]})"}
+                        },
+                        "required": ["strategy_name", "symbol", "timeframe", "param_grid"]
+                    }
+                }
             }
         ]
 
@@ -208,7 +242,6 @@ class AITools:
                 
                 # Resolve Dataset ID
                 datasets = self.metadata_store.list_datasets()
-                # Case insensitive match for symbol and timeframe
                 dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
                 
                 if not dataset:
@@ -218,8 +251,7 @@ class AITools:
                 engine = BacktestEngine()
 
                 try:
-                    # Run backtest (synchronous for now, but in async func)
-                    # Note: engine.run reads file, which is blocking, but it's fast enough for local or should be run in executor if needed.
+                    # Run backtest
                     result = engine.run(dataset['id'], strat_name)
 
                     # Return Summary Metrics
@@ -240,40 +272,29 @@ class AITools:
                 if not dataset:
                     return {"error": "Dataset not found"}
 
-                import pandas as pd
                 df = pd.read_parquet(dataset['file_path'])
                 head = df.head(10).to_dict(orient='records')
                 return {"data": head}
 
             elif tool_name == "read_file":
                 path = args.get("path")
-                # Security Check
                 if ".." in path or path.startswith("/"):
                     return {"error": "Invalid path"}
-
                 if not (path.startswith("strategies/") or path.startswith("logs/")):
                     return {"error": "Access denied. Only strategies/ and logs/ allowed."}
-
                 if not os.path.exists(path):
                     return {"error": "File not found"}
-
                 with open(path, "r") as f:
                     return {"content": f.read()}
 
             elif tool_name == "write_file":
                 path = args.get("path")
                 content = args.get("content")
-
-                # Security Check
                 if ".." in path or path.startswith("/"):
                     return {"error": "Invalid path"}
-
                 if not (path.startswith("strategies/") or path.startswith("logs/")):
                     return {"error": "Access denied. Only strategies/ and logs/ allowed."}
-
-                # Ensure directory exists
                 os.makedirs(os.path.dirname(path), exist_ok=True)
-
                 with open(path, "w") as f:
                     f.write(content)
                 return {"status": "success", "message": f"File {path} written."}
@@ -281,20 +302,39 @@ class AITools:
             elif tool_name == "delete_entity":
                 type_ = args.get("type")
                 id_ = args.get("id")
-
                 if type_ == "strategy":
                     try:
                         self.strategy_loader.delete_strategy(id_)
                         return {"status": "success", "message": f"Strategy {id_} deleted."}
                     except Exception as e:
                          return {"error": str(e)}
-
                 elif type_ == "dataset":
                     try:
                         self.metadata_store.delete_dataset(id_)
                         return {"status": "success", "message": f"Dataset {id_} deleted."}
                     except Exception as e:
                          return {"error": str(e)}
+
+            elif tool_name == "analyze_market_structure":
+                symbol = args.get("symbol")
+                tf = args.get("timeframe")
+                datasets = self.metadata_store.list_datasets()
+                dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
+                if not dataset:
+                    return {"error": "Dataset not found"}
+                df = pd.read_parquet(dataset['file_path'])
+                return calculate_market_structure(df)
+
+            elif tool_name == "optimize_parameters":
+                strat_name = args.get("strategy_name")
+                symbol = args.get("symbol")
+                tf = args.get("timeframe")
+                param_grid = args.get("param_grid")
+                datasets = self.metadata_store.list_datasets()
+                dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
+                if not dataset:
+                    return {"error": "Dataset not found"}
+                return optimize_strategy(strat_name, dataset['id'], param_grid)
             
             else:
                 return {"error": f"Tool '{tool_name}' not found."}

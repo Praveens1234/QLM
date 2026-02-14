@@ -638,7 +638,17 @@ function appendMessage(role, text) {
     // Markdown formatting
     let html = text
         .replace(/</g, "&lt;").replace(/>/g, "&gt;") // Escape HTML
-        .replace(/```python([\s\S]*?)```/g, '<div class="mt-2 mb-2 bg-slate-950 rounded-lg border border-slate-900 overflow-hidden"><div class="bg-slate-900 px-3 py-1 text-[10px] text-slate-500 font-mono uppercase border-b border-slate-800">Python</div><pre class="p-3 overflow-x-auto text-xs"><code class="language-python">$1</code></pre></div>')
+        .replace(/```python([\s\S]*?)```/g, (match, code) => {
+            return `<div class="mt-2 mb-2 bg-slate-950 rounded-lg border border-slate-900 overflow-hidden group relative">
+                <div class="bg-slate-900 px-3 py-1 text-[10px] text-slate-500 font-mono uppercase border-b border-slate-800 flex justify-between items-center">
+                    <span>Python</span>
+                    <button onclick="applyCodeToEditor(this)" data-code="${encodeURIComponent(code)}" class="text-indigo-400 hover:text-indigo-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i> Apply
+                    </button>
+                </div>
+                <pre class="p-3 overflow-x-auto text-xs"><code class="language-python">${code}</code></pre>
+            </div>`;
+        })
         .replace(/```([\s\S]*?)```/g, '<pre class="bg-slate-950 p-3 rounded-lg text-xs border border-slate-900 overflow-x-auto mt-2 mb-2"><code>$1</code></pre>')
         .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
         .replace(/\n/g, '<br>');
@@ -649,6 +659,15 @@ function appendMessage(role, text) {
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
     return id;
+}
+
+function applyCodeToEditor(btn) {
+    const code = decodeURIComponent(btn.getAttribute('data-code'));
+    if(editor) {
+        editor.setValue(code);
+        router.navigate('strategies');
+        alert("Code applied to editor!");
+    }
 }
 
 // Bind Chat Input

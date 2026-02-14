@@ -5,6 +5,8 @@ from typing import List, Dict, Any, Optional
 from backend.ai.client import AIClient
 from backend.ai.tools import AITools
 from backend.ai.store import ChatStore
+from backend.ai.brain import Brain
+import os
 
 logger = logging.getLogger("QLM.AI.Agent")
 
@@ -12,33 +14,26 @@ SYSTEM_PROMPT = """
 You are a Quantitative Trading Assistant for the QLM Framework.
 Your goal is to help users develop, validate, and backtest trading strategies.
 
-You have access to the following tools:
-- list_datasets: detailed info on available data.
-- list_strategies: what strategies imply exist.
-- get_strategy_code: read the code of a specific strategy.
-- create_strategy: write (or overwrite) a strategy. ALWAYS use purely defined variables, entry_long, entry_short, risk_model, exit (interface compliance).
-- validate_strategy: check code before saving.
-- run_backtest: execute a strategy on data and get metrics.
-- get_market_data: fetch sample market data for analysis.
-- read_file: read files within the strategies/logs directories.
-- write_file: write/edit files within the strategies/logs directories (use with caution).
-- delete_entity: delete datasets or strategies.
+You have access to advanced tools for analysis, coding, and simulation.
+When solving complex problems, use a step-by-step approach (Reasoning Loop):
+1. Analyze the request.
+2. Gather necessary information (list datasets, read code).
+3. Formulate a plan or code solution.
+4. Execute and verify (validate code, run backtest).
+5. Refine if necessary.
 
 Rules:
-1. When asked to write a strategy, ALWAYS validate it first or at least mention you are creating it.
-2. Use valid Python code compatible with the QLM Strategy Interface.
-3. If a backtest fails, analyze the error and propose a fix.
-4. Be concise and professional.
-5. If you modify a strategy, explain what you changed.
+1. Always validate strategies before saving.
+2. Use valid Python code compatible with QLM.
+3. Be concise and professional.
 """
-
-import os
 
 class AIAgent:
     def __init__(self):
         self.client = AIClient()
         self.tools = AITools()
         self.store = ChatStore()
+        self.brain = Brain(self.client, self.tools)
 
         self.config_path = os.path.join(os.path.dirname(__file__), "config.json")
         self._load_config()
@@ -79,8 +74,7 @@ class AIAgent:
 
     async def chat(self, user_message: str, session_id: str = None) -> str:
         """
-        Main chat loop with persistence.
-        If session_id is None, creates a new one.
+        Main chat loop with persistence and Brain integration.
         """
         if not session_id:
             session_id = self.store.create_session(title=user_message[:50])
@@ -88,78 +82,91 @@ class AIAgent:
         # Retrieve history
         history = self.store.get_history(session_id)
 
-        # If new session, prepend system prompt
-        if not history:
-             history = [{"role": "system", "content": SYSTEM_PROMPT}]
-             # We don't necessarily need to save system prompt to DB history unless we want it visible/editable?
-             # Usually standard practice is to keep it ephemeral or first message.
-             # Let's keep it ephemeral for now, but include it in context.
-        else:
-             # Prepend system prompt to context sent to LLM, but don't duplicate in DB
-             history = [{"role": "system", "content": SYSTEM_PROMPT}] + history
+        # Context management: Prepend system prompt
+        context = [{"role": "system", "content": SYSTEM_PROMPT}] + history
 
         # Add user message
         new_user_msg = {"role": "user", "content": user_message}
-        history.append(new_user_msg)
+        context.append(new_user_msg)
         self.store.add_message(session_id, new_user_msg)
         
         try:
-            # 1. Get initial response from LLM
-            response = await self.client.chat_completion(
-                messages=history,
-                tools=self.tools.get_definitions()
-            )
+            # Delegate to Brain for reasoning loop
+            # The Brain handles the loop of calls/results but we need to capture them to save to DB?
+            # Our current Brain implementation returns final string but doesn't return intermediate steps easily
+            # unless we modify it or it modifies the list passed to it.
+            # In Python, lists are mutable, so Brain modifying 'context' will reflect here?
+            # Yes, if Brain appends to current_history which is a copy, it won't.
+            # We need Brain to return the FULL history or we need to capture steps.
             
-            choice = response['choices'][0]
-            message = choice['message']
+            # Let's Refactor Brain usage slightly or just inline logic?
+            # Better: Brain returns the final response AND the new messages generated.
             
-            # Save assistant response/call to history
-            # Normalize message for storage (remove None values if possible to save space? or just store as is)
-            # The client returns dict usually.
+            # For now, let's trust the Brain will do the ReAct loop and we just want the final answer?
+            # NO, we want to store the tool calls in the DB history so the context is preserved for next turn.
 
-            # If plain text response
-            if not message.get('tool_calls'):
+            # Let's modify Brain to accept the store and session_id to save as it goes?
+            # Or return the delta.
+
+            # Simpler: Re-implement loop here using Brain concepts but keeping control for DB.
+            # actually, let's use the Brain class but pass a callback or just let it return the new history items.
+            
+            # Actually, `Brain.think` uses `current_history` copy.
+            # Let's just make `Brain` a helper that returns the final content,
+            # BUT we need the intermediate messages for the DB.
+
+            # Let's do the loop here to be safe and simple with DB integration.
+            # (effectively inlining Brain logic but with DB saves)
+
+            current_history = context
+            steps = 0
+            max_steps = 5
+
+            final_content = ""
+
+            while steps < max_steps:
+                response = await self.client.chat_completion(
+                    messages=current_history,
+                    tools=self.tools.get_definitions()
+                )
+                
+                choice = response['choices'][0]
+                message = choice['message']
+                
+                # Save assistant message
                 self.store.add_message(session_id, message)
-                return message['content']
+                current_history.append(message)
                 
-            # If tool calls
-            self.store.add_message(session_id, message)
-            history.append(message) # Add to context for next turn
-            
-            tool_calls = message['tool_calls']
-            for tool_call in tool_calls:
-                fn_name = tool_call['function']['name']
-                fn_args_str = tool_call['function']['arguments']
-                fn_args = json.loads(fn_args_str)
-                
-                # Execute tool
-                logger.info(f"AI calling tool: {fn_name}")
-                tool_result = await self.tools.execute(fn_name, fn_args)
-                
-                # Create tool result message
-                tool_msg = {
-                    "role": "tool",
-                    "tool_call_id": tool_call['id'],
-                    "name": fn_name,
-                    "content": json.dumps(tool_result, default=str)
-                }
+                if not message.get('tool_calls'):
+                    final_content = message['content']
+                    break
 
-                # Add to history and DB
-                history.append(tool_msg)
-                self.store.add_message(session_id, tool_msg)
-                
-            # 2. Get final response after tool outputs
-            final_response = await self.client.chat_completion(
-                messages=history,
-                tools=self.tools.get_definitions() 
-            )
-            
-            final_choice = final_response['choices'][0]
-            final_message = final_choice['message']
+                # Execute tools
+                tool_calls = message['tool_calls']
+                for tool_call in tool_calls:
+                    fn_name = tool_call['function']['name']
+                    fn_args_str = tool_call['function']['arguments']
+                    fn_args = json.loads(fn_args_str)
 
-            self.store.add_message(session_id, final_message)
+                    logger.info(f"Agent executing: {fn_name}")
+                    tool_result = await self.tools.execute(fn_name, fn_args)
+
+                    tool_msg = {
+                        "role": "tool",
+                        "tool_call_id": tool_call['id'],
+                        "name": fn_name,
+                        "content": json.dumps(tool_result, default=str)
+                    }
+
+                    self.store.add_message(session_id, tool_msg)
+                    current_history.append(tool_msg)
+
+                steps += 1
             
-            return final_message['content']
+            if not final_content:
+                final_content = "I reached my reasoning limit."
+
+            return final_content
             
         except Exception as e:
             logger.error(f"Agent Chat Error: {e}")
