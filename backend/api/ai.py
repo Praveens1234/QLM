@@ -1,7 +1,7 @@
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from backend.ai.agent import AIAgent
 import logging
 
@@ -14,14 +14,19 @@ agent = AIAgent()
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
+    session_id: str
 
 class ConfigRequest(BaseModel):
     api_key: Optional[str] = None
     base_url: Optional[str] = None
     model: Optional[str] = None
+
+class SessionCreate(BaseModel):
+    title: str
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
@@ -33,12 +38,50 @@ async def chat(request: ChatRequest):
             raise HTTPException(status_code=400, detail="Message cannot be empty")
         
         logger.info(f"User Message: {request.message}")
-        response = await agent.chat(request.message)
-        return {"response": response}
+
+        # If no session ID, create one
+        session_id = request.session_id
+        if not session_id:
+            session_id = agent.create_session(title=request.message[:30] + "...")
+
+        response = await agent.chat(request.message, session_id=session_id)
+        return {"response": response, "session_id": session_id}
         
     except Exception as e:
         logger.error(f"Chat API Error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/sessions")
+async def list_sessions():
+    """
+    List all chat sessions.
+    """
+    return agent.list_sessions()
+
+@router.post("/sessions")
+async def create_session(session: SessionCreate):
+    """
+    Create a new chat session.
+    """
+    session_id = agent.create_session(session.title)
+    return {"id": session_id, "title": session.title}
+
+@router.get("/sessions/{session_id}/history")
+async def get_history(session_id: str):
+    """
+    Get chat history for a session.
+    """
+    return agent.get_history(session_id)
+
+@router.delete("/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """
+    Delete a chat session.
+    """
+    agent.delete_session(session_id)
+    return {"status": "success"}
 
 @router.post("/config")
 async def configure_agent(request: ConfigRequest):
@@ -69,11 +112,3 @@ async def get_config():
         "base_url": agent.client.base_url,
         "model": agent.client.model
     }
-
-@router.delete("/history")
-async def clear_history():
-    """
-    Clear conversation history.
-    """
-    agent.clear_history()
-    return {"status": "success", "message": "Conversation history cleared."}

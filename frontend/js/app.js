@@ -5,14 +5,25 @@ const WS_URL = `ws://${window.location.host}/api/ws`;
 let socket;
 let datasets = [];
 let strategies = [];
+let sessions = [];
+let currentSessionId = null;
 let currentStrategyCode = "";
 let editor; // Monaco instance
 
 // Router (Simple hash router)
 const router = {
     navigate: (page) => {
-        document.querySelectorAll('.page').forEach(el => el.style.display = 'none');
-        document.getElementById(`page-${page}`).style.display = 'block';
+        document.querySelectorAll('.page').forEach(el => {
+            el.classList.remove('active');
+            el.style.display = 'none'; // Ensure hidden
+        });
+
+        const target = document.getElementById(`page-${page}`);
+        if(target) {
+            target.style.display = 'block';
+            setTimeout(() => target.classList.add('active'), 10); // Trigger animation
+        }
+
         window.location.hash = page;
 
         // Update Nav Active State
@@ -20,23 +31,19 @@ const router = {
         const activeBtn = document.getElementById(`nav-${page}`);
         if (activeBtn) activeBtn.classList.add('active');
 
+        // Close mobile sidebar if open
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar.classList.contains('open')) sidebar.classList.remove('open');
+
+        // Page specific loads
         if (page === 'dashboard') updateDashboardStats();
         if (page === 'data') loadDatasets();
         if (page === 'strategies') {
             loadStrategies();
-            // Ensure editor is visible before layout
-            setTimeout(() => {
-                if (editor) {
-                    editor.layout();
-                } else {
-                    // Try initializing if not yet done (failed lazy load?)
-                    // This is handled by window.onload but good to be safe.
-                    // A simple retry or just logging.
-                    console.log("Editor not ready yet on switch");
-                }
-            }, 200);
+            setTimeout(() => { if (editor) editor.layout(); }, 200);
         }
         if (page === 'backtest') loadBacktestOptions();
+        if (page === 'assistant') loadSessions();
     },
     init: () => {
         window.addEventListener('hashchange', () => router.navigate(window.location.hash.substring(1) || 'dashboard'));
@@ -44,6 +51,13 @@ const router = {
     }
 };
 
+// UI Toggles
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('open');
+}
+
+// Config
 async function saveConfig() {
     const apiKey = document.getElementById('cfg-api-key').value.trim();
     const model = document.getElementById('cfg-model').value.trim();
@@ -82,7 +96,6 @@ async function saveConfig() {
 }
 
 async function fetchModels() {
-    // First save current connection args
     const apiKey = document.getElementById('cfg-api-key').value.trim();
     const baseUrl = document.getElementById('cfg-base-url').value.trim();
 
@@ -92,20 +105,18 @@ async function fetchModels() {
     }
 
     try {
-        // 1. Update Config on Server
         await fetch(`${API_URL}/ai/config`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: apiKey, base_url: baseUrl, model: "" }) // Model empty for now
+            body: JSON.stringify({ api_key: apiKey, base_url: baseUrl, model: "" })
         });
 
-        // 2. Fetch Models
         const res = await fetch(`${API_URL}/ai/models`);
         const data = await res.json();
 
         if (data.models && data.models.length > 0) {
             const dataList = document.getElementById('model-list');
-            dataList.innerHTML = ''; // Clear existing
+            dataList.innerHTML = '';
             data.models.forEach(m => {
                 const opt = document.createElement('option');
                 opt.value = m;
@@ -119,21 +130,18 @@ async function fetchModels() {
         alert("Error fetching models: " + e + "\n\nPlease enter Model ID manually.");
     }
 }
+
 async function updateDashboardStats() {
-    // Simple verification stats - in real app would fetch from API
-    // We can infer some from loaded data if we have it, or fetch it.
-    // Let's just fetch counts to be accurate.
     try {
         const dRes = await fetch(`${API_URL}/data/`);
         const datasets = await dRes.json();
         const sRes = await fetch(`${API_URL}/strategies/`);
         const strategies = await sRes.json();
 
-        // Update DOM if elements exist (they should in new layout)
         const cards = document.querySelectorAll('.stat-card .big-number');
         if (cards.length >= 2) {
-            cards[0].innerText = strategies.length; // Active Strategies
-            cards[1].innerText = datasets.length;   // Datasets
+            cards[0].innerText = strategies.length;
+            cards[1].innerText = datasets.length;
         }
     } catch (e) { console.error("Stats error", e); }
 }
@@ -167,11 +175,11 @@ function renderDatasets() {
         <tr>
             <td>${d.symbol}</td>
             <td>${d.timeframe}</td>
-            <td>${d.start_date}</td>
-            <td>${d.end_date}</td>
+            <td>${d.start_date.split('T')[0]}</td>
+            <td>${d.end_date.split('T')[0]}</td>
             <td>${d.row_count}</td>
             <td>
-                <button onclick="deleteDataset('${d.id}')">Delete</button>
+                <button onclick="deleteDataset('${d.id}')" class="icon-btn" style="color:var(--danger-color)"><i class="fa-solid fa-trash"></i></button>
             </td>
         </tr>
     `).join('');
@@ -213,15 +221,19 @@ async function loadStrategies() {
     strategies = await res.json();
     const list = document.getElementById('strategy-list');
     list.innerHTML = strategies.map(s => `
-        <li class="strategy-item" style="display:flex; justify-content:space-between; align-items:center;">
-            <span onclick="loadStrategyCode('${s.name}', ${s.latest_version})" style="flex:1; cursor:pointer;">
-                ${s.name} (v${s.latest_version})
-            </span>
-            <button onclick="deleteStrategy('${s.name}')" class="icon-btn" title="Delete Strategy" style="color:var(--danger-color); padding: 0.2rem 0.5rem;">
+        <li class="session-item" onclick="loadStrategyCode('${s.name}', ${s.latest_version})">
+            <span>${s.name} <small>(v${s.latest_version})</small></span>
+            <button onclick="deleteStrategy('${s.name}'); event.stopPropagation();" class="icon-btn" style="color:var(--danger-color)">
                 <i class="fa-solid fa-trash"></i>
             </button>
         </li>
     `).join('');
+}
+
+function createNewStrategy() {
+    currentStrategyCode = "";
+    document.getElementById('strategy-name-input').value = "";
+    if (editor) editor.setValue("# New Strategy\n\nfrom backend.core.strategy import Strategy\n\nclass NewStrategy(Strategy):\n    pass");
 }
 
 async function deleteStrategy(name) {
@@ -230,13 +242,9 @@ async function deleteStrategy(name) {
     try {
         const res = await fetch(`${API_URL}/strategies/${name}`, { method: 'DELETE' });
         if (res.ok) {
-            alert(`Strategy '${name}' deleted successfully.`);
             loadStrategies();
-            // Clear editor if deleted strategy was open
             if (document.getElementById('strategy-name-input').value === name) {
-                currentStrategyCode = "";
-                document.getElementById('strategy-name-input').value = "";
-                if (editor) editor.setValue("# Select a strategy or create one");
+                createNewStrategy();
             }
         } else {
             const err = await res.json();
@@ -324,14 +332,13 @@ async function runBacktest() {
 }
 
 function updateProgress(msg) {
-    if (msg.dataset_id !== document.getElementById('bt-dataset').value) return; // simple check
-
     const bar = document.getElementById('bt-progress-bar');
     const status = document.getElementById('bt-status');
+    // Check if relevant
 
     if (msg.type === 'progress') {
         bar.style.width = `${msg.progress}%`;
-        status.innerText = `${msg.message} (${msg.progress}%) - Time: ${msg.data.current_time}`;
+        status.innerText = `${msg.message} (${msg.progress}%) - ${msg.data.current_time}`;
     } else if (msg.type === 'finished') {
         bar.style.width = '100%';
         status.innerText = "Completed";
@@ -341,6 +348,10 @@ function updateProgress(msg) {
 function renderResults(results) {
     const container = document.getElementById('bt-results');
     const m = results.metrics;
+
+    // Helper for coloring
+    const pnlColor = m.net_profit >= 0 ? 'var(--success-color)' : 'var(--danger-color)';
+
     container.innerHTML = `
         <div class="card no-padding" style="margin-bottom: 2rem;">
             <div class="card-header">
@@ -349,7 +360,7 @@ function renderResults(results) {
             <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); padding: 1.5rem; gap: 1rem; margin: 0;">
                 <div class="metric-item">
                     <small>Net Profit</small>
-                    <div class="big-number" style="color:${m.net_profit >= 0 ? 'var(--success-color)' : 'var(--danger-color)'}">${m.net_profit}</div>
+                    <div class="big-number" style="color:${pnlColor}">${m.net_profit}</div>
                 </div>
                 <div class="metric-item">
                     <small>Total Trades</small>
@@ -384,40 +395,31 @@ function renderResults(results) {
                         <tr>
                             <th>Entry Time (UTC)</th>
                             <th>Dir</th>
+                            <th>Size</th>
                             <th>Entry</th>
-                            <th>SL</th>
-                            <th>TP</th>
                             <th>Exit Time (UTC)</th>
                             <th>Exit</th>
                             <th>PnL</th>
-                            <th>Duration</th>
-                            <th>Status/Reason</th>
+                            <th>Reason</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${results.trades.map(t => {
-        const pnlClass = t.pnl >= 0 ? 'pnl-green' : 'pnl-red';
-        const pnlFormatted = t.pnl.toFixed(2);
-        const slDisplay = t.sl ? t.sl.toFixed(2) : '-';
-        const tpDisplay = t.tp ? t.tp.toFixed(2) : '-';
-
-        return `
+                            const pnlClass = t.pnl >= 0 ? 'color:var(--success-color)' : 'color:var(--danger-color)';
+                            const size = t.size ? t.size.toFixed(2) : '1.00';
+                            return `
                             <tr>
                                 <td>${t.entry_time}</td>
-                                <td><span class="badge ${t.direction}">${t.direction.toUpperCase()}</span></td>
+                                <td><span style="padding:2px 6px; border-radius:4px; font-size:0.8em; background:${t.direction==='long'?'rgba(16, 185, 129, 0.2)':'rgba(239, 68, 68, 0.2)'}; color:${t.direction==='long'?'var(--success-color)':'var(--danger-color)'}">${t.direction.toUpperCase()}</span></td>
+                                <td>${size}</td>
                                 <td>${t.entry_price.toFixed(2)}</td>
-                                <td style="color:var(--danger-color); opacity:0.8;">${slDisplay}</td>
-                                <td style="color:var(--success-color); opacity:0.8;">${tpDisplay}</td>
                                 <td>${t.exit_time}</td>
                                 <td>${t.exit_price.toFixed(2)}</td>
-                                <td class="${pnlClass}">
-                                    <b>${t.pnl > 0 ? '+' : ''}${pnlFormatted}</b>
-                                </td>
-                                <td>${t.duration} m</td>
+                                <td style="${pnlClass}; font-weight:bold;">${t.pnl.toFixed(2)}</td>
                                 <td>${t.exit_reason}</td>
                             </tr>
                             `;
-    }).join('')}
+                        }).join('')}
                     </tbody>
                 </table>
             </div>
@@ -443,118 +445,161 @@ async function applyTemplate() {
     const res = await fetch(`${API_URL}/strategies/templates/${name}`);
     const data = await res.json();
 
-    // Rename class to avoid conflict? Or user does it.
-    // For now just load it.
     if (editor) editor.setValue(data.code);
     else document.getElementById('strategy-editor-fallback').value = data.code;
 
-    // Auto-fill name
     document.getElementById('strategy-name-input').value = `${name.toUpperCase()}_Strategy`;
 }
 
-// AI Chat Logic
-function initChat() {
-    const chatToggle = document.getElementById('chatToggle');
-    const closeChat = document.getElementById('closeChat');
-    const chatPanel = document.getElementById('ai-chat-panel');
-    const chatInput = document.getElementById('chatInput');
-    const sendMessageBtn = document.getElementById('sendMessage');
-    const chatHistory = document.getElementById('chatHistory');
+// AI Assistant Logic (Persistent Sessions)
+async function loadSessions() {
+    try {
+        const res = await fetch(`${API_URL}/ai/sessions`);
+        sessions = await res.json();
+        renderSessions();
 
-    if (!chatToggle || !chatPanel) return;
-
-    function toggleChat() {
-        const isVisible = chatPanel.classList.contains('visible');
-        if (isVisible) {
-            chatPanel.classList.remove('visible');
-            chatToggle.classList.remove('open');
-        } else {
-            chatPanel.classList.add('visible');
-            chatToggle.classList.add('open');
-            chatInput.focus();
+        // Load first session if exists and none selected
+        if (!currentSessionId && sessions.length > 0) {
+            loadSession(sessions[0].id);
+        } else if (currentSessionId) {
+             // ensure active class
+             renderSessions();
         }
+    } catch (e) {
+        console.error("Failed to load sessions", e);
     }
-
-    chatToggle.addEventListener('click', toggleChat);
-    closeChat.addEventListener('click', toggleChat);
-
-    async function sendChatMessage() {
-        const message = chatInput.value.trim();
-        if (!message) return;
-
-        appendMessage('user', message);
-        chatInput.value = '';
-
-        // Show typing indicator
-        const typingId = appendMessage('ai', '<i class="fas fa-ellipsis-h fa-fade"></i>');
-
-        try {
-            const res = await fetch(`${API_URL}/ai/chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: message })
-            });
-            const data = await res.json();
-
-            // Remove typing indicator
-            const typingEl = document.getElementById(typingId);
-            if (typingEl) typingEl.remove();
-
-            if (res.ok) {
-                appendMessage('ai', data.response);
-            } else {
-                appendMessage('ai', `Error: ${data.detail || 'Failed to get response'}`);
-            }
-        } catch (err) {
-            // Remove typing indicator
-            const typingEl = document.getElementById(typingId);
-            if (typingEl) typingEl.remove();
-
-            appendMessage('ai', `Connection Error: ${err.message}`);
-        }
-    }
-
-    function appendMessage(role, text) {
-        const msgDiv = document.createElement('div');
-        const id = 'msg-' + Date.now();
-        msgDiv.id = id;
-        msgDiv.className = `chat-message ${role}`;
-
-        // Basic Markdown Support
-        // 1. Code blocks
-        text = text.replace(/```python([\s\S]*?)```/g, '<pre><code class="language-python">$1</code></pre>');
-        text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-
-        // 2. Bold / Italic
-        text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-        // 3. Newlines to breaks (if not in pre)
-        // Simple hack: if it contains <pre>, don't replace newlines globally securely. 
-        // For now, let's just do simple replacement for non-code parts.
-        // Or executing strategy?
-
-        msgDiv.innerHTML = text; // Warning: InnerHTML usage. In prod use DOMPurify.
-
-        chatHistory.appendChild(msgDiv);
-        chatHistory.scrollTop = chatHistory.scrollHeight;
-        return id;
-    }
-
-    sendMessageBtn.addEventListener('click', sendChatMessage);
-    chatInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendChatMessage();
-    });
 }
+
+function renderSessions() {
+    const list = document.getElementById('session-list');
+    list.innerHTML = sessions.map(s => `
+        <li class="session-item ${s.id === currentSessionId ? 'active' : ''}" onclick="loadSession('${s.id}')">
+            <span>${s.title}</span>
+            <button onclick="deleteSession('${s.id}'); event.stopPropagation()" class="icon-btn" style="padding:2px"><i class="fa-solid fa-times"></i></button>
+        </li>
+    `).join('');
+}
+
+async function newSession() {
+    const title = prompt("Session Title:", "New Analysis");
+    if (!title) return;
+
+    try {
+        const res = await fetch(`${API_URL}/ai/sessions`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({title})
+        });
+        const session = await res.json();
+        currentSessionId = session.id;
+        sessions.unshift(session);
+        renderSessions();
+        document.getElementById('chat-container').innerHTML = '';
+        appendMessage('system', "Started new session. How can I help?");
+    } catch (e) {
+        alert("Failed to create session");
+    }
+}
+
+async function loadSession(id) {
+    currentSessionId = id;
+    renderSessions();
+    const container = document.getElementById('chat-container');
+    container.innerHTML = '<div style="text-align:center; padding:1rem; color:var(--text-secondary)">Loading...</div>';
+
+    try {
+        const res = await fetch(`${API_URL}/ai/sessions/${id}/history`);
+        const history = await res.json();
+
+        container.innerHTML = '';
+        history.forEach(msg => {
+            if (msg.role === 'user') appendMessage('user', msg.content);
+            if (msg.role === 'assistant') appendMessage('ai', msg.content);
+            if (msg.role === 'tool') {
+                // Optional: Show tool outputs debug style?
+                // For now skip or show as subtle system msg
+                // appendMessage('system', `Tool Output: ${msg.name}`);
+            }
+        });
+    } catch (e) {
+        container.innerHTML = 'Error loading history.';
+    }
+}
+
+async function deleteSession(id) {
+    if (!confirm("Delete this chat?")) return;
+    await fetch(`${API_URL}/ai/sessions/${id}`, { method: 'DELETE' });
+    if (currentSessionId === id) {
+        currentSessionId = null;
+        document.getElementById('chat-container').innerHTML = '';
+    }
+    loadSessions();
+}
+
+async function sendChatMessage() {
+    const input = document.getElementById('ai-input');
+    const message = input.value.trim();
+    if (!message) return;
+
+    if (!currentSessionId) await newSession(); // Auto create if null
+
+    input.value = '';
+    appendMessage('user', message);
+
+    const loadingId = appendMessage('ai', '...');
+
+    try {
+        const res = await fetch(`${API_URL}/ai/chat`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ message, session_id: currentSessionId })
+        });
+        const data = await res.json();
+
+        document.getElementById(loadingId).remove();
+        appendMessage('ai', data.response);
+
+        // Refresh session list (title might update or re-order?)
+        // Ideally we update title based on content if needed, but for now just keep simple.
+    } catch (e) {
+        document.getElementById(loadingId).innerText = "Error: " + e.message;
+    }
+}
+
+function appendMessage(role, text) {
+    const container = document.getElementById('chat-container');
+    const div = document.createElement('div');
+    const id = 'msg-' + Date.now();
+    div.id = id;
+    div.className = `chat-message ${role}`;
+
+    // Markdown formatting
+    let html = text
+        .replace(/</g, "&lt;").replace(/>/g, "&gt;") // Escape HTML
+        .replace(/```python([\s\S]*?)```/g, '<pre><code class="language-python">$1</code></pre>')
+        .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>');
+
+    div.innerHTML = html;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    return id;
+}
+
+// Bind Chat Input
+document.getElementById('ai-send-btn').addEventListener('click', sendChatMessage);
+document.getElementById('ai-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendChatMessage();
+});
 
 // Init
 window.onload = () => {
     initWS();
     router.init();
     loadTemplates();
-    initChat();
 
-    // Load config from Backend (Persistent)
+    // Load config
     fetch(`${API_URL}/ai/config`)
         .then(res => res.json())
         .then(config => {
@@ -569,21 +614,15 @@ window.onload = () => {
     require(['vs/editor/editor.main'], function () {
         const container = document.getElementById('editor-container');
         if (container) {
-            // Force strict height calculation to avoid flex collapse
-            container.style.height = 'calc(100vh - 220px)';
-            container.style.width = '100%';
-
             editor = monaco.editor.create(container, {
                 value: "# Select a strategy or create one",
                 language: 'python',
                 theme: 'vs-dark',
                 automaticLayout: true,
-                scrollBeyondLastLine: false,
                 minimap: { enabled: false }
             });
-
-            // Resize observer as backup
-            new ResizeObserver(() => editor.layout()).observe(container);
+            // Initial Layout
+            setTimeout(() => editor.layout(), 100);
         }
     });
 };

@@ -1,10 +1,11 @@
-
 import json
 import logging
 from typing import List, Dict, Any, Optional
 from backend.core.strategy import StrategyLoader
 from backend.core.store import MetadataStore
 from backend.core.engine import BacktestEngine
+import os
+import shutil
 
 logger = logging.getLogger("QLM.AI.Tools")
 
@@ -101,6 +102,65 @@ class AITools:
                         "required": ["strategy_name", "symbol", "timeframe"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_market_data",
+                    "description": "Fetch first 10 rows of a dataset for analysis.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "symbol": {"type": "string", "description": "Symbol"},
+                            "timeframe": {"type": "string", "description": "Timeframe"}
+                        },
+                        "required": ["symbol", "timeframe"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "read_file",
+                    "description": "Read content of a file in strategies or logs directory.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string", "description": "Relative path (e.g., strategies/MyStrat/v1.py)"}
+                        },
+                        "required": ["path"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "write_file",
+                    "description": "Write content to a file in strategies or logs directory. Use with caution.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string", "description": "Relative path"},
+                            "content": {"type": "string", "description": "Content to write"}
+                        },
+                        "required": ["path", "content"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "delete_entity",
+                    "description": "Delete a strategy or dataset.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "type": {"type": "string", "enum": ["strategy", "dataset"]},
+                            "id": {"type": "string", "description": "Name for strategy, ID for dataset"}
+                        },
+                        "required": ["type", "id"]
+                    }
+                }
             }
         ]
 
@@ -154,9 +214,9 @@ class AITools:
                 if not dataset:
                     available = [f"{d['symbol']} ({d['timeframe']})" for d in datasets]
                     return {"error": f"Dataset {symbol} {tf} not found. Available: {', '.join(available)}"}
-                
+
                 engine = BacktestEngine()
-                
+
                 try:
                     # Run backtest (synchronous for now, but in async func)
                     # Note: engine.run reads file, which is blocking, but it's fast enough for local or should be run in executor if needed.
@@ -170,6 +230,71 @@ class AITools:
                     }
                 except Exception as e:
                     return {"error": f"Backtest runtime error: {str(e)}"}
+
+            elif tool_name == "get_market_data":
+                symbol = args.get("symbol")
+                tf = args.get("timeframe")
+                datasets = self.metadata_store.list_datasets()
+                dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
+
+                if not dataset:
+                    return {"error": "Dataset not found"}
+
+                import pandas as pd
+                df = pd.read_parquet(dataset['file_path'])
+                head = df.head(10).to_dict(orient='records')
+                return {"data": head}
+
+            elif tool_name == "read_file":
+                path = args.get("path")
+                # Security Check
+                if ".." in path or path.startswith("/"):
+                    return {"error": "Invalid path"}
+
+                if not (path.startswith("strategies/") or path.startswith("logs/")):
+                    return {"error": "Access denied. Only strategies/ and logs/ allowed."}
+
+                if not os.path.exists(path):
+                    return {"error": "File not found"}
+
+                with open(path, "r") as f:
+                    return {"content": f.read()}
+
+            elif tool_name == "write_file":
+                path = args.get("path")
+                content = args.get("content")
+
+                # Security Check
+                if ".." in path or path.startswith("/"):
+                    return {"error": "Invalid path"}
+
+                if not (path.startswith("strategies/") or path.startswith("logs/")):
+                    return {"error": "Access denied. Only strategies/ and logs/ allowed."}
+
+                # Ensure directory exists
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+
+                with open(path, "w") as f:
+                    f.write(content)
+                return {"status": "success", "message": f"File {path} written."}
+
+            elif tool_name == "delete_entity":
+                type_ = args.get("type")
+                id_ = args.get("id")
+
+                if type_ == "strategy":
+                    try:
+                        self.strategy_loader.delete_strategy(id_)
+                        return {"status": "success", "message": f"Strategy {id_} deleted."}
+                    except Exception as e:
+                         return {"error": str(e)}
+
+                elif type_ == "dataset":
+                    try:
+                        self.metadata_store.delete_dataset(id_)
+                        return {"status": "success", "message": f"Dataset {id_} deleted."}
+                    except Exception as e:
+                         return {"error": str(e)}
             
             else:
                 return {"error": f"Tool '{tool_name}' not found."}

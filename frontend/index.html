@@ -7,16 +7,16 @@
     <title>QLM - QuantLogic Framework</title>
     <link rel="stylesheet" href="/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
 <body>
     <div id="app">
-        <aside class="sidebar-nav">
+        <aside class="sidebar-nav" id="sidebar">
             <div class="logo">
                 <i class="fa-solid fa-layer-group"></i> QLM
-                <small>QuantLogic</small>
             </div>
             <nav>
                 <button onclick="router.navigate('dashboard')" class="nav-btn" id="nav-dashboard">
@@ -31,36 +31,45 @@
                 <button onclick="router.navigate('backtest')" class="nav-btn" id="nav-backtest">
                     <i class="fa-solid fa-play"></i> Backtest
                 </button>
+                <button onclick="router.navigate('assistant')" class="nav-btn" id="nav-assistant">
+                    <i class="fa-solid fa-robot"></i> Assistant
+                </button>
                 <div style="flex:1"></div> <!-- Spacer -->
                 <button onclick="router.navigate('settings')" class="nav-btn" id="nav-settings">
                     <i class="fa-solid fa-cog"></i> Settings
                 </button>
             </nav>
             <div class="sidebar-footer">
-                Version 0.1.0 Beta
+                Version 1.1.0 Beta
             </div>
         </aside>
+
+        <!-- Mobile Header -->
+        <div class="mobile-header">
+            <div class="logo">
+                <i class="fa-solid fa-layer-group"></i> QLM
+            </div>
+            <button class="icon-btn" onclick="toggleSidebar()">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+        </div>
 
         <main id="main-content">
             <!-- Dashboard Page -->
             <div id="page-dashboard" class="page">
                 <header class="page-header">
                     <h2>Dashboard</h2>
-                    <span class="status-indicator online"><i class="fa-solid fa-circle"></i> System Online</span>
+                    <span class="status-indicator online"><i class="fa-solid fa-circle" style="color:var(--success-color)"></i> System Online</span>
                 </header>
 
-                <div class="dashboard-grid">
+                <div class="dashboard-grid" style="display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
                     <div class="card stat-card">
                         <h3>Active Strategies</h3>
-                        <div class="big-number">3</div>
+                        <div class="big-number">--</div>
                     </div>
                     <div class="card stat-card">
                         <h3>Datasets Available</h3>
-                        <div class="big-number">5</div>
-                    </div>
-                    <div class="card stat-card">
-                        <h3>Last Backtest</h3>
-                        <div class="big-number result-good">+12.5%</div>
+                        <div class="big-number">--</div>
                     </div>
                 </div>
 
@@ -71,14 +80,14 @@
             </div>
 
             <!-- Data Page -->
-            <div id="page-data" class="page" style="display:none">
+            <div id="page-data" class="page">
                 <header class="page-header">
                     <h2>Data Management</h2>
                 </header>
 
                 <div class="card">
                     <h3><i class="fa-solid fa-upload"></i> Upload New Dataset</h3>
-                    <div class="form-row">
+                    <div class="form-row" style="flex-wrap: wrap;">
                         <input type="file" id="upload-file" accept=".csv" class="file-input">
                         <input type="text" id="upload-symbol" placeholder="Symbol (e.g. XAUUSD)">
                         <input type="text" id="upload-tf" placeholder="Timeframe (e.g. 1H)">
@@ -90,72 +99,73 @@
                     <div class="card-header">
                         <h3>Available Datasets</h3>
                     </div>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Symbol</th>
-                                <th>Timeframe</th>
-                                <th>Start Date</th>
-                                <th>End Date</th>
-                                <th>Rows</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="data-table-body"></tbody>
-                    </table>
+                    <div style="overflow-x: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Timeframe</th>
+                                    <th>Start Date</th>
+                                    <th>End Date</th>
+                                    <th>Rows</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="data-table-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
             <!-- Strategies Page -->
-            <div id="page-strategies" class="page" style="display:none">
+            <div id="page-strategies" class="page">
                 <header class="page-header">
                     <h2>Strategy Editor</h2>
                 </header>
 
-                <div class="split-view">
-                    <div class="strategy-sidebar">
-                        <div class="sidebar-header">
-                            <h3>Files</h3>
+                <div class="split-view" style="display:flex; height: calc(100vh - 120px); gap: 1rem;">
+                    <div class="strategy-sidebar" style="width: 250px; display: flex; flex-direction: column;">
+                        <div class="sidebar-header" style="margin-bottom: 1rem; display: flex; justify-content: space-between;">
+                            <h3 style="margin:0">Files</h3>
                             <button
-                                onclick="currentStrategyCode=''; document.getElementById('strategy-name-input').value=''; if(editor) editor.setValue('# New Strategy');"
+                                onclick="createNewStrategy()"
                                 class="icon-btn" title="New Strategy">
                                 <i class="fa-solid fa-plus"></i>
                             </button>
                         </div>
-                        <ul id="strategy-list" class="file-list"></ul>
+                        <ul id="strategy-list" class="session-list"></ul>
                     </div>
 
-                    <div class="editor-area">
-                        <div class="editor-toolbar">
+                    <div class="editor-area" style="flex: 1; display: flex; flex-direction: column;">
+                        <div class="editor-toolbar" style="margin-bottom: 0.5rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
                             <div class="toolbar-group">
-                                <select id="template-select" onchange="applyTemplate()" class="select-input">
+                                <select id="template-select" onchange="applyTemplate()" class="select-input" style="width: auto;">
                                     <option value="">-- Load Template --</option>
                                 </select>
                             </div>
-                            <div class="toolbar-group">
+                            <div class="toolbar-group" style="display: flex; gap: 0.5rem;">
                                 <input type="text" id="strategy-name-input" placeholder="Strategy Name"
-                                    class="text-input">
-                                <button onclick="validateStrategy()" class="icon-btn" title="Validate Code"
-                                    style="color:var(--success-color); border: 1px solid var(--border-color); margin-right: 0.5rem;">
+                                    class="text-input" style="width: 200px;">
+                                <button onclick="validateStrategy()" class="icon-btn" title="Validate Code">
                                     <i class="fa-solid fa-check-double"></i> Validate
                                 </button>
                                 <button onclick="saveStrategy()" class="primary-btn"><i class="fa-solid fa-save"></i>
                                     Save</button>
                             </div>
                         </div>
-                        <div id="editor-container"></div>
+                        <div id="editor-container" style="flex:1; border: 1px solid var(--card-border);"></div>
                         <textarea id="strategy-editor-fallback" style="display:none"></textarea>
                     </div>
                 </div>
             </div>
 
             <!-- Backtest Page -->
-            <div id="page-backtest" class="page" style="display:none">
+            <div id="page-backtest" class="page">
                 <header class="page-header">
                     <h2>Backtest Runner</h2>
                 </header>
 
-                <div class="config-grid">
+                <div class="config-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
                     <div class="card">
                         <h3>Configuration</h3>
                         <div class="form-group">
@@ -166,28 +176,52 @@
                             <label>Strategy</label>
                             <select id="bt-strategy" class="full-width"></select>
                         </div>
-                        <button onclick="runBacktest()" class="primary-btn full-width limit-btn"><i
+                        <button onclick="runBacktest()" class="primary-btn full-width limit-btn" style="width:100%"><i
                                 class="fa-solid fa-play"></i> Run Backtest</button>
                     </div>
 
                     <div class="card">
                         <h3>Status</h3>
                         <div class="progress-wrapper">
-                            <div class="progress-container">
-                                <div id="bt-progress-bar" class="progress-bar"></div>
+                            <div class="progress-container" style="background: rgba(0,0,0,0.3); height: 10px; border-radius: 5px; overflow: hidden; margin-bottom: 0.5rem;">
+                                <div id="bt-progress-bar" class="progress-bar" style="width: 0%; height: 100%; background: var(--accent-color); transition: width 0.3s;"></div>
                             </div>
-                            <div id="bt-status" class="status-text">Ready to start</div>
+                            <div id="bt-status" class="status-text" style="font-size: 0.9rem;">Ready to start</div>
                         </div>
                     </div>
                 </div>
 
-                <div id="bt-results" class="results-area">
+                <div id="bt-results" class="results-area" style="margin-top: 2rem;">
                     <!-- Results injected here -->
                 </div>
             </div>
 
+            <!-- Assistant Page (New) -->
+            <div id="page-assistant" class="page">
+                <header class="page-header">
+                    <h2>AI Assistant</h2>
+                    <button onclick="newSession()" class="primary-btn"><i class="fa-solid fa-plus"></i> New Chat</button>
+                </header>
+
+                <div class="ai-layout">
+                    <div class="ai-sidebar">
+                         <h3>Sessions</h3>
+                         <ul id="session-list" class="session-list"></ul>
+                    </div>
+                    <div class="ai-main">
+                        <div id="chat-container" class="chat-container">
+                            <!-- Messages -->
+                        </div>
+                        <div class="chat-input-wrapper">
+                            <input type="text" id="ai-input" placeholder="Ask anything about strategies, data, or code..." autocomplete="off">
+                            <button id="ai-send-btn" class="primary-btn"><i class="fa-solid fa-paper-plane"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Settings Page -->
-            <div id="page-settings" class="page" style="display:none">
+            <div id="page-settings" class="page">
                 <header class="page-header">
                     <h2>Settings</h2>
                 </header>
@@ -228,27 +262,6 @@
                 </div>
             </div>
         </main>
-    </div>
-    <!-- AI Chat Interface -->
-    <button class="chat-toggle-btn" id="chatToggle" title="Ask AI Agent">
-        <i class="fas fa-robot"></i>
-    </button>
-
-    <div id="ai-chat-panel">
-        <div class="chat-header">
-            <h3><span class="ai-status-dot"></span> QLM Assistant</h3>
-            <button class="icon-btn" id="closeChat"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="chat-history" id="chatHistory">
-            <div class="chat-message ai">
-                Hello! I am your Quantitative Trading Assistant. I can help you create strategies, run backtests, or
-                analyze performance. How can I help?
-            </div>
-        </div>
-        <div class="chat-input-area">
-            <input type="text" id="chatInput" class="full-width" placeholder="Type a message..." autocomplete="off">
-            <button class="primary-btn" id="sendMessage"><i class="fas fa-paper-plane"></i></button>
-        </div>
     </div>
 
     <script src="/js/app.js"></script>
