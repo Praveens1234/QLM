@@ -1,49 +1,60 @@
 # 🚀 QuantLogic Framework (QLM)
 
 ![QLM Banner](https://img.shields.io/badge/Status-Beta-blue?style=for-the-badge)
-![Python](https://img.shields.io/badge/Python-3.9%2B-yellow?style=for-the-badge)
+![Python](https://img.shields.io/badge/Python-3.12%2B-yellow?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+![AI-Powered](https://img.shields.io/badge/AI-Agentic-purple?style=for-the-badge)
 
-**QuantLogic Framework (QLM)** is a high-performance, modular algorithmic trading backtesting engine built for quantitative researchers and traders. It provides a seamless workflow from **Data Ingestion** to **Strategy Development**, **Validation**, and **Backtesting**.
+**QuantLogic Framework (QLM)** is an institutional-grade algorithmic trading platform designed for quantitative researchers. It integrates a high-performance **Event-Driven Backtester** with an autonomous **AI Research Agent** capable of self-healing, multi-step reasoning, and full strategy lifecycle management.
 
 ---
 
-## ✨ Features
+## 📸 Interface Preview
 
-### 📊 Data Management
-- **Universal Ingestion**: Supports CSV uploads with automatic parsing.
-- **Parquet Storage**: Optimized for speed and compression.
-- **Metadata Tracking**: Keeps track of symbols, timeframes, and date ranges.
+| **Dashboard** | **AI Architect** |
+|:---:|:---:|
+| <img src="public/screenshots/01_dashboard.png" width="400" /> | <img src="public/screenshots/05_ai_assistant.png" width="400" /> |
 
-### 🧠 Strategy Engine
-- **Class-Based API**: Define strategies using a clean, object-oriented Python interface.
-- **Vectorized Indicators**: Built on `pandas` and `numpy` for lightning-fast calculations.
-- **Risk Management**: Integrated SL/TP logic and Position Sizing.
-- **New! Runtime Validator**:
-    - **Syntax Check**: Ensures your code is valid Python.
-    - **Security Sandbox**: Blocks dangerous imports (`os`, `sys`).
-    - **Interface Compliance**: Verifies required methods.
-    - **Runtime Simulation**: Dry-runs your strategy against dummy data to catch logic errors *before* backtesting.
+| **Strategy Lab** | **Backtest Runner** |
+|:---:|:---:|
+| <img src="public/screenshots/03_strategy_lab.png" width="400" /> | <img src="public/screenshots/04_backtest_runner.png" width="400" /> |
 
-### ⚡ Backtesting Core
-- **Event-Driven Execution**: Simulates realistic market conditions.
-- **Detailed Metrics**: Win Rate, Sharpe Ratio, Max Drawdown, Profit Factor.
-- **Visual Reports**: Interactive charts and trade logs.
+---
 
-### 🖥️ Modern UI
-- **Dashboard**: Real-time system status and quick stats.
-- **Strategy Editor**: Built-in Monaco Editor with syntax highlighting.
-- **Results Viewer**: Comprehensive analysis tools.
+## ✨ Key Features
+
+### 🧠 Agentic AI Core
+*   **ReAct "Brain" Architecture**: The AI reasons in loops (Thought -> Action -> Observation) to solve complex tasks.
+*   **Self-Healing Workflow**: If a tool fails (e.g., syntax error in generated code), the agent analyzes the stack trace and autonomously pushes a fix.
+*   **Context & Job Management**: Maintains awareness of long-running goals ("Create a mean reversion strategy for BTC") across multiple chat turns.
+*   **Auto-Coder**: Generates high-quality, bug-free Python strategies strictly adhering to the QLM interface.
+
+### 📊 Professional Data Management
+*   **Universal Ingestion**: Drag-and-drop CSV uploads with automatic parsing.
+*   **Parquet Storage**: High-performance columnar storage for million-row datasets.
+*   **Market Structure Analytics**: Built-in tools for Trend, Volatility (ATR), and Support/Resistance analysis.
+
+### ⚡ Institutional-Grade Backtesting
+*   **Event-Driven Engine**: Simulates realistic market conditions candle-by-candle.
+*   **Advanced Metrics**: Max Drawdown (Abs), Profit Factor, Sharpe Ratio, Expectancy.
+*   **Position Sizing**: Dynamic sizing logic embedded in strategies.
+*   **Vectorized & Loop Hybrid**: Optimized for both speed and complex logic.
+
+### 🖥️ "Financial Terminal" UI
+*   **Modern Design**: Dark-themed, Slate/Zinc aesthetics using **Tailwind CSS**.
+*   **Mobile Responsive**: Fully functional on desktop and mobile devices.
+*   **Real-Time Visualization**: WebSocket-powered progress bars and live "Thinking" status updates from the AI.
 
 ---
 
 ## 🛠️ Installation
 
 ### Prerequisites
-- Python 3.9+
-- Git
+*   Python 3.9+
+*   Git
 
-### Setup
+### Quick Start
+
 1.  **Clone the Repository**
     ```bash
     git clone https://github.com/Praveens1234/QLM.git
@@ -59,36 +70,32 @@
     ```bash
     python -m backend.main
     ```
-    The server will start at `http://localhost:8000`.
+    Access the terminal at `http://localhost:8000`.
 
 ---
 
 ## 🚀 Usage Guide
 
 ### 1. Ingest Data
-data is stored locally in the `data/` directory. Use the **Data** tab to upload CSV files.
-- **Format**: `Date, Open, High, Low, Close, Volume`
-- **Supported Timeframes**: M1, H1, D1, etc.
+Navigate to **Data Manager** and upload your OHLCV CSV files.
+*   **Format**: `Date, Open, High, Low, Close, Volume`
+*   **Processing**: auto-converted to Parquet for speed.
 
-### 2. Develop a Strategy
-Navigate to the **Strategies** tab.
-- Click **"+"** to create a new strategy.
-- Implement the required methods:
-    - `define_variables(df)`: Calculate indicators.
-    - `entry_long(df, vars)`: Return boolean Series for long signals.
-    - `entry_short(df, vars)`: Return boolean Series for short signals.
-    - `risk_model(df, vars)`: Define SL/TP levels.
-    - `exit(df, vars, trade)`: Custom exit logic.
+### 2. AI Architect
+Go to the **AI Assistant** tab.
+*   **Ask**: "Analyze XAUUSD 1H structure and write a Trend Following strategy."
+*   **Watch**: The "Status Pipeline" will show the agent analyzing data -> planning -> coding.
+*   **Auto-Fix**: If the code fails validation, the agent will see the error and fix it automatically.
 
-### 3. Validate Strategy
-Click the **"Validate"** button in the toolbar.
-- The system will run a **Runtime Simulation** to ensure your code is bug-free and ready for backtesting.
+### 3. Strategy Lab
+*   Review and edit the generated Python code.
+*   Click **"Validate"** to run a safety check and dry-run simulation.
+*   Click **"Save"** to version control your strategy.
 
-### 4. Run Backtest
-Go to the **Backtest** tab.
-- Select your **Dataset** and **Strategy**.
-- Click **"Run Backtest"**.
-- Analyze the results in the **Performance Report**.
+### 4. Backtest Runner
+*   Select your Dataset and Strategy.
+*   Click **"Run Simulation"**.
+*   View real-time progress and detailed performance metrics.
 
 ---
 
@@ -96,16 +103,17 @@ Go to the **Backtest** tab.
 
 ```
 QLM/
-├── backend/                # Core Application Logic
-│   ├── api/                # FastAPI Endpoints
-│   ├── core/               # Engine & Data Managers
+├── backend/                # FastAPI Application
+│   ├── ai/                 # AI Brain, Agent, Tools, Memory, Store
+│   ├── core/               # Backtest Engine, Strategy Interface
+│   ├── api/                # API Routes & WebSockets
 │   └── main.py             # Entry Point
 ├── frontend/               # UI Assets
-│   ├── css/                # Styles
-│   ├── js/                 # Dashboard Logic
-│   └── index.html          # Main Interface
+│   ├── css/                # Tailwind & Custom Styles
+│   ├── js/                 # App Logic
+│   └── index.html          # Single Page Application
 ├── strategies/             # User Strategies (Versioned)
-├── data/                   # Data Storage (GitIgnored)
+├── data/                   # Data Storage (Parquet/SQLite)
 └── requirements.txt        # Dependencies
 ```
 

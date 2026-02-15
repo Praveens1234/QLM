@@ -1,5 +1,25 @@
 {
-    "api_key": "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",
-    "base_url": "https://integrate.api.nvidia.com/v1",
-    "model": "z-ai/glm4.7"
+    "active_provider_id": "test_provider",
+    "active_model_id": "model-b",
+    "providers": [
+        {
+            "id": "default",
+            "name": "Default Provider",
+            "base_url": "https://integrate.api.nvidia.com/v1",
+            "api_key": "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",
+            "available_models": [
+                "minimaxai/minimax-m2.1"
+            ]
+        },
+        {
+            "id": "test_provider",
+            "name": "Test Provider",
+            "base_url": "http://test.com",
+            "api_key": "key123",
+            "available_models": [
+                "model-a",
+                "model-b"
+            ]
+        }
+    ]
 }

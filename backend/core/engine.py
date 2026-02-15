@@ -93,6 +93,9 @@ class BacktestEngine:
         sl_arr = risk.get('sl', pd.Series([np.nan]*n_rows)).fillna(np.nan).values
         tp_arr = risk.get('tp', pd.Series([np.nan]*n_rows)).fillna(np.nan).values
         
+        # Position Sizing
+        pos_sizes = strategy.position_size(df, vars_dict).fillna(1.0).values
+
         trades = []
         active_trade = None
         
@@ -171,10 +174,11 @@ class BacktestEngine:
                 
                 if exit_reason:
                     # Calculate PnL
+                    trade_size = active_trade.get('size', 1.0)
                     if active_trade['direction'] == 'long':
-                        trade_pnl = (exit_price - active_trade['entry_price'])
+                        trade_pnl = (exit_price - active_trade['entry_price']) * trade_size
                     else:
-                        trade_pnl = (active_trade['entry_price'] - exit_price)
+                        trade_pnl = (active_trade['entry_price'] - exit_price) * trade_size
                         
                     # 5. Format Timestamps for Output (24h UTC)
                     exit_dt = pd.to_datetime(current_time, unit='ns', utc=True)
@@ -208,7 +212,8 @@ class BacktestEngine:
                         "entry_price": close_p,
                         "direction": "long",
                         "sl": float(sl_arr[i]) if not np.isnan(sl_arr[i]) else None,
-                        "tp": float(tp_arr[i]) if not np.isnan(tp_arr[i]) else None
+                        "tp": float(tp_arr[i]) if not np.isnan(tp_arr[i]) else None,
+                        "size": float(pos_sizes[i]) if not np.isnan(pos_sizes[i]) else 1.0
                     }
                 elif sig_short[i]:
                     active_trade = {
@@ -216,7 +221,8 @@ class BacktestEngine:
                         "entry_price": close_p,
                         "direction": "short",
                         "sl": float(sl_arr[i]) if not np.isnan(sl_arr[i]) else None,
-                        "tp": float(tp_arr[i]) if not np.isnan(tp_arr[i]) else None
+                        "tp": float(tp_arr[i]) if not np.isnan(tp_arr[i]) else None,
+                        "size": float(pos_sizes[i]) if not np.isnan(pos_sizes[i]) else 1.0
                     }
         
         # Calculate Metrics

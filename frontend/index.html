@@ -1,257 +1,457 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QLM - QuantLogic Framework</title>
-    <link rel="stylesheet" href="/css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        },
+                        emerald: {
+                            500: '#10b981',
+                        },
+                        rose: {
+                            500: '#f43f5e',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Monaco -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/css/tailwind_custom.css">
 </head>
 
-<body>
-    <div id="app">
-        <aside class="sidebar-nav">
-            <div class="logo">
-                <i class="fa-solid fa-layer-group"></i> QLM
-                <small>QuantLogic</small>
-            </div>
-            <nav>
-                <button onclick="router.navigate('dashboard')" class="nav-btn" id="nav-dashboard">
-                    <i class="fa-solid fa-chart-line"></i> Dashboard
-                </button>
-                <button onclick="router.navigate('data')" class="nav-btn" id="nav-data">
-                    <i class="fa-solid fa-database"></i> Data
-                </button>
-                <button onclick="router.navigate('strategies')" class="nav-btn" id="nav-strategies">
-                    <i class="fa-solid fa-code"></i> Strategies
-                </button>
-                <button onclick="router.navigate('backtest')" class="nav-btn" id="nav-backtest">
-                    <i class="fa-solid fa-play"></i> Backtest
-                </button>
-                <div style="flex:1"></div> <!-- Spacer -->
-                <button onclick="router.navigate('settings')" class="nav-btn" id="nav-settings">
-                    <i class="fa-solid fa-cog"></i> Settings
-                </button>
-            </nav>
-            <div class="sidebar-footer">
-                Version 0.1.0 Beta
-            </div>
-        </aside>
+<body class="bg-slate-950 text-slate-100 h-screen w-screen overflow-hidden flex font-sans text-sm">
 
-        <main id="main-content">
-            <!-- Dashboard Page -->
-            <div id="page-dashboard" class="page">
-                <header class="page-header">
-                    <h2>Dashboard</h2>
-                    <span class="status-indicator online"><i class="fa-solid fa-circle"></i> System Online</span>
-                </header>
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between transition-transform duration-300 fixed md:relative z-50 h-full md:translate-x-0 -translate-x-full">
+        <!-- Header -->
+        <div class="p-6 border-b border-slate-800 flex items-center gap-3">
+            <div class="h-8 w-8 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-layer-group text-white text-xs"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight text-white leading-tight">QLM</h1>
+                <p class="text-[10px] text-slate-400 font-medium tracking-wide uppercase">QuantLogic</p>
+            </div>
+        </div>
 
-                <div class="dashboard-grid">
-                    <div class="card stat-card">
-                        <h3>Active Strategies</h3>
-                        <div class="big-number">3</div>
+        <!-- Navigation -->
+        <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+            <button onclick="router.navigate('dashboard')" id="nav-dashboard" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+                <i class="fa-solid fa-chart-line w-5 text-center group-hover:text-indigo-400 transition-colors"></i>
+                <span class="font-medium">Dashboard</span>
+            </button>
+
+            <button onclick="router.navigate('data')" id="nav-data" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+                <i class="fa-solid fa-database w-5 text-center group-hover:text-emerald-400 transition-colors"></i>
+                <span class="font-medium">Data Manager</span>
+            </button>
+
+            <button onclick="router.navigate('strategies')" id="nav-strategies" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+                <i class="fa-solid fa-code w-5 text-center group-hover:text-amber-400 transition-colors"></i>
+                <span class="font-medium">Strategy Lab</span>
+            </button>
+
+            <button onclick="router.navigate('backtest')" id="nav-backtest" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+                <i class="fa-solid fa-play w-5 text-center group-hover:text-rose-400 transition-colors"></i>
+                <span class="font-medium">Backtest Runner</span>
+            </button>
+
+            <button onclick="router.navigate('assistant')" id="nav-assistant" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all mt-6 border-t border-slate-800 pt-6">
+                <i class="fa-solid fa-robot w-5 text-center group-hover:text-cyan-400 transition-colors"></i>
+                <span class="font-medium">AI Assistant</span>
+                <span class="ml-auto bg-indigo-500/20 text-indigo-300 text-[10px] font-bold px-1.5 py-0.5 rounded">BETA</span>
+            </button>
+        </nav>
+
+        <!-- Footer -->
+        <div class="p-4 border-t border-slate-800">
+            <button onclick="router.navigate('settings')" id="nav-settings" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
+                <i class="fa-solid fa-cog w-5 text-center"></i>
+                <span>Settings</span>
+            </button>
+            <div class="mt-4 text-center text-[10px] text-slate-600 font-mono">
+                v1.2.0-beta
+            </div>
+        </div>
+    </aside>
+
+    <!-- Overlay for mobile -->
+    <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden md:hidden transition-opacity"></div>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 relative">
+
+        <!-- Mobile Header -->
+        <header class="md:hidden h-14 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
+            <div class="flex items-center gap-2">
+                <div class="h-6 w-6 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded flex items-center justify-center">
+                    <i class="fa-solid fa-layer-group text-white text-[10px]"></i>
+                </div>
+                <span class="font-bold text-white">QLM</span>
+            </div>
+            <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white p-2">
+                <i class="fa-solid fa-bars text-lg"></i>
+            </button>
+        </header>
+
+        <!-- Page Container -->
+        <div id="page-container" class="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 space-y-8 scroll-smooth">
+
+            <!-- Dashboard -->
+            <section id="page-dashboard" class="page hidden animate-fade-in space-y-8">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white tracking-tight">Dashboard</h2>
+                        <p class="text-slate-400 text-sm mt-1">System Overview & Status</p>
                     </div>
-                    <div class="card stat-card">
-                        <h3>Datasets Available</h3>
-                        <div class="big-number">5</div>
-                    </div>
-                    <div class="card stat-card">
-                        <h3>Last Backtest</h3>
-                        <div class="big-number result-good">+12.5%</div>
+                    <div class="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-medium border border-emerald-500/20">
+                        <span class="relative flex h-2 w-2">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        System Online
                     </div>
                 </div>
 
-                <div class="card welcome-card">
-                    <h3>Welcome to QuantLogic Framework</h3>
-                    <p>Select a module from the sidebar to begin your quantitative research.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Stat Card 1 -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors group">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-2 bg-indigo-500/10 rounded-lg text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                                <i class="fa-solid fa-code"></i>
+                            </div>
+                            <!-- Trend indicator (dummy) -->
+                            <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                <i class="fa-solid fa-arrow-trend-up"></i> +2
+                            </span>
+                        </div>
+                        <div class="text-3xl font-bold text-white stat-value" data-stat="strategies">--</div>
+                        <div class="text-xs text-slate-500 font-medium uppercase tracking-wide mt-1">Active Strategies</div>
+                    </div>
+
+                    <!-- Stat Card 2 -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors group">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-2 bg-emerald-500/10 rounded-lg text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                                <i class="fa-solid fa-database"></i>
+                            </div>
+                             <span class="text-xs font-mono text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">
+                                UPDATED
+                            </span>
+                        </div>
+                        <div class="text-3xl font-bold text-white stat-value" data-stat="datasets">--</div>
+                        <div class="text-xs text-slate-500 font-medium uppercase tracking-wide mt-1">Datasets Available</div>
+                    </div>
+
+                    <!-- Stat Card 3 -->
+                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors group">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-2 bg-amber-500/10 rounded-lg text-amber-400 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+                                <i class="fa-solid fa-play"></i>
+                            </div>
+                        </div>
+                        <div class="text-3xl font-bold text-white stat-value">Ready</div>
+                        <div class="text-xs text-slate-500 font-medium uppercase tracking-wide mt-1">Engine Status</div>
+                    </div>
+
+                     <!-- Stat Card 4 (Welcome) -->
+                     <div class="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-5 text-white flex flex-col justify-center items-start shadow-lg shadow-indigo-900/50 col-span-1 md:col-span-2 lg:col-span-1">
+                        <h3 class="font-bold text-lg mb-1">Welcome back!</h3>
+                        <p class="text-indigo-100 text-xs leading-relaxed mb-3">Ready to build your next alpha strategy?</p>
+                        <button onclick="router.navigate('strategies')" class="text-xs bg-white text-indigo-600 font-bold px-3 py-1.5 rounded hover:bg-indigo-50 transition-colors w-full text-center">
+                            Open Lab
+                        </button>
+                    </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- Data Page -->
-            <div id="page-data" class="page" style="display:none">
-                <header class="page-header">
-                    <h2>Data Management</h2>
-                </header>
-
-                <div class="card">
-                    <h3><i class="fa-solid fa-upload"></i> Upload New Dataset</h3>
-                    <div class="form-row">
-                        <input type="file" id="upload-file" accept=".csv" class="file-input">
-                        <input type="text" id="upload-symbol" placeholder="Symbol (e.g. XAUUSD)">
-                        <input type="text" id="upload-tf" placeholder="Timeframe (e.g. 1H)">
-                        <button onclick="uploadDataset()" class="primary-btn">Upload</button>
+            <!-- Data Manager -->
+            <section id="page-data" class="page hidden animate-fade-in space-y-6">
+                 <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white tracking-tight">Data Manager</h2>
+                        <p class="text-slate-400 text-sm mt-1">Manage historical datasets (CSV/Parquet)</p>
                     </div>
                 </div>
 
-                <div class="card no-padding">
-                    <div class="card-header">
-                        <h3>Available Datasets</h3>
+                <!-- Upload Card -->
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-upload text-indigo-400"></i> Import Dataset
+                    </h3>
+                    <div class="flex flex-col md:flex-row gap-4 items-end">
+                        <div class="flex-1 w-full">
+                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">CSV File</label>
+                            <input type="file" id="upload-file" accept=".csv" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-indigo-400 hover:file:bg-slate-700 cursor-pointer border border-slate-700 rounded-lg bg-slate-950 focus:outline-none focus:border-indigo-500 transition-colors">
+                        </div>
+                        <div class="w-full md:w-48">
+                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Symbol</label>
+                            <input type="text" id="upload-symbol" placeholder="e.g. BTCUSD" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono">
+                        </div>
+                        <div class="w-full md:w-32">
+                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Timeframe</label>
+                            <input type="text" id="upload-tf" placeholder="e.g. 1H" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono">
+                        </div>
+                        <button onclick="uploadDataset()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-6 py-2 rounded-lg transition-colors shadow-lg shadow-indigo-900/20 text-sm flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-plus"></i> Upload
+                        </button>
                     </div>
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Symbol</th>
-                                <th>Timeframe</th>
-                                <th>Start Date</th>
-                                <th>End Date</th>
-                                <th>Rows</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="data-table-body"></tbody>
-                    </table>
                 </div>
-            </div>
 
-            <!-- Strategies Page -->
-            <div id="page-strategies" class="page" style="display:none">
-                <header class="page-header">
-                    <h2>Strategy Editor</h2>
-                </header>
+                <!-- Table -->
+                <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                        <h3 class="text-sm font-semibold text-white">Available Datasets</h3>
+                        <button onclick="loadDatasets()" class="text-slate-500 hover:text-white transition-colors text-xs"><i class="fa-solid fa-refresh"></i></button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-400">
+                            <thead class="bg-slate-950 text-xs uppercase font-medium text-slate-500">
+                                <tr>
+                                    <th class="px-6 py-3">Symbol</th>
+                                    <th class="px-6 py-3">Timeframe</th>
+                                    <th class="px-6 py-3">Range</th>
+                                    <th class="px-6 py-3 text-right">Rows</th>
+                                    <th class="px-6 py-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="data-table-body" class="divide-y divide-slate-800">
+                                <!-- Dynamic Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
 
-                <div class="split-view">
-                    <div class="strategy-sidebar">
-                        <div class="sidebar-header">
-                            <h3>Files</h3>
-                            <button
-                                onclick="currentStrategyCode=''; document.getElementById('strategy-name-input').value=''; if(editor) editor.setValue('# New Strategy');"
-                                class="icon-btn" title="New Strategy">
-                                <i class="fa-solid fa-plus"></i>
+            <!-- Strategy Editor -->
+            <section id="page-strategies" class="page hidden animate-fade-in h-[calc(100vh-8rem)] flex flex-col">
+                <div class="flex items-center justify-between mb-4 flex-shrink-0">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white tracking-tight">Strategy Lab</h2>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="validateStrategy()" class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                            <i class="fa-solid fa-check-double"></i> Validate
+                        </button>
+                        <button onclick="saveStrategy()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-indigo-900/20 flex items-center gap-2">
+                            <i class="fa-solid fa-save"></i> Save
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex-1 flex gap-4 overflow-hidden min-h-0">
+                    <!-- Sidebar List -->
+                    <div class="w-64 flex-shrink-0 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                        <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Files</span>
+                            <button onclick="createNewStrategy()" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition-colors" title="New Strategy">
+                                <i class="fa-solid fa-plus text-xs"></i>
                             </button>
                         </div>
-                        <ul id="strategy-list" class="file-list"></ul>
+                        <div class="flex-1 overflow-y-auto p-2 space-y-1" id="strategy-list">
+                            <!-- Items -->
+                        </div>
                     </div>
 
-                    <div class="editor-area">
-                        <div class="editor-toolbar">
-                            <div class="toolbar-group">
-                                <select id="template-select" onchange="applyTemplate()" class="select-input">
-                                    <option value="">-- Load Template --</option>
-                                </select>
+                    <!-- Editor Area -->
+                    <div class="flex-1 flex flex-col gap-2 min-w-0">
+                        <!-- Toolbar -->
+                        <div class="flex gap-2 items-center">
+                             <div class="relative flex-1">
+                                <i class="fa-solid fa-pen absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                                <input type="text" id="strategy-name-input" placeholder="StrategyName" class="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none font-mono">
+                             </div>
+                             <select id="template-select" onchange="applyTemplate()" class="bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5">
+                                <option value="">Load Template...</option>
+                            </select>
+                        </div>
+
+                        <!-- Monaco Container -->
+                        <div id="editor-container" class="flex-1 border border-slate-800 rounded-xl bg-[#1e1e1e] overflow-hidden shadow-inner"></div>
+                        <textarea id="strategy-editor-fallback" class="hidden"></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Backtest Runner -->
+            <section id="page-backtest" class="page hidden animate-fade-in space-y-6">
+                 <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white tracking-tight">Backtest Runner</h2>
+                        <p class="text-slate-400 text-sm mt-1">Simulate strategies on historical data</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Config -->
+                    <div class="lg:col-span-1 space-y-6">
+                         <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+                            <h3 class="text-sm font-semibold text-white uppercase tracking-wide border-b border-slate-800 pb-2 mb-2">Configuration</h3>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Dataset</label>
+                                <select id="bt-dataset" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"></select>
                             </div>
-                            <div class="toolbar-group">
-                                <input type="text" id="strategy-name-input" placeholder="Strategy Name"
-                                    class="text-input">
-                                <button onclick="validateStrategy()" class="icon-btn" title="Validate Code"
-                                    style="color:var(--success-color); border: 1px solid var(--border-color); margin-right: 0.5rem;">
-                                    <i class="fa-solid fa-check-double"></i> Validate
-                                </button>
-                                <button onclick="saveStrategy()" class="primary-btn"><i class="fa-solid fa-save"></i>
-                                    Save</button>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Strategy</label>
+                                <select id="bt-strategy" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"></select>
+                            </div>
+
+                            <button onclick="runBacktest()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2 mt-4">
+                                <i class="fa-solid fa-rocket"></i> Run Simulation
+                            </button>
+                         </div>
+
+                         <!-- Status -->
+                         <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="text-xs font-semibold text-slate-500 uppercase">Status</h3>
+                                <span id="bt-status-badge" class="hidden bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold">RUNNING</span>
+                            </div>
+
+                            <div class="w-full bg-slate-800 rounded-full h-2.5 mb-2 overflow-hidden">
+                              <div id="bt-progress-bar" class="bg-indigo-500 h-2.5 rounded-full transition-all duration-300 w-0 progress-bar-striped"></div>
+                            </div>
+                            <p id="bt-status" class="text-xs text-slate-400 font-mono text-right">Ready</p>
+                         </div>
+                    </div>
+
+                    <!-- Results -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <div id="bt-results" class="space-y-6">
+                            <!-- Placeholder -->
+                            <div class="h-64 border-2 border-dashed border-slate-800 rounded-xl flex flex-col items-center justify-center text-slate-600">
+                                <i class="fa-solid fa-chart-area text-4xl mb-4 opacity-50"></i>
+                                <span class="text-sm font-medium">No backtest results yet</span>
                             </div>
                         </div>
-                        <div id="editor-container"></div>
-                        <textarea id="strategy-editor-fallback" style="display:none"></textarea>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- Backtest Page -->
-            <div id="page-backtest" class="page" style="display:none">
-                <header class="page-header">
-                    <h2>Backtest Runner</h2>
-                </header>
+            <!-- AI Assistant -->
+            <section id="page-assistant" class="page hidden animate-fade-in h-[calc(100vh-8rem)] flex gap-6">
+                 <!-- Sessions Sidebar -->
+                 <div class="w-64 flex-shrink-0 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hidden md:flex">
+                    <div class="p-4 border-b border-slate-800">
+                        <button onclick="newSession()" class="w-full bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-600/20 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-plus"></i> New Chat
+                        </button>
+                    </div>
+                    <ul id="session-list" class="flex-1 overflow-y-auto p-2 space-y-1"></ul>
+                 </div>
 
-                <div class="config-grid">
-                    <div class="card">
-                        <h3>Configuration</h3>
-                        <div class="form-group">
-                            <label>Dataset</label>
-                            <select id="bt-dataset" class="full-width"></select>
+                 <!-- Chat Area -->
+                 <div class="flex-1 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl relative">
+                    <!-- Chat Header -->
+                    <div class="h-14 border-b border-slate-800 flex items-center px-6 justify-between bg-slate-900/50 backdrop-blur z-10">
+                        <div class="flex items-center gap-2">
+                             <div class="h-2 w-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                             <span class="text-sm font-semibold text-white">QLM Assistant</span>
                         </div>
-                        <div class="form-group">
-                            <label>Strategy</label>
-                            <select id="bt-strategy" class="full-width"></select>
-                        </div>
-                        <button onclick="runBacktest()" class="primary-btn full-width limit-btn"><i
-                                class="fa-solid fa-play"></i> Run Backtest</button>
+                        <button class="md:hidden text-slate-400" onclick="alert('Session list on mobile coming soon')"><i class="fa-solid fa-history"></i></button>
                     </div>
 
-                    <div class="card">
-                        <h3>Status</h3>
-                        <div class="progress-wrapper">
-                            <div class="progress-container">
-                                <div id="bt-progress-bar" class="progress-bar"></div>
+                    <!-- Messages -->
+                    <div id="chat-container" class="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth">
+                        <!-- Messages go here -->
+                         <div class="flex justify-start">
+                            <div class="max-w-[80%] rounded-2xl rounded-tl-none bg-slate-800 border border-slate-700 p-4 text-sm text-slate-300">
+                                <p>Hello! I am your Quantitative Trading Assistant. I can help you create strategies, run backtests, or analyze performance. How can I help?</p>
                             </div>
-                            <div id="bt-status" class="status-text">Ready to start</div>
                         </div>
                     </div>
-                </div>
 
-                <div id="bt-results" class="results-area">
-                    <!-- Results injected here -->
-                </div>
-            </div>
-
-            <!-- Settings Page -->
-            <div id="page-settings" class="page" style="display:none">
-                <header class="page-header">
-                    <h2>Settings</h2>
-                </header>
-
-                <div class="card" style="max-width: 600px;">
-                    <h3>AI Configuration</h3>
-                    <div class="form-group">
-                        <label>OpenAI API Key (or compatible)</label>
-                        <input type="password" id="cfg-api-key" class="full-width" placeholder="sk-...">
-                    </div>
-                    <div class="form-group">
-                        <label>Base URL (Optional)</label>
-                        <div style="display:flex; gap:0.5rem;">
-                            <input type="text" id="cfg-base-url" class="full-width"
-                                placeholder="https://api.openai.com/v1">
-                            <button onclick="fetchModels()" class="icon-btn" title="Fetch Models"><i
-                                    class="fa-solid fa-sync"></i></button>
+                    <!-- Input -->
+                    <div class="p-4 border-t border-slate-800 bg-slate-900/80 backdrop-blur">
+                        <div class="flex gap-2 relative">
+                             <input type="text" id="ai-input" placeholder="Type your message..." autocomplete="off" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all pr-12 shadow-inner">
+                             <button id="ai-send-btn" class="absolute right-2 top-1.5 bottom-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg px-4 transition-colors flex items-center justify-center">
+                                <i class="fa-solid fa-paper-plane text-xs"></i>
+                             </button>
                         </div>
-                        <small style="color:var(--text-secondary)">Use http://localhost:1234/v1 for local LLMs</small>
                     </div>
-                    <div class="form-group">
-                        <label>Analysis Model</label>
-                        <div style="display:flex; gap:0.5rem;">
-                            <input type="text" id="cfg-model" class="full-width" placeholder="gpt-4-turbo"
-                                list="model-list">
-                            <datalist id="model-list">
-                                <option value="gpt-4-turbo"></option>
-                                <option value="gpt-3.5-turbo"></option>
-                                <option value="meta/llama-3-70b-instruct"></option>
-                                <option value="nvidia/nemotron-4-340b-instruct"></option>
-                            </datalist>
-                        </div>
-                        <small style="color:var(--text-secondary)">Type manually or fetch to populate list</small>
-                    </div>
-                    <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
-                        <button onclick="saveConfig()" class="primary-btn">Save Configuration</button>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
-    <!-- AI Chat Interface -->
-    <button class="chat-toggle-btn" id="chatToggle" title="Ask AI Agent">
-        <i class="fas fa-robot"></i>
-    </button>
+                 </div>
+            </section>
 
-    <div id="ai-chat-panel">
-        <div class="chat-header">
-            <h3><span class="ai-status-dot"></span> QLM Assistant</h3>
-            <button class="icon-btn" id="closeChat"><i class="fas fa-times"></i></button>
+            <!-- Settings -->
+            <section id="page-settings" class="page hidden animate-fade-in max-w-3xl mx-auto space-y-6">
+                 <h2 class="text-2xl font-bold text-white tracking-tight mb-6">AI Model Registry</h2>
+
+                 <!-- Active Selection -->
+                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-white border-b border-slate-800 pb-2 mb-4">Active Configuration</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Provider</label>
+                            <select id="active-provider" onchange="loadProviderModels(this.value)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Model</label>
+                            <select id="active-model" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"></select>
+                        </div>
+                    </div>
+                    <div class="flex justify-end pt-4">
+                        <button onclick="saveActiveConfig()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-lg text-sm">Apply Active</button>
+                    </div>
+                 </div>
+
+                 <!-- Add Provider -->
+                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-white border-b border-slate-800 pb-2 mb-4">Add New Provider</h3>
+                    <div class="grid grid-cols-1 gap-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <input type="text" id="new-prov-name" placeholder="Provider Name (e.g. NVIDIA)" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+                            <input type="text" id="new-prov-url" placeholder="Base URL" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+                        </div>
+                        <input type="password" id="new-prov-key" placeholder="API Key" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+                    </div>
+                    <div class="flex justify-end pt-4 gap-2">
+                        <button onclick="addProvider()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-lg text-sm">Add Provider</button>
+                    </div>
+                 </div>
+
+                 <!-- List Providers -->
+                 <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                    <div class="px-6 py-4 bg-slate-800/30 border-b border-slate-800">
+                        <h3 class="text-sm font-semibold text-white">Registered Providers</h3>
+                    </div>
+                    <ul id="provider-list" class="divide-y divide-slate-800 text-sm text-slate-400"></ul>
+                 </div>
+            </section>
+
         </div>
-        <div class="chat-history" id="chatHistory">
-            <div class="chat-message ai">
-                Hello! I am your Quantitative Trading Assistant. I can help you create strategies, run backtests, or
-                analyze performance. How can I help?
-            </div>
-        </div>
-        <div class="chat-input-area">
-            <input type="text" id="chatInput" class="full-width" placeholder="Type a message..." autocomplete="off">
-            <button class="primary-btn" id="sendMessage"><i class="fas fa-paper-plane"></i></button>
-        </div>
-    </div>
+    </main>
 
     <script src="/js/app.js"></script>
 </body>
-
 </html>

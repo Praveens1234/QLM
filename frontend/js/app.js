@@ -5,38 +5,54 @@ const WS_URL = `ws://${window.location.host}/api/ws`;
 let socket;
 let datasets = [];
 let strategies = [];
+let sessions = [];
+let currentSessionId = null;
 let currentStrategyCode = "";
 let editor; // Monaco instance
 
 // Router (Simple hash router)
 const router = {
     navigate: (page) => {
-        document.querySelectorAll('.page').forEach(el => el.style.display = 'none');
-        document.getElementById(`page-${page}`).style.display = 'block';
+        document.querySelectorAll('.page').forEach(el => {
+            el.classList.add('hidden');
+        });
+
+        const target = document.getElementById(`page-${page}`);
+        if(target) {
+            target.classList.remove('hidden');
+            target.classList.add('animate-fade-in');
+        }
+
         window.location.hash = page;
 
         // Update Nav Active State
-        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-        const activeBtn = document.getElementById(`nav-${page}`);
-        if (activeBtn) activeBtn.classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(btn => {
+            btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg', 'shadow-indigo-500/20');
+            btn.classList.add('text-slate-400', 'hover:bg-slate-800', 'hover:text-white');
+        });
 
+        const activeBtn = document.getElementById(`nav-${page}`);
+        if (activeBtn) {
+            activeBtn.classList.remove('text-slate-400', 'hover:bg-slate-800');
+            activeBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-lg', 'shadow-indigo-500/20');
+        }
+
+        // Close mobile sidebar if open
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        if (!sidebar.classList.contains('-translate-x-full')) {
+            toggleSidebar();
+        }
+
+        // Page specific loads
         if (page === 'dashboard') updateDashboardStats();
         if (page === 'data') loadDatasets();
         if (page === 'strategies') {
             loadStrategies();
-            // Ensure editor is visible before layout
-            setTimeout(() => {
-                if (editor) {
-                    editor.layout();
-                } else {
-                    // Try initializing if not yet done (failed lazy load?)
-                    // This is handled by window.onload but good to be safe.
-                    // A simple retry or just logging.
-                    console.log("Editor not ready yet on switch");
-                }
-            }, 200);
+            setTimeout(() => { if (editor) editor.layout(); }, 200);
         }
         if (page === 'backtest') loadBacktestOptions();
+        if (page === 'assistant') loadSessions();
     },
     init: () => {
         window.addEventListener('hashchange', () => router.navigate(window.location.hash.substring(1) || 'dashboard'));
@@ -44,96 +60,142 @@ const router = {
     }
 };
 
-async function saveConfig() {
-    const apiKey = document.getElementById('cfg-api-key').value.trim();
-    const model = document.getElementById('cfg-model').value.trim();
-    const baseUrl = document.getElementById('cfg-base-url').value.trim();
+// UI Toggles
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
 
-    if (!apiKey) {
-        alert("Please enter an API Key.");
+    sidebar.classList.toggle('-translate-x-full');
+    overlay.classList.toggle('hidden');
+}
+
+// AI Settings & Registry
+let providers = [];
+let activeConfig = {};
+
+async function loadProviders() {
+    try {
+        const res = await fetch(`${API_URL}/ai/config/providers`);
+        providers = await res.json();
+
+        // Render List
+        const list = document.getElementById('provider-list');
+        list.innerHTML = providers.map(p => `
+            <li class="px-6 py-3 flex justify-between items-center">
+                <div>
+                    <div class="font-medium text-slate-300">${p.name}</div>
+                    <div class="text-[10px] text-slate-500 font-mono">${p.base_url}</div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] ${p.has_key ? 'text-emerald-500' : 'text-rose-500'} bg-slate-800 px-2 py-0.5 rounded">
+                        ${p.has_key ? 'KEY SET' : 'NO KEY'}
+                    </span>
+                    <div class="text-xs text-slate-500">${p.models.length} Models</div>
+                </div>
+            </li>
+        `).join('');
+
+        // Populate Active Dropdown
+        const activeSelect = document.getElementById('active-provider');
+        activeSelect.innerHTML = `<option value="">Select Provider</option>` +
+            providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+        // Load Active Config
+        const confRes = await fetch(`${API_URL}/ai/config/active`);
+        activeConfig = await confRes.json();
+
+        if (activeConfig.base_url) { // infer provider by url matching or just select if active set
+             // Simple matching logic if provider_name is returned
+             if(activeConfig.provider_name) {
+                 // find id
+                 const p = providers.find(x => x.name === activeConfig.provider_name);
+                 if(p) {
+                     activeSelect.value = p.id;
+                     loadProviderModels(p.id, activeConfig.model);
+                 }
+             }
+        }
+    } catch (e) { console.error("Error loading providers", e); }
+}
+
+async function addProvider() {
+    const name = document.getElementById('new-prov-name').value;
+    const url = document.getElementById('new-prov-url').value;
+    const key = document.getElementById('new-prov-key').value;
+
+    if(!name || !url || !key) {
+        alert("Fill all fields");
         return;
     }
 
     try {
-        const payload = {
-            api_key: apiKey,
-            model: model,
-            base_url: baseUrl
-        };
-
-        const res = await fetch(`${API_URL}/ai/config`, {
+        await fetch(`${API_URL}/ai/config/providers`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name, base_url: url, api_key: key})
         });
 
-        const data = await res.json();
+        // Auto-fetch models
+        const provId = name.toLowerCase().replace(/ /g, "_");
+        // Reload list
+        await loadProviders();
+        // Trigger model fetch
+        alert("Provider added. Fetching models...");
+        await fetchModelsForProvider(provId);
+        await loadProviders(); // Reload with models
 
-        if (res.ok) {
-            alert(`Configuration Saved Successfully!`);
-        } else {
-            console.error("Config Error:", data);
-            alert(`Error saving config: ${data.detail}`);
-        }
-    } catch (e) {
-        console.error("Config Network Error:", e);
-        alert("Config save failed: " + e.message);
+        // Clear inputs
+        document.getElementById('new-prov-name').value = "";
+        document.getElementById('new-prov-url').value = "";
+        document.getElementById('new-prov-key').value = "";
+
+    } catch(e) {
+        alert("Error adding provider: " + e);
     }
 }
 
-async function fetchModels() {
-    // First save current connection args
-    const apiKey = document.getElementById('cfg-api-key').value.trim();
-    const baseUrl = document.getElementById('cfg-base-url').value.trim();
-
-    if (!apiKey) {
-        alert("Please enter API Key first.");
-        return;
-    }
-
+async function fetchModelsForProvider(providerId) {
     try {
-        // 1. Update Config on Server
-        await fetch(`${API_URL}/ai/config`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: apiKey, base_url: baseUrl, model: "" }) // Model empty for now
-        });
-
-        // 2. Fetch Models
-        const res = await fetch(`${API_URL}/ai/models`);
-        const data = await res.json();
-
-        if (data.models && data.models.length > 0) {
-            const dataList = document.getElementById('model-list');
-            dataList.innerHTML = ''; // Clear existing
-            data.models.forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m;
-                dataList.appendChild(opt);
-            });
-            alert(`Loaded ${data.models.length} models into suggestions.`);
-        } else {
-            alert("No models found via API. Please enter Model ID manually.");
-        }
+        await fetch(`${API_URL}/ai/config/models/${providerId}`);
     } catch (e) {
-        alert("Error fetching models: " + e + "\n\nPlease enter Model ID manually.");
+        console.error("Model fetch failed", e);
     }
 }
+
+function loadProviderModels(providerId, selectedModel = null) {
+    const provider = providers.find(p => p.id === providerId);
+    const modelSelect = document.getElementById('active-model');
+    modelSelect.innerHTML = "";
+
+    if (provider && provider.models) {
+        modelSelect.innerHTML = provider.models.map(m => `<option value="${m}">${m}</option>`).join('');
+        if (selectedModel) modelSelect.value = selectedModel;
+    }
+}
+
+async function saveActiveConfig() {
+    const pid = document.getElementById('active-provider').value;
+    const mid = document.getElementById('active-model').value;
+
+    await fetch(`${API_URL}/ai/config/active`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({provider_id: pid, model_id: mid})
+    });
+    alert("Active Configuration Updated!");
+}
+
 async function updateDashboardStats() {
-    // Simple verification stats - in real app would fetch from API
-    // We can infer some from loaded data if we have it, or fetch it.
-    // Let's just fetch counts to be accurate.
     try {
         const dRes = await fetch(`${API_URL}/data/`);
         const datasets = await dRes.json();
         const sRes = await fetch(`${API_URL}/strategies/`);
         const strategies = await sRes.json();
 
-        // Update DOM if elements exist (they should in new layout)
-        const cards = document.querySelectorAll('.stat-card .big-number');
+        const cards = document.querySelectorAll('.stat-value');
         if (cards.length >= 2) {
-            cards[0].innerText = strategies.length; // Active Strategies
-            cards[1].innerText = datasets.length;   // Datasets
+            cards[0].innerText = strategies.length;
+            cards[1].innerText = datasets.length;
         }
     } catch (e) { console.error("Stats error", e); }
 }
@@ -163,15 +225,26 @@ async function loadDatasets() {
 
 function renderDatasets() {
     const tbody = document.getElementById('data-table-body');
+    if (datasets.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-xs text-slate-500 uppercase tracking-wide">No Datasets Found</td></tr>`;
+        return;
+    }
     tbody.innerHTML = datasets.map(d => `
-        <tr>
-            <td>${d.symbol}</td>
-            <td>${d.timeframe}</td>
-            <td>${d.start_date}</td>
-            <td>${d.end_date}</td>
-            <td>${d.row_count}</td>
-            <td>
-                <button onclick="deleteDataset('${d.id}')">Delete</button>
+        <tr class="hover:bg-slate-800/50 transition-colors group">
+            <td class="px-6 py-4 font-mono font-medium text-white">${d.symbol}</td>
+            <td class="px-6 py-4">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                    ${d.timeframe}
+                </span>
+            </td>
+            <td class="px-6 py-4 text-xs text-slate-500 font-mono">
+                ${d.start_date.split('T')[0]} <span class="text-slate-600">to</span> ${d.end_date.split('T')[0]}
+            </td>
+            <td class="px-6 py-4 text-right text-xs text-slate-400 font-mono">${d.row_count.toLocaleString()}</td>
+            <td class="px-6 py-4 text-right">
+                <button onclick="deleteDataset('${d.id}')" class="text-slate-500 hover:text-rose-500 transition-colors p-1 opacity-0 group-hover:opacity-100">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
             </td>
         </tr>
     `).join('');
@@ -212,16 +285,32 @@ async function loadStrategies() {
     const res = await fetch(`${API_URL}/strategies/`);
     strategies = await res.json();
     const list = document.getElementById('strategy-list');
+
+    if (strategies.length === 0) {
+        list.innerHTML = `<div class="p-4 text-center text-xs text-slate-500">No strategies yet</div>`;
+        return;
+    }
+
     list.innerHTML = strategies.map(s => `
-        <li class="strategy-item" style="display:flex; justify-content:space-between; align-items:center;">
-            <span onclick="loadStrategyCode('${s.name}', ${s.latest_version})" style="flex:1; cursor:pointer;">
-                ${s.name} (v${s.latest_version})
-            </span>
-            <button onclick="deleteStrategy('${s.name}')" class="icon-btn" title="Delete Strategy" style="color:var(--danger-color); padding: 0.2rem 0.5rem;">
-                <i class="fa-solid fa-trash"></i>
+        <div class="group flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700" onclick="loadStrategyCode('${s.name}', ${s.latest_version})">
+            <div class="flex items-center gap-3 overflow-hidden">
+                <div class="h-8 w-8 rounded bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-xs font-mono font-bold border border-indigo-500/20">PY</div>
+                <div class="overflow-hidden">
+                    <h4 class="text-sm font-medium text-slate-200 truncate">${s.name}</h4>
+                    <p class="text-[10px] text-slate-500">v${s.latest_version}</p>
+                </div>
+            </div>
+            <button onclick="deleteStrategy('${s.name}'); event.stopPropagation();" class="text-slate-600 hover:text-rose-500 p-1.5 rounded transition-colors opacity-0 group-hover:opacity-100">
+                <i class="fa-solid fa-trash-can text-xs"></i>
             </button>
-        </li>
+        </div>
     `).join('');
+}
+
+function createNewStrategy() {
+    currentStrategyCode = "";
+    document.getElementById('strategy-name-input').value = "";
+    if (editor) editor.setValue("# New Strategy\n\nfrom backend.core.strategy import Strategy\n\nclass NewStrategy(Strategy):\n    pass");
 }
 
 async function deleteStrategy(name) {
@@ -230,13 +319,9 @@ async function deleteStrategy(name) {
     try {
         const res = await fetch(`${API_URL}/strategies/${name}`, { method: 'DELETE' });
         if (res.ok) {
-            alert(`Strategy '${name}' deleted successfully.`);
             loadStrategies();
-            // Clear editor if deleted strategy was open
             if (document.getElementById('strategy-name-input').value === name) {
-                currentStrategyCode = "";
-                document.getElementById('strategy-name-input').value = "";
-                if (editor) editor.setValue("# Select a strategy or create one");
+                createNewStrategy();
             }
         } else {
             const err = await res.json();
@@ -311,6 +396,12 @@ async function runBacktest() {
     document.getElementById('bt-progress-bar').style.width = '0%';
     document.getElementById('bt-status').innerText = "Starting...";
 
+    // Show badge
+    const badge = document.getElementById('bt-status-badge');
+    badge.classList.remove('hidden');
+    badge.innerText = "STARTING";
+    badge.className = "bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
+
     const res = await fetch(`${API_URL}/backtest/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -320,107 +411,139 @@ async function runBacktest() {
     if (!res.ok) {
         alert("Backtest failed to start");
         document.getElementById('bt-status').innerText = "Failed";
+        badge.innerText = "FAILED";
+        badge.className = "bg-rose-500/10 text-rose-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
     }
 }
 
 function updateProgress(msg) {
-    if (msg.dataset_id !== document.getElementById('bt-dataset').value) return; // simple check
-
     const bar = document.getElementById('bt-progress-bar');
     const status = document.getElementById('bt-status');
+    const badge = document.getElementById('bt-status-badge');
 
     if (msg.type === 'progress') {
         bar.style.width = `${msg.progress}%`;
-        status.innerText = `${msg.message} (${msg.progress}%) - Time: ${msg.data.current_time}`;
+        status.innerText = `${msg.message} - ${msg.data.current_time}`;
+
+        badge.innerText = "RUNNING";
+        badge.className = "bg-indigo-500/10 text-indigo-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
+
     } else if (msg.type === 'finished') {
         bar.style.width = '100%';
         status.innerText = "Completed";
+        badge.innerText = "COMPLETED";
+        badge.className = "bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
+    } else if (msg.type === 'ai_status') {
+        renderAIStatus(msg);
     }
+}
+
+function renderAIStatus(msg) {
+    if (msg.session_id !== currentSessionId) return;
+
+    const container = document.getElementById('chat-container');
+    // Check if last element is a status indicator
+    let statusEl = document.getElementById('ai-status-indicator');
+
+    if (!statusEl) {
+        const div = document.createElement('div');
+        div.id = 'ai-status-indicator';
+        div.className = "flex w-full mb-4 justify-start";
+        div.innerHTML = `
+            <div class="max-w-[85%] p-3 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 text-xs flex items-center gap-3 animate-pulse">
+                <i class="fa-solid fa-circle-notch fa-spin text-indigo-500"></i>
+                <div class="flex flex-col">
+                    <span class="font-bold uppercase tracking-wide text-[10px] text-indigo-400" id="ai-status-step">Thinking</span>
+                    <span id="ai-status-detail">Processing...</span>
+                </div>
+            </div>
+        `;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        statusEl = div;
+    }
+
+    document.getElementById('ai-status-step').innerText = msg.step;
+    document.getElementById('ai-status-detail').innerText = msg.detail;
 }
 
 function renderResults(results) {
     const container = document.getElementById('bt-results');
     const m = results.metrics;
+
+    const pnlColor = m.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400';
+
     container.innerHTML = `
-        <div class="card no-padding" style="margin-bottom: 2rem;">
-            <div class="card-header">
-                <h3>Performance Metrics</h3>
-            </div>
-            <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); padding: 1.5rem; gap: 1rem; margin: 0;">
-                <div class="metric-item">
-                    <small>Net Profit</small>
-                    <div class="big-number" style="color:${m.net_profit >= 0 ? 'var(--success-color)' : 'var(--danger-color)'}">${m.net_profit}</div>
-                </div>
-                <div class="metric-item">
-                    <small>Total Trades</small>
-                    <div class="big-number">${m.total_trades}</div>
-                </div>
-                <div class="metric-item">
-                    <small>Win Rate</small>
-                    <div class="big-number">${m.win_rate}%</div>
-                </div>
-                <div class="metric-item">
-                    <small>Profit Factor</small>
-                    <div class="big-number">${m.profit_factor}</div>
-                </div>
-                <div class="metric-item">
-                    <small>Max Drawdown</small>
-                    <div class="big-number" style="color:var(--danger-color)">${m.max_drawdown} (${m.max_drawdown_pct}%)</div>
-                </div>
-                <div class="metric-item">
-                    <small>Avg Duration</small>
-                    <div class="big-number">${m.avg_duration} m</div>
-                </div>
-            </div>
+        <!-- Metrics Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Net Profit</span>
+                <div class="text-xl font-bold ${pnlColor} mt-1">$${m.net_profit}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Trades</span>
+                <div class="text-xl font-bold text-white mt-1">${m.total_trades}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Win Rate</span>
+                <div class="text-xl font-bold text-white mt-1">${m.win_rate}%</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Profit Factor</span>
+                <div class="text-xl font-bold text-white mt-1">${m.profit_factor}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Max DD</span>
+                <div class="text-xl font-bold text-rose-400 mt-1">$${m.max_drawdown}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Avg Duration</span>
+                <div class="text-xl font-bold text-white mt-1">${m.avg_duration}m</div>
+             </div>
         </div>
         
-        <div class="card no-padding">
-            <div class="card-header">
-                <h3>Trade Ledger</h3>
-            </div>
-            <div style="max-height: 500px; overflow-y: auto;">
-                <table class="data-table">
-                    <thead style="position: sticky; top: 0; background: var(--card-bg); z-index: 1;">
+        <!-- Trade Ledger -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+             <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+                <h3 class="text-sm font-semibold text-white">Trade Ledger</h3>
+             </div>
+             <div class="overflow-x-auto max-h-[400px]">
+                <table class="w-full text-left text-sm text-slate-400">
+                    <thead class="bg-slate-950 text-xs uppercase font-medium text-slate-500 sticky top-0">
                         <tr>
-                            <th>Entry Time (UTC)</th>
-                            <th>Dir</th>
-                            <th>Entry</th>
-                            <th>SL</th>
-                            <th>TP</th>
-                            <th>Exit Time (UTC)</th>
-                            <th>Exit</th>
-                            <th>PnL</th>
-                            <th>Duration</th>
-                            <th>Status/Reason</th>
+                            <th class="px-6 py-3">Entry Time (UTC)</th>
+                            <th class="px-6 py-3">Dir</th>
+                            <th class="px-6 py-3">Size</th>
+                            <th class="px-6 py-3 text-right">Entry</th>
+                            <th class="px-6 py-3">Exit Time (UTC)</th>
+                            <th class="px-6 py-3 text-right">Exit</th>
+                            <th class="px-6 py-3 text-right">PnL</th>
+                            <th class="px-6 py-3 text-right">Reason</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="divide-y divide-slate-800 font-mono">
                         ${results.trades.map(t => {
-        const pnlClass = t.pnl >= 0 ? 'pnl-green' : 'pnl-red';
-        const pnlFormatted = t.pnl.toFixed(2);
-        const slDisplay = t.sl ? t.sl.toFixed(2) : '-';
-        const tpDisplay = t.tp ? t.tp.toFixed(2) : '-';
+                            const pnlClass = t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                            const dirClass = t.direction === 'long' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20';
 
-        return `
-                            <tr>
-                                <td>${t.entry_time}</td>
-                                <td><span class="badge ${t.direction}">${t.direction.toUpperCase()}</span></td>
-                                <td>${t.entry_price.toFixed(2)}</td>
-                                <td style="color:var(--danger-color); opacity:0.8;">${slDisplay}</td>
-                                <td style="color:var(--success-color); opacity:0.8;">${tpDisplay}</td>
-                                <td>${t.exit_time}</td>
-                                <td>${t.exit_price.toFixed(2)}</td>
-                                <td class="${pnlClass}">
-                                    <b>${t.pnl > 0 ? '+' : ''}${pnlFormatted}</b>
+                            return `
+                            <tr class="hover:bg-slate-800/50 transition-colors">
+                                <td class="px-6 py-3 text-xs">${t.entry_time}</td>
+                                <td class="px-6 py-3">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${dirClass}">${t.direction}</span>
                                 </td>
-                                <td>${t.duration} m</td>
-                                <td>${t.exit_reason}</td>
+                                <td class="px-6 py-3 text-xs">${t.size ? t.size.toFixed(2) : '1.00'}</td>
+                                <td class="px-6 py-3 text-right text-xs text-white">${t.entry_price.toFixed(2)}</td>
+                                <td class="px-6 py-3 text-xs">${t.exit_time}</td>
+                                <td class="px-6 py-3 text-right text-xs text-white">${t.exit_price.toFixed(2)}</td>
+                                <td class="px-6 py-3 text-right font-bold ${pnlClass}">${t.pnl.toFixed(2)}</td>
+                                <td class="px-6 py-3 text-right text-xs">${t.exit_reason}</td>
                             </tr>
                             `;
-    }).join('')}
+                        }).join('')}
                     </tbody>
                 </table>
-            </div>
+             </div>
         </div>
     `;
 }
@@ -430,7 +553,7 @@ async function loadTemplates() {
     const res = await fetch(`${API_URL}/strategies/templates/list`);
     const templates = await res.json();
     const select = document.getElementById('template-select');
-    select.innerHTML = `<option value="">-- Load Template --</option>` +
+    select.innerHTML = `<option value="">Load Template...</option>` +
         templates.map(t => `<option value="${t}">${t.toUpperCase()}</option>`).join('');
 }
 
@@ -443,118 +566,201 @@ async function applyTemplate() {
     const res = await fetch(`${API_URL}/strategies/templates/${name}`);
     const data = await res.json();
 
-    // Rename class to avoid conflict? Or user does it.
-    // For now just load it.
     if (editor) editor.setValue(data.code);
     else document.getElementById('strategy-editor-fallback').value = data.code;
 
-    // Auto-fill name
     document.getElementById('strategy-name-input').value = `${name.toUpperCase()}_Strategy`;
 }
 
-// AI Chat Logic
-function initChat() {
-    const chatToggle = document.getElementById('chatToggle');
-    const closeChat = document.getElementById('closeChat');
-    const chatPanel = document.getElementById('ai-chat-panel');
-    const chatInput = document.getElementById('chatInput');
-    const sendMessageBtn = document.getElementById('sendMessage');
-    const chatHistory = document.getElementById('chatHistory');
+// AI Assistant Logic (Persistent Sessions)
+async function loadSessions() {
+    try {
+        const res = await fetch(`${API_URL}/ai/sessions`);
+        sessions = await res.json();
+        renderSessions();
 
-    if (!chatToggle || !chatPanel) return;
-
-    function toggleChat() {
-        const isVisible = chatPanel.classList.contains('visible');
-        if (isVisible) {
-            chatPanel.classList.remove('visible');
-            chatToggle.classList.remove('open');
-        } else {
-            chatPanel.classList.add('visible');
-            chatToggle.classList.add('open');
-            chatInput.focus();
+        // Load first session if exists and none selected
+        if (!currentSessionId && sessions.length > 0) {
+            loadSession(sessions[0].id);
+        } else if (currentSessionId) {
+             // ensure active class
+             renderSessions();
         }
+    } catch (e) {
+        console.error("Failed to load sessions", e);
     }
-
-    chatToggle.addEventListener('click', toggleChat);
-    closeChat.addEventListener('click', toggleChat);
-
-    async function sendChatMessage() {
-        const message = chatInput.value.trim();
-        if (!message) return;
-
-        appendMessage('user', message);
-        chatInput.value = '';
-
-        // Show typing indicator
-        const typingId = appendMessage('ai', '<i class="fas fa-ellipsis-h fa-fade"></i>');
-
-        try {
-            const res = await fetch(`${API_URL}/ai/chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: message })
-            });
-            const data = await res.json();
-
-            // Remove typing indicator
-            const typingEl = document.getElementById(typingId);
-            if (typingEl) typingEl.remove();
-
-            if (res.ok) {
-                appendMessage('ai', data.response);
-            } else {
-                appendMessage('ai', `Error: ${data.detail || 'Failed to get response'}`);
-            }
-        } catch (err) {
-            // Remove typing indicator
-            const typingEl = document.getElementById(typingId);
-            if (typingEl) typingEl.remove();
-
-            appendMessage('ai', `Connection Error: ${err.message}`);
-        }
-    }
-
-    function appendMessage(role, text) {
-        const msgDiv = document.createElement('div');
-        const id = 'msg-' + Date.now();
-        msgDiv.id = id;
-        msgDiv.className = `chat-message ${role}`;
-
-        // Basic Markdown Support
-        // 1. Code blocks
-        text = text.replace(/```python([\s\S]*?)```/g, '<pre><code class="language-python">$1</code></pre>');
-        text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-
-        // 2. Bold / Italic
-        text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-        // 3. Newlines to breaks (if not in pre)
-        // Simple hack: if it contains <pre>, don't replace newlines globally securely. 
-        // For now, let's just do simple replacement for non-code parts.
-        // Or executing strategy?
-
-        msgDiv.innerHTML = text; // Warning: InnerHTML usage. In prod use DOMPurify.
-
-        chatHistory.appendChild(msgDiv);
-        chatHistory.scrollTop = chatHistory.scrollHeight;
-        return id;
-    }
-
-    sendMessageBtn.addEventListener('click', sendChatMessage);
-    chatInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendChatMessage();
-    });
 }
+
+function renderSessions() {
+    const list = document.getElementById('session-list');
+    list.innerHTML = sessions.map(s => `
+        <li class="flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors text-sm ${s.id === currentSessionId ? 'bg-indigo-600/10 text-indigo-400 font-medium' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}" onclick="loadSession('${s.id}')">
+            <span class="truncate pr-2">${s.title}</span>
+            <button onclick="deleteSession('${s.id}'); event.stopPropagation()" class="text-slate-600 hover:text-rose-500 p-1 rounded opacity-60 hover:opacity-100">
+                <i class="fa-solid fa-times text-xs"></i>
+            </button>
+        </li>
+    `).join('');
+}
+
+async function newSession() {
+    const title = prompt("Session Title:", "New Analysis");
+    if (!title) return;
+
+    try {
+        const res = await fetch(`${API_URL}/ai/sessions`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({title})
+        });
+        const session = await res.json();
+        currentSessionId = session.id;
+        sessions.unshift(session);
+        renderSessions();
+        document.getElementById('chat-container').innerHTML = '';
+        appendMessage('system', "Started new session. How can I help?");
+    } catch (e) {
+        alert("Failed to create session");
+    }
+}
+
+async function loadSession(id) {
+    currentSessionId = id;
+    renderSessions();
+    const container = document.getElementById('chat-container');
+    container.innerHTML = '<div class="text-center p-4 text-xs text-slate-500 animate-pulse">Loading History...</div>';
+
+    try {
+        const res = await fetch(`${API_URL}/ai/sessions/${id}/history`);
+        const history = await res.json();
+
+        container.innerHTML = '';
+        if(history.length === 0) {
+             appendMessage('system', "Started new session. How can I help?");
+        }
+
+        history.forEach(msg => {
+            if (msg.role === 'user') appendMessage('user', msg.content);
+            if (msg.role === 'assistant') appendMessage('ai', msg.content);
+            if (msg.role === 'tool') {
+                // Optional: Show tool outputs debug style?
+            }
+        });
+    } catch (e) {
+        container.innerHTML = '<div class="text-center p-4 text-xs text-rose-500">Error loading history.</div>';
+    }
+}
+
+async function deleteSession(id) {
+    if (!confirm("Delete this chat?")) return;
+    await fetch(`${API_URL}/ai/sessions/${id}`, { method: 'DELETE' });
+    if (currentSessionId === id) {
+        currentSessionId = null;
+        document.getElementById('chat-container').innerHTML = '';
+    }
+    loadSessions();
+}
+
+async function sendChatMessage() {
+    const input = document.getElementById('ai-input');
+    const message = input.value.trim();
+    if (!message) return;
+
+    if (!currentSessionId) await newSession();
+
+    input.value = '';
+    appendMessage('user', message);
+
+    const loadingId = appendMessage('ai', '<span class="animate-pulse">Thinking...</span>');
+
+    try {
+        const res = await fetch(`${API_URL}/ai/chat`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ message, session_id: currentSessionId })
+        });
+        const data = await res.json();
+
+        // Remove simple loading indicator if present
+        const loadingEl = document.getElementById(loadingId);
+        if(loadingEl) loadingEl.remove();
+
+        // Remove detailed status indicator if present
+        const statusEl = document.getElementById('ai-status-indicator');
+        if(statusEl) statusEl.remove();
+
+        appendMessage('ai', data.response);
+
+    } catch (e) {
+        const loadingEl = document.getElementById(loadingId);
+        if(loadingEl) loadingEl.innerHTML = `<span class="text-rose-400">Error: ${e.message}</span>`;
+    }
+}
+
+function appendMessage(role, text) {
+    const container = document.getElementById('chat-container');
+    const div = document.createElement('div');
+    const id = 'msg-' + Date.now();
+    div.id = id;
+
+    // Style based on role
+    div.className = "flex w-full mb-4 " + (role === 'user' ? "justify-end" : "justify-start");
+
+    const bubbleClass = role === 'user'
+        ? "bg-indigo-600 text-white chat-bubble-user"
+        : (role === 'system' ? "bg-slate-800/50 text-slate-400 text-xs italic text-center w-full bg-transparent" : "bg-slate-800 border border-slate-700 text-slate-200 chat-bubble-ai");
+
+    const innerDiv = document.createElement('div');
+    innerDiv.className = `max-w-[85%] p-4 shadow-sm ${bubbleClass}`;
+
+    // Markdown formatting
+    let html = text
+        .replace(/</g, "&lt;").replace(/>/g, "&gt;") // Escape HTML
+        .replace(/```python([\s\S]*?)```/g, (match, code) => {
+            return `<div class="mt-2 mb-2 bg-slate-950 rounded-lg border border-slate-900 overflow-hidden group relative">
+                <div class="bg-slate-900 px-3 py-1 text-[10px] text-slate-500 font-mono uppercase border-b border-slate-800 flex justify-between items-center">
+                    <span>Python</span>
+                    <button onclick="applyCodeToEditor(this)" data-code="${encodeURIComponent(code)}" class="text-indigo-400 hover:text-indigo-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i> Apply
+                    </button>
+                </div>
+                <pre class="p-3 overflow-x-auto text-xs"><code class="language-python">${code}</code></pre>
+            </div>`;
+        })
+        .replace(/```([\s\S]*?)```/g, '<pre class="bg-slate-950 p-3 rounded-lg text-xs border border-slate-900 overflow-x-auto mt-2 mb-2"><code>$1</code></pre>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
+        .replace(/\n/g, '<br>');
+
+    innerDiv.innerHTML = html;
+    div.appendChild(innerDiv);
+
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    return id;
+}
+
+function applyCodeToEditor(btn) {
+    const code = decodeURIComponent(btn.getAttribute('data-code'));
+    if(editor) {
+        editor.setValue(code);
+        router.navigate('strategies');
+        alert("Code applied to editor!");
+    }
+}
+
+// Bind Chat Input
+document.getElementById('ai-send-btn').addEventListener('click', sendChatMessage);
+document.getElementById('ai-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendChatMessage();
+});
 
 // Init
 window.onload = () => {
     initWS();
     router.init();
     loadTemplates();
-    initChat();
 
-    // Load config from Backend (Persistent)
+    // Load config
     fetch(`${API_URL}/ai/config`)
         .then(res => res.json())
         .then(config => {
@@ -569,21 +775,18 @@ window.onload = () => {
     require(['vs/editor/editor.main'], function () {
         const container = document.getElementById('editor-container');
         if (container) {
-            // Force strict height calculation to avoid flex collapse
-            container.style.height = 'calc(100vh - 220px)';
-            container.style.width = '100%';
-
             editor = monaco.editor.create(container, {
                 value: "# Select a strategy or create one",
                 language: 'python',
                 theme: 'vs-dark',
                 automaticLayout: true,
-                scrollBeyondLastLine: false,
-                minimap: { enabled: false }
+                minimap: { enabled: false },
+                padding: { top: 16, bottom: 16 },
+                fontSize: 13,
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace"
             });
-
-            // Resize observer as backup
-            new ResizeObserver(() => editor.layout()).observe(container);
+            // Initial Layout
+            setTimeout(() => editor.layout(), 100);
         }
     });
 };

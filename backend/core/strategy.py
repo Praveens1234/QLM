@@ -59,6 +59,13 @@ class Strategy(ABC):
         """
         pass
 
+    def position_size(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series:
+        """
+        Return a Series of position sizes.
+        Default is 1.0 for all candles.
+        """
+        return pd.Series(1.0, index=df.index, dtype=float)
+
 class StrategyLoader:
     """
     Handles loading, saving, and versioning of strategies.
@@ -277,7 +284,8 @@ class StrategyLoader:
             dates = pd.date_range(start="2023-01-01", periods=10, freq="h")
             df = pd.DataFrame({
                 "open": [100.0]*10, "high": [105.0]*10, "low": [95.0]*10, "close": [100.0]*10, "volume": [1000.0]*10,
-                "datetime": dates
+                "datetime": dates,
+                "dtv": dates.astype('int64')
             })
             
             # Run Methods & Check Returns
