@@ -98,78 +98,29 @@ class AIAgent:
         context.append(new_user_msg)
         self.store.add_message(session_id, new_user_msg)
         
+        # Define Callbacks
+        async def on_message(msg: Dict[str, Any]):
+            self.store.add_message(session_id, msg)
+
+        async def on_tool_success(name: str, args: Dict, result: Any):
+            if name == "create_strategy":
+                 self.job_manager.update_job(session_id, "Strategy Created", {"strategy_name": args.get("name")})
+            elif name == "run_backtest":
+                 self.job_manager.update_job(session_id, "Backtest Run", {"backtest_status": "Complete"})
+            elif name == "list_datasets":
+                 self.job_manager.update_job(session_id, "Datasets Listed")
+
         try:
-            steps = 0
-            max_steps = 10
-
-            while steps < max_steps:
-                if on_status:
-                    await on_status("Thinking", f"Step {steps+1}: Reasoning...")
-
-                response = await self.client.chat_completion(
-                    messages=context,
-                    tools=self.tools.get_definitions()
-                )
-                
-                choice = response['choices'][0]
-                message = choice['message']
-                
-                self.store.add_message(session_id, message)
-                context.append(message)
-                
-                if not message.get('tool_calls'):
-                    self.job_manager.complete_job(session_id)
-                    return message['content']
-
-                # Execute Tools
-                tool_calls = message['tool_calls']
-                for tool_call in tool_calls:
-                    fn_name = tool_call['function']['name']
-                    fn_args_str = tool_call['function']['arguments']
-
-                    if on_status:
-                        try:
-                            args_disp = json.loads(fn_args_str)
-                            disp_str = f"{fn_name}({str(args_disp)[:40]}...)"
-                        except:
-                            disp_str = f"{fn_name}(...)"
-                        await on_status("Invoking Tool", disp_str)
-
-                    tool_result = {}
-                    try:
-                        fn_args = json.loads(fn_args_str)
-                        tool_result = await self.tools.execute(fn_name, fn_args)
-
-                        # Job Updates
-                        if fn_name == "create_strategy":
-                            self.job_manager.update_job(session_id, "Strategy Created", {"strategy_name": fn_args.get("name")})
-                        elif fn_name == "run_backtest":
-                            self.job_manager.update_job(session_id, "Backtest Run", {"backtest_status": "Complete"})
-                        elif fn_name == "list_datasets":
-                             self.job_manager.update_job(session_id, "Datasets Listed")
-
-                        if isinstance(tool_result, dict) and tool_result.get("error"):
-                            logger.warning(f"Tool {fn_name} logical error: {tool_result['error']}")
-
-                    except Exception as e:
-                        tool_result = {"error": f"Tool Crash: {str(e)}"}
-                        logger.error(f"Tool {fn_name} crash: {e}")
-
-                    result_str = json.dumps(tool_result, default=str)
-
-                    tool_msg = {
-                        "role": "tool",
-                        "tool_call_id": tool_call['id'],
-                        "name": fn_name,
-                        "content": result_str
-                    }
-
-                    self.store.add_message(session_id, tool_msg)
-                    context.append(tool_msg)
-
-                steps += 1
+            response = await self.brain.think(
+                history=context,
+                max_steps=10,
+                on_status=on_status,
+                on_message=on_message,
+                on_tool_success=on_tool_success
+            )
             
-            return "I reached the maximum reasoning steps (10). I may be stuck in a loop."
+            self.job_manager.complete_job(session_id)
+            return response
 
         except Exception as e:
             logger.error(f"Agent Chat Error: {e}")

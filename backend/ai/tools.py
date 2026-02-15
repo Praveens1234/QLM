@@ -8,6 +8,8 @@ from backend.ai.analytics import calculate_market_structure, optimize_strategy
 import os
 import shutil
 import pandas as pd
+import asyncio
+import functools
 
 logger = logging.getLogger("QLM.AI.Tools")
 
@@ -198,6 +200,33 @@ class AITools:
             }
         ]
 
+    def _validate_path(self, path: str, allowed_roots: List[str] = ["strategies", "logs"]) -> str:
+        """
+        Validate that the path is within the allowed directories to prevent path traversal.
+        """
+        # Normalize and resolve absolute path
+        abs_path = os.path.abspath(path)
+        cwd = os.getcwd()
+
+        valid = False
+        for root in allowed_roots:
+            abs_root = os.path.abspath(os.path.join(cwd, root))
+            # Check if abs_path starts with abs_root
+            if os.path.commonpath([abs_path, abs_root]) == abs_root:
+                valid = True
+                break
+
+        if not valid:
+            raise ValueError(f"Access denied: {path} is outside allowed directories ({', '.join(allowed_roots)}).")
+        return abs_path
+
+    async def _run_sync(self, func, *args, **kwargs):
+        """
+        Run a synchronous blocking function in the default executor.
+        """
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, functools.partial(func, *args, **kwargs))
+
     async def execute(self, tool_name: str, args: Dict) -> Any:
         """
         Execute a tool by name with arguments.
@@ -206,135 +235,167 @@ class AITools:
         
         try:
             if tool_name == "list_datasets":
-                return self.metadata_store.list_datasets()
+                return await self._run_sync(self.metadata_store.list_datasets)
                 
             elif tool_name == "list_strategies":
-                return self.strategy_loader.list_strategies()
+                return await self._run_sync(self.strategy_loader.list_strategies)
                 
             elif tool_name == "get_strategy_code":
                 name = args.get("name")
-                code = self.strategy_loader.get_strategy_code(name)
-                if code:
-                    return {"found": True, "code": code}
-                return {"found": False, "error": "Strategy not found"}
+                def _get():
+                    code = self.strategy_loader.get_strategy_code(name)
+                    if code:
+                        return {"found": True, "code": code}
+                    return {"found": False, "error": "Strategy not found"}
+                return await self._run_sync(_get)
                 
             elif tool_name == "create_strategy":
                 name = args.get("name")
                 code = args.get("code")
                 
-                # First validate
-                validation = self.strategy_loader.validate_strategy_code(code)
-                if not validation.get("valid"):
-                    return {"status": "failed", "validation": validation}
+                def _create():
+                    # First validate
+                    validation = self.strategy_loader.validate_strategy_code(code)
+                    if not validation.get("valid"):
+                        return {"status": "failed", "validation": validation}
+
+                    # If valid, save
+                    version = self.strategy_loader.save_strategy(name, code)
+                    return {"status": "success", "version": version, "message": f"Strategy {name} saved (v{version})."}
                 
-                # If valid, save
-                version = self.strategy_loader.save_strategy(name, code)
-                return {"status": "success", "version": version, "message": f"Strategy {name} saved (v{version})."}
+                return await self._run_sync(_create)
             
             elif tool_name == "validate_strategy":
                 code = args.get("code")
-                return self.strategy_loader.validate_strategy_code(code)
+                return await self._run_sync(self.strategy_loader.validate_strategy_code, code)
                 
             elif tool_name == "run_backtest":
                 strat_name = args.get("strategy_name")
                 symbol = args.get("symbol")
                 tf = args.get("timeframe")
                 
-                # Resolve Dataset ID
-                datasets = self.metadata_store.list_datasets()
-                dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
-                
-                if not dataset:
-                    available = [f"{d['symbol']} ({d['timeframe']})" for d in datasets]
-                    return {"error": f"Dataset {symbol} {tf} not found. Available: {', '.join(available)}"}
+                def _run_bt():
+                    # Resolve Dataset ID
+                    datasets = self.metadata_store.list_datasets()
+                    dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
 
-                engine = BacktestEngine()
+                    if not dataset:
+                        available = [f"{d['symbol']} ({d['timeframe']})" for d in datasets]
+                        return {"error": f"Dataset {symbol} {tf} not found. Available: {', '.join(available)}"}
 
-                try:
-                    # Run backtest
-                    result = engine.run(dataset['id'], strat_name)
+                    engine = BacktestEngine()
 
-                    # Return Summary Metrics
-                    return {
-                        "status": "success",
-                        "metrics": result['metrics'],
-                        "trade_count": len(result['trades'])
-                    }
-                except Exception as e:
-                    return {"error": f"Backtest runtime error: {str(e)}"}
+                    try:
+                        # Run backtest
+                        result = engine.run(dataset['id'], strat_name)
+
+                        # Return Summary Metrics
+                        return {
+                            "status": "success",
+                            "metrics": result['metrics'],
+                            "trade_count": len(result['trades'])
+                        }
+                    except Exception as e:
+                        return {"error": f"Backtest runtime error: {str(e)}"}
+
+                return await self._run_sync(_run_bt)
 
             elif tool_name == "get_market_data":
                 symbol = args.get("symbol")
                 tf = args.get("timeframe")
-                datasets = self.metadata_store.list_datasets()
-                dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
 
-                if not dataset:
-                    return {"error": "Dataset not found"}
+                def _get_data():
+                    datasets = self.metadata_store.list_datasets()
+                    dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
 
-                df = pd.read_parquet(dataset['file_path'])
-                head = df.head(10).to_dict(orient='records')
-                return {"data": head}
+                    if not dataset:
+                        return {"error": "Dataset not found"}
+
+                    df = pd.read_parquet(dataset['file_path'])
+                    head = df.head(10).to_dict(orient='records')
+                    return {"data": head}
+
+                return await self._run_sync(_get_data)
 
             elif tool_name == "read_file":
                 path = args.get("path")
-                if ".." in path or path.startswith("/"):
-                    return {"error": "Invalid path"}
-                if not (path.startswith("strategies/") or path.startswith("logs/")):
-                    return {"error": "Access denied. Only strategies/ and logs/ allowed."}
-                if not os.path.exists(path):
-                    return {"error": "File not found"}
-                with open(path, "r") as f:
-                    return {"content": f.read()}
+
+                def _read():
+                    try:
+                        abs_path = self._validate_path(path)
+                        if not os.path.exists(abs_path):
+                            return {"error": "File not found"}
+                        with open(abs_path, "r") as f:
+                            return {"content": f.read()}
+                    except ValueError as ve:
+                         return {"error": str(ve)}
+
+                return await self._run_sync(_read)
 
             elif tool_name == "write_file":
                 path = args.get("path")
                 content = args.get("content")
-                if ".." in path or path.startswith("/"):
-                    return {"error": "Invalid path"}
-                if not (path.startswith("strategies/") or path.startswith("logs/")):
-                    return {"error": "Access denied. Only strategies/ and logs/ allowed."}
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                with open(path, "w") as f:
-                    f.write(content)
-                return {"status": "success", "message": f"File {path} written."}
+
+                def _write():
+                    try:
+                        abs_path = self._validate_path(path)
+                        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+                        with open(abs_path, "w") as f:
+                            f.write(content)
+                        return {"status": "success", "message": f"File {path} written."}
+                    except ValueError as ve:
+                         return {"error": str(ve)}
+
+                return await self._run_sync(_write)
 
             elif tool_name == "delete_entity":
                 type_ = args.get("type")
                 id_ = args.get("id")
-                if type_ == "strategy":
-                    try:
-                        self.strategy_loader.delete_strategy(id_)
-                        return {"status": "success", "message": f"Strategy {id_} deleted."}
-                    except Exception as e:
-                         return {"error": str(e)}
-                elif type_ == "dataset":
-                    try:
-                        self.metadata_store.delete_dataset(id_)
-                        return {"status": "success", "message": f"Dataset {id_} deleted."}
-                    except Exception as e:
-                         return {"error": str(e)}
+
+                def _delete():
+                    if type_ == "strategy":
+                        try:
+                            self.strategy_loader.delete_strategy(id_)
+                            return {"status": "success", "message": f"Strategy {id_} deleted."}
+                        except Exception as e:
+                             return {"error": str(e)}
+                    elif type_ == "dataset":
+                        try:
+                            self.metadata_store.delete_dataset(id_)
+                            return {"status": "success", "message": f"Dataset {id_} deleted."}
+                        except Exception as e:
+                             return {"error": str(e)}
+
+                return await self._run_sync(_delete)
 
             elif tool_name == "analyze_market_structure":
                 symbol = args.get("symbol")
                 tf = args.get("timeframe")
-                datasets = self.metadata_store.list_datasets()
-                dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
-                if not dataset:
-                    return {"error": "Dataset not found"}
-                df = pd.read_parquet(dataset['file_path'])
-                return calculate_market_structure(df)
+
+                def _analyze():
+                    datasets = self.metadata_store.list_datasets()
+                    dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
+                    if not dataset:
+                        return {"error": "Dataset not found"}
+                    df = pd.read_parquet(dataset['file_path'])
+                    return calculate_market_structure(df)
+
+                return await self._run_sync(_analyze)
 
             elif tool_name == "optimize_parameters":
                 strat_name = args.get("strategy_name")
                 symbol = args.get("symbol")
                 tf = args.get("timeframe")
                 param_grid = args.get("param_grid")
-                datasets = self.metadata_store.list_datasets()
-                dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
-                if not dataset:
-                    return {"error": "Dataset not found"}
-                return optimize_strategy(strat_name, dataset['id'], param_grid)
+
+                def _optimize():
+                    datasets = self.metadata_store.list_datasets()
+                    dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
+                    if not dataset:
+                        return {"error": "Dataset not found"}
+                    return optimize_strategy(strat_name, dataset['id'], param_grid)
+
+                return await self._run_sync(_optimize)
             
             else:
                 return {"error": f"Tool '{tool_name}' not found."}
