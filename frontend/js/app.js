@@ -69,78 +69,120 @@ function toggleSidebar() {
     overlay.classList.toggle('hidden');
 }
 
-// Config
-async function saveConfig() {
-    const apiKey = document.getElementById('cfg-api-key').value.trim();
-    const model = document.getElementById('cfg-model').value.trim();
-    const baseUrl = document.getElementById('cfg-base-url').value.trim();
+// AI Settings & Registry
+let providers = [];
+let activeConfig = {};
 
-    if (!apiKey) {
-        alert("Please enter an API Key.");
+async function loadProviders() {
+    try {
+        const res = await fetch(`${API_URL}/ai/config/providers`);
+        providers = await res.json();
+
+        // Render List
+        const list = document.getElementById('provider-list');
+        list.innerHTML = providers.map(p => `
+            <li class="px-6 py-3 flex justify-between items-center">
+                <div>
+                    <div class="font-medium text-slate-300">${p.name}</div>
+                    <div class="text-[10px] text-slate-500 font-mono">${p.base_url}</div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] ${p.has_key ? 'text-emerald-500' : 'text-rose-500'} bg-slate-800 px-2 py-0.5 rounded">
+                        ${p.has_key ? 'KEY SET' : 'NO KEY'}
+                    </span>
+                    <div class="text-xs text-slate-500">${p.models.length} Models</div>
+                </div>
+            </li>
+        `).join('');
+
+        // Populate Active Dropdown
+        const activeSelect = document.getElementById('active-provider');
+        activeSelect.innerHTML = `<option value="">Select Provider</option>` +
+            providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+        // Load Active Config
+        const confRes = await fetch(`${API_URL}/ai/config/active`);
+        activeConfig = await confRes.json();
+
+        if (activeConfig.base_url) { // infer provider by url matching or just select if active set
+             // Simple matching logic if provider_name is returned
+             if(activeConfig.provider_name) {
+                 // find id
+                 const p = providers.find(x => x.name === activeConfig.provider_name);
+                 if(p) {
+                     activeSelect.value = p.id;
+                     loadProviderModels(p.id, activeConfig.model);
+                 }
+             }
+        }
+    } catch (e) { console.error("Error loading providers", e); }
+}
+
+async function addProvider() {
+    const name = document.getElementById('new-prov-name').value;
+    const url = document.getElementById('new-prov-url').value;
+    const key = document.getElementById('new-prov-key').value;
+
+    if(!name || !url || !key) {
+        alert("Fill all fields");
         return;
     }
 
     try {
-        const payload = {
-            api_key: apiKey,
-            model: model,
-            base_url: baseUrl
-        };
-
-        const res = await fetch(`${API_URL}/ai/config`, {
+        await fetch(`${API_URL}/ai/config/providers`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name, base_url: url, api_key: key})
         });
 
-        const data = await res.json();
+        // Auto-fetch models
+        const provId = name.toLowerCase().replace(/ /g, "_");
+        // Reload list
+        await loadProviders();
+        // Trigger model fetch
+        alert("Provider added. Fetching models...");
+        await fetchModelsForProvider(provId);
+        await loadProviders(); // Reload with models
 
-        if (res.ok) {
-            alert(`Configuration Saved Successfully!`);
-        } else {
-            console.error("Config Error:", data);
-            alert(`Error saving config: ${data.detail}`);
-        }
-    } catch (e) {
-        console.error("Config Network Error:", e);
-        alert("Config save failed: " + e.message);
+        // Clear inputs
+        document.getElementById('new-prov-name').value = "";
+        document.getElementById('new-prov-url').value = "";
+        document.getElementById('new-prov-key').value = "";
+
+    } catch(e) {
+        alert("Error adding provider: " + e);
     }
 }
 
-async function fetchModels() {
-    const apiKey = document.getElementById('cfg-api-key').value.trim();
-    const baseUrl = document.getElementById('cfg-base-url').value.trim();
-
-    if (!apiKey) {
-        alert("Please enter API Key first.");
-        return;
-    }
-
+async function fetchModelsForProvider(providerId) {
     try {
-        await fetch(`${API_URL}/ai/config`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: apiKey, base_url: baseUrl, model: "" })
-        });
-
-        const res = await fetch(`${API_URL}/ai/models`);
-        const data = await res.json();
-
-        if (data.models && data.models.length > 0) {
-            const dataList = document.getElementById('model-list');
-            dataList.innerHTML = '';
-            data.models.forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m;
-                dataList.appendChild(opt);
-            });
-            alert(`Loaded ${data.models.length} models into suggestions.`);
-        } else {
-            alert("No models found via API. Please enter Model ID manually.");
-        }
+        await fetch(`${API_URL}/ai/config/models/${providerId}`);
     } catch (e) {
-        alert("Error fetching models: " + e + "\n\nPlease enter Model ID manually.");
+        console.error("Model fetch failed", e);
     }
+}
+
+function loadProviderModels(providerId, selectedModel = null) {
+    const provider = providers.find(p => p.id === providerId);
+    const modelSelect = document.getElementById('active-model');
+    modelSelect.innerHTML = "";
+
+    if (provider && provider.models) {
+        modelSelect.innerHTML = provider.models.map(m => `<option value="${m}">${m}</option>`).join('');
+        if (selectedModel) modelSelect.value = selectedModel;
+    }
+}
+
+async function saveActiveConfig() {
+    const pid = document.getElementById('active-provider').value;
+    const mid = document.getElementById('active-model').value;
+
+    await fetch(`${API_URL}/ai/config/active`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({provider_id: pid, model_id: mid})
+    });
+    alert("Active Configuration Updated!");
 }
 
 async function updateDashboardStats() {

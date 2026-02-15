@@ -404,42 +404,48 @@
             </section>
 
             <!-- Settings -->
-            <section id="page-settings" class="page hidden animate-fade-in max-w-2xl mx-auto space-y-6">
-                 <h2 class="text-2xl font-bold text-white tracking-tight mb-6">Settings</h2>
+            <section id="page-settings" class="page hidden animate-fade-in max-w-3xl mx-auto space-y-6">
+                 <h2 class="text-2xl font-bold text-white tracking-tight mb-6">AI Model Registry</h2>
 
-                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
-                    <h3 class="text-sm font-semibold text-white border-b border-slate-800 pb-2">AI Configuration</h3>
-
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">OpenAI API Key</label>
-                        <input type="password" id="cfg-api-key" placeholder="sk-..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono">
-                    </div>
-
+                 <!-- Active Selection -->
+                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-white border-b border-slate-800 pb-2 mb-4">Active Configuration</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Base URL</label>
-                            <input type="text" id="cfg-base-url" placeholder="https://api.openai.com/v1" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono">
+                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Provider</label>
+                            <select id="active-provider" onchange="loadProviderModels(this.value)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"></select>
                         </div>
-                         <div>
+                        <div>
                             <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Model</label>
-                            <div class="flex gap-2">
-                                <input type="text" id="cfg-model" list="model-list" placeholder="gpt-4-turbo" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono">
-                                <datalist id="model-list">
-                                    <option value="gpt-4-turbo"></option>
-                                    <option value="gpt-3.5-turbo"></option>
-                                </datalist>
-                                <button onclick="fetchModels()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg px-3 border border-slate-700 transition-colors" title="Fetch Models">
-                                    <i class="fa-solid fa-sync"></i>
-                                </button>
-                            </div>
+                            <select id="active-model" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"></select>
                         </div>
                     </div>
-
                     <div class="flex justify-end pt-4">
-                        <button onclick="saveConfig()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-6 py-2 rounded-lg transition-colors shadow-lg shadow-emerald-900/20 text-sm">
-                            Save Changes
-                        </button>
+                        <button onclick="saveActiveConfig()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-lg text-sm">Apply Active</button>
                     </div>
+                 </div>
+
+                 <!-- Add Provider -->
+                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-white border-b border-slate-800 pb-2 mb-4">Add New Provider</h3>
+                    <div class="grid grid-cols-1 gap-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <input type="text" id="new-prov-name" placeholder="Provider Name (e.g. NVIDIA)" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+                            <input type="text" id="new-prov-url" placeholder="Base URL" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+                        </div>
+                        <input type="password" id="new-prov-key" placeholder="API Key" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+                    </div>
+                    <div class="flex justify-end pt-4 gap-2">
+                        <button onclick="addProvider()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-lg text-sm">Add Provider</button>
+                    </div>
+                 </div>
+
+                 <!-- List Providers -->
+                 <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                    <div class="px-6 py-4 bg-slate-800/30 border-b border-slate-800">
+                        <h3 class="text-sm font-semibold text-white">Registered Providers</h3>
+                    </div>
+                    <ul id="provider-list" class="divide-y divide-slate-800 text-sm text-slate-400"></ul>
                  </div>
             </section>
 

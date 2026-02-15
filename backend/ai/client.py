@@ -1,36 +1,40 @@
-
 import os
 import aiohttp
 import logging
-from typing import List, Dict, Any, Optional, AsyncGenerator
+from typing import List, Dict, Any, Optional
+from backend.ai.config_manager import AIConfigManager
 
 logger = logging.getLogger("QLM.AI.Client")
 
 class AIClient:
     """
     A generic OpenAI-compatible API client.
-    Supports streaming and non-streaming chat completions.
+    Supports dynamic configuration via AIConfigManager.
     """
-    def __init__(self, api_key: str = None, base_url: str = "https://api.openai.com/v1", model: str = "gpt-4-turbo"):
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        self.base_url = base_url.rstrip("/")
-        self.model = model
+    def __init__(self):
+        self.config_manager = AIConfigManager()
+        self._reload_config()
+
+    def _reload_config(self):
+        conf = self.config_manager.get_active_config()
+        self.api_key = conf.get("api_key")
+        self.base_url = conf.get("base_url", "https://api.openai.com/v1").rstrip("/")
+        self.model = conf.get("model", "gpt-4-turbo")
         
     def configure(self, api_key: str, base_url: str, model: str):
-        """Update client configuration at runtime."""
+        """
+        Legacy/Direct override.
+        Note: This doesn't persist to the new manager structure directly unless we update the manager.
+        """
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.model = model
-        logger.info(f"AI Client configured: Model={self.model}, BaseURL={self.base_url}")
 
-    async def chat_completion(self, messages: List[Dict[str, str]], tools: Optional[List[Dict]] = None, stream: bool = False) -> Dict[str, Any]:
-        """
-        Send a chat completion request.
-        """
+    async def chat_completion(self, messages: List[Dict[str, str]], tools: Optional[List[Dict]] = None) -> Dict[str, Any]:
+        self._reload_config() # Ensure latest
+
         if not self.api_key:
-             # For some local LLMs, API key might not be strictly required, but usually is. 
-             # We'll warn but proceed if it's missing, or maybe use a dummy.
-             pass
+             raise ValueError("AI API Key not configured. Please check Settings.")
 
         url = f"{self.base_url}/chat/completions"
         headers = {
@@ -41,7 +45,7 @@ class AIClient:
         payload = {
             "model": self.model,
             "messages": messages,
-            "stream": stream
+            "stream": False # Streaming handled via other means if needed, keeping simple here
         }
         
         if tools:
@@ -56,22 +60,14 @@ class AIClient:
                         logger.error(f"AI Request failed: {response.status} - {error_text}")
                         raise Exception(f"AI API Error: {response.status} - {error_text}")
                     
-                    if stream:
-                        # For now, we will just return the response object for the caller to iterate
-                        # But typically this method might yield. 
-                        # To keep it simple for the first pass, let's implement non-streaming first thoroughly.
-                        raise NotImplementedError("Streaming not yet implemented in basic client wrapper")
-                    else:
-                        return await response.json()
+                    return await response.json()
                         
         except Exception as e:
             logger.error(f"AI Client Exception: {e}")
             raise e
 
     async def list_models(self) -> List[str]:
-        """
-        Fetch available models from the provider.
-        """
+        self._reload_config()
         if not self.api_key:
              return []
 
@@ -85,7 +81,6 @@ class AIClient:
                 async with session.get(url, headers=headers) as response:
                     if response.status == 200:
                         data = await response.json()
-                        # OpenAI format: {"data": [{"id": "model-id", ...}, ...]}
                         if "data" in data:
                             return [m["id"] for m in data["data"]]
                         return []
