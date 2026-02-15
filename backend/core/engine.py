@@ -26,12 +26,6 @@ class BacktestEngine:
         """
         try:
             # 1. Load Dataset
-            # We access the store via DataManager? DataManager needs to find file path.
-            # DataManager needs metadata to know path? 
-            # I should inject store into DataManager or just use file path here if known?
-            # Better: DataManager.get_dataset_df(id)
-            # For now I'll assume I can get the path from metadata store via API or direct Use.
-            # Let's import MetadataStore here locally to avoid circular deps if any
             from backend.core.store import MetadataStore
             store = MetadataStore()
             metadata = store.get_dataset(dataset_id)
@@ -89,9 +83,22 @@ class BacktestEngine:
         
         # Risk Model
         risk = strategy.risk_model(df, vars_dict)
-        # Convert risk series to numpy for speed, handling missing keys
-        sl_arr = risk.get('sl', pd.Series([np.nan]*n_rows)).fillna(np.nan).values
-        tp_arr = risk.get('tp', pd.Series([np.nan]*n_rows)).fillna(np.nan).values
+
+        # FIX: Handle cases where 'sl' or 'tp' are None or missing gracefully
+        # Create a default NaN series if key is missing or value is None
+        default_nan_series = pd.Series([np.nan]*n_rows, index=df.index)
+
+        sl_series = risk.get('sl')
+        if sl_series is None:
+            sl_series = default_nan_series
+
+        tp_series = risk.get('tp')
+        if tp_series is None:
+            tp_series = default_nan_series
+
+        # Convert to numpy and fillna just in case
+        sl_arr = sl_series.fillna(np.nan).values
+        tp_arr = tp_series.fillna(np.nan).values
         
         # Position Sizing
         pos_sizes = strategy.position_size(df, vars_dict).fillna(1.0).values
