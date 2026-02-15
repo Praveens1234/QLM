@@ -33,10 +33,7 @@ Now fully compatible with the **Model Context Protocol (MCP)**, allowing externa
 ### 🔌 MCP Service (New!)
 *   **Protocol**: Exposes QLM via Server-Sent Events (SSE).
 *   **Endpoint**: `http://<IP>:8010/api/mcp/sse`
-*   **Capabilities**:
-    *   **Tools**: Access to `create_strategy`, `run_backtest`, `analyze_market`, and more.
-    *   **Resources**: Read access to Strategies (`qlm://strategy/...`) and Datasets (`qlm://data/...`).
-    *   **Prompts**: Built-in "Senior Quant" persona.
+*   **Capabilities**: Full control over Data, Strategies, and Backtesting.
 
 ### 🧠 Agentic AI Core
 *   **ReAct "Brain" Architecture**: The AI reasons in loops (Thought -> Action -> Observation) to solve complex tasks.
@@ -52,10 +49,6 @@ Now fully compatible with the **Model Context Protocol (MCP)**, allowing externa
 *   **Event-Driven Engine**: Simulates realistic market conditions candle-by-candle.
 *   **Advanced Metrics**: Max Drawdown (Abs), Profit Factor, Sharpe Ratio, Expectancy.
 *   **Position Sizing**: Dynamic sizing logic embedded in strategies.
-
-### 🖥️ "Financial Terminal" UI
-*   **Modern Design**: Dark-themed, Slate/Zinc aesthetics using **Tailwind CSS**.
-*   **Mobile Responsive**: Fully functional on desktop and mobile devices.
 
 ---
 
@@ -88,21 +81,42 @@ Now fully compatible with the **Model Context Protocol (MCP)**, allowing externa
 
 ## 🚀 MCP Connection Guide
 
-To connect an MCP Client (like Claude Desktop) to QLM:
+Use any MCP-compliant client (e.g., Claude Desktop, Zed Editor) to connect to QLM.
 
-1.  Start QLM (`python -m backend.main`).
-2.  Configure your client:
-    ```json
-    {
-      "mcpServers": {
-        "qlm": {
-          "command": "",
-          "url": "http://127.0.0.1:8010/api/mcp/sse"
-        }
-      }
+1.  **Start QLM**: Ensure the server is running on `0.0.0.0:8010`.
+2.  **Configure Client**: Add the SSE endpoint.
+
+**Claude Desktop Config (`claude_desktop_config.json`):**
+```json
+{
+  "mcpServers": {
+    "qlm": {
+      "command": "",
+      "url": "http://127.0.0.1:8010/api/mcp/sse"
     }
-    ```
-    *(Note: If using `mcp-cli` or similar, point to the SSE endpoint).*
+  }
+}
+```
+
+### 🧰 MCP Tool Reference
+
+Once connected, you have full control via these tools:
+
+| Tool Name | Description |
+| :--- | :--- |
+| **`create_strategy`** | Write/Update a Python strategy file. |
+| **`validate_strategy`** | Dry-run code validation and syntax check. |
+| **`run_backtest`** | Execute a simulation on a specific dataset. |
+| **`optimize_parameters`** | Run parameter optimization simulations. |
+| **`list_datasets`** | View available OHLCV data. |
+| **`import_dataset_from_url`** | Download & ingest CSV/ZIP from a direct link. |
+| **`get_market_data`** | Peek at raw data rows (Pandas DataFrame). |
+| **`analyze_market_structure`** | Calculate Trend, Volatility, and S/R levels. |
+| **`consult_skill`** | Retrieve expert docs (Coding, Analysis, Debugging). |
+| **`get_system_status`** | View server health, version, and CPU/RAM usage. |
+| **`update_ai_config`** | Change the active AI Model/Provider. |
+| **`read_file`** | Read strategy source code or logs. |
+| **`write_file`** | Direct file access (Sandboxed). |
 
 ---
 

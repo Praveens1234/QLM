@@ -6,22 +6,26 @@ from backend.core.store import MetadataStore
 from backend.core.engine import BacktestEngine
 from backend.core.data import DataManager
 from backend.ai.analytics import calculate_market_structure, optimize_strategy
+from backend.ai.config_manager import AIConfigManager
 import os
 import shutil
 import pandas as pd
 import asyncio
 import functools
+import platform
+import psutil
 
 logger = logging.getLogger("QLM.AI.Tools")
 
 class AITools:
     """
-    Registry of tools available to the AI Agent.
+    Registry of tools available to the AI Agent and MCP.
     """
     def __init__(self):
         self.strategy_loader = StrategyLoader()
         self.metadata_store = MetadataStore()
         self.data_manager = DataManager()
+        self.config_manager = AIConfigManager()
         
     def get_definitions(self) -> List[Dict]:
         """
@@ -213,6 +217,32 @@ class AITools:
                             "param_grid": {"type": "object", "description": "Dict of parameters to optimize (e.g., {'window': [10, 20]})"}
                         },
                         "required": ["strategy_name", "symbol", "timeframe", "param_grid"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_system_status",
+                    "description": "Get server health, version, and resource usage.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "update_ai_config",
+                    "description": "Update AI provider configuration.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "provider_id": {"type": "string", "description": "Provider ID (e.g., 'openai')"},
+                            "model_id": {"type": "string", "description": "Model ID (e.g., 'gpt-4')"}
+                        },
+                        "required": ["provider_id", "model_id"]
                     }
                 }
             }
@@ -426,6 +456,26 @@ class AITools:
                     return optimize_strategy(strat_name, dataset['id'], param_grid)
 
                 return await self._run_sync(_optimize)
+
+            elif tool_name == "get_system_status":
+                def _status():
+                    return {
+                        "status": "online",
+                        "system": "QLM",
+                        "version": "2.0.0",
+                        "os": platform.system(),
+                        "cpu_percent": psutil.cpu_percent(),
+                        "memory_percent": psutil.virtual_memory().percent,
+                    }
+                return await self._run_sync(_status)
+
+            elif tool_name == "update_ai_config":
+                pid = args.get("provider_id")
+                mid = args.get("model_id")
+                def _update():
+                    self.config_manager.set_active(pid, mid)
+                    return {"status": "success", "message": f"Active AI set to {mid} via {pid}"}
+                return await self._run_sync(_update)
             
             else:
                 return {"error": f"Tool '{tool_name}' not found."}
