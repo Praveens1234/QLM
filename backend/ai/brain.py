@@ -7,10 +7,23 @@ import traceback
 
 logger = logging.getLogger("QLM.AI.Brain")
 
+# Human-readable status mapping
+TOOL_DISPLAY_NAMES = {
+    "list_datasets": "🔍 Scanning Data",
+    "list_strategies": "📂 Checking Strategies",
+    "get_strategy_code": "📖 Reading Code",
+    "create_strategy": "📝 Writing Strategy",
+    "validate_strategy": "✅ Validating Logic",
+    "run_backtest": "🚀 Running Simulation",
+    "get_market_data": "📊 Fetching Market Data",
+    "import_dataset_from_url": "⬇️ Downloading Dataset",
+    "analyze_market_structure": "🧠 Analyzing Market",
+    "optimize_parameters": "⚙️ Optimizing"
+}
+
 class Brain:
     """
     Implements a ReAct (Reasoning + Acting) loop for the AI Agent.
-    Allows for multi-step planning and tool execution.
     """
     def __init__(self, client: AIClient, tools: AITools):
         self.client = client
@@ -23,23 +36,14 @@ class Brain:
                     on_message: Callable[[Dict[str, Any]], Awaitable[None]] = None,
                     on_tool_success: Callable[[str, Dict, Any], Awaitable[None]] = None
                     ) -> str:
-        """
-        Execute the reasoning loop.
 
-        Args:
-            history: The conversation history so far.
-            max_steps: Maximum reasoning steps (LLM calls) to prevent infinite loops.
-            on_status: Async callback(step_name, detail) for UI updates.
-            on_message: Async callback(message) to persist new messages (tool calls, outputs).
-            on_tool_success: Async callback(name, args, result) for side effects (e.g. Job updates).
-        """
         steps = 0
         current_history = history.copy()
 
         while steps < max_steps:
             logger.info(f"Thinking Step {steps + 1}/{max_steps}")
             if on_status:
-                await on_status("Thinking", f"Step {steps + 1}: Reasoning...")
+                await on_status("Thinking", f"Step {steps + 1}: Planning next move...")
 
             # 1. Get LLM Response
             try:
@@ -50,19 +54,19 @@ class Brain:
             except Exception as e:
                 logger.error(f"LLM Call Failed: {e}")
                 traceback.print_exc()
-                return f"Error contacting AI provider: {str(e)}"
+                return f"**Connection Error**: Failed to contact AI provider ({str(e)})."
 
             choice = response['choices'][0]
             message = choice['message']
 
-            # Add assistant message to local history
+            # Add to local history
             current_history.append(message)
 
-            # Persist assistant message (includes content and/or tool_calls)
+            # Persist assistant message
             if on_message:
                 await on_message(message)
 
-            # If no tool calls, we are done
+            # If no tool calls, we are done (Final Answer)
             if not message.get('tool_calls'):
                 return message['content']
 
@@ -72,29 +76,25 @@ class Brain:
                 fn_name = tool_call['function']['name']
                 fn_args_str = tool_call['function']['arguments']
 
-                # UI Status Update
+                # UI Status Update (Enhanced)
                 if on_status:
-                    try:
-                        args_disp = json.loads(fn_args_str)
-                        disp_str = f"{fn_name}({str(args_disp)[:40]}...)"
-                    except:
-                        disp_str = f"{fn_name}(...)"
-                    await on_status("Invoking Tool", disp_str)
+                    display_name = TOOL_DISPLAY_NAMES.get(fn_name, fn_name)
+                    await on_status("Executing", display_name)
 
                 # Execute
                 tool_result = {}
                 fn_args = {}
                 try:
                     fn_args = json.loads(fn_args_str)
-                    logger.info(f"Brain executing: {fn_name} with {fn_args.keys()}")
+                    logger.info(f"Brain executing: {fn_name} with keys {list(fn_args.keys())}")
 
                     tool_result = await self.tools.execute(fn_name, fn_args)
 
-                    # Check for logical errors in tool result
+                    # Logical Error Check
                     if isinstance(tool_result, dict) and tool_result.get("error"):
-                        logger.warning(f"Tool {fn_name} logical error: {tool_result['error']}")
+                        logger.warning(f"Tool {fn_name} returned error: {tool_result['error']}")
                     else:
-                         # Tool Success Callback (Side Effects)
+                         # Success Callback
                          if on_tool_success:
                              await on_tool_success(fn_name, fn_args, tool_result)
 
@@ -120,4 +120,4 @@ class Brain:
 
             steps += 1
 
-        return "I reached the maximum reasoning steps (10). I may be stuck in a loop."
+        return "I reached the maximum reasoning steps (10) without a final answer. Please refine your request."

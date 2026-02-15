@@ -12,19 +12,35 @@ import os
 
 logger = logging.getLogger("QLM.AI.Agent")
 
-# Base Prompt
+# Enhanced Base Prompt
 BASE_PROMPT = """
-You are a **Senior Quantitative Researcher (Agent)** for the QLM Framework.
-Your goal is to autonomously develop, validate, and optimize trading strategies.
+You are a **Senior Quantitative Researcher** for the QLM (QuantLogic Framework).
+Your mission is to autonomously develop, validate, and optimize institutional-grade trading strategies.
 
-You have access to a powerful set of tools. You must use them responsibly.
-Use the **ReAct (Reasoning + Acting)** pattern: Thought -> Tool -> Observation.
+### 🧠 Operational Protocol (ReAct)
+You must function in a loop of **Reasoning** and **Acting**:
+1.  **Analyze**: Understand the user's intent. If vague, ask clarifying questions.
+2.  **Plan**: Decide which tools are needed. Explain your reasoning briefly.
+3.  **Execute**: Use the provided tools (e.g., `create_strategy`, `run_backtest`).
+4.  **Observe**: Analyze the tool output. If it fails, **self-heal** by fixing the inputs or code.
+5.  **Conclude**: Present the final result clearly to the user.
 
-**Critical Rules:**
-1.  **Always** validate a strategy (`validate_strategy`) before running a backtest.
-2.  **Never** hallucinate dataset IDs. Use `list_datasets` to find them.
-3.  **Self-Heal**: If a tool fails, analyze the error and retry with corrected parameters. Do not give up immediately.
-4.  **Formatting**: Output Python code in markdown blocks ` ```python ... ``` `.
+### 📜 Critical Rules
+*   **Persona**: Professional, rigorous, data-driven. Do not be overly chatty.
+*   **Validation**: **ALWAYS** run `validate_strategy` before `run_backtest`.
+*   **Data Integrity**: Never hallucinate Dataset IDs. Use `list_datasets` to find them.
+*   **Code Quality**: Write robust, vectorized Python code using `pandas`. Handle `NaN`s and edge cases.
+*   **Safety**: Do not access files outside `strategies/` or `logs/`.
+
+### 🛠️ Tool Usage Guidelines
+*   `import_dataset_from_url`: Use this if the user provides a link (Zip/CSV).
+*   `create_strategy`: Needs full python code. Inherit from `Strategy`.
+*   `optimize_parameters`: Use this to refine a losing strategy.
+
+Output Python code in markdown blocks:
+```python
+...
+```
 """
 
 def load_skill(name: str) -> str:
@@ -36,31 +52,29 @@ def load_skill(name: str) -> str:
 
 def get_relevant_skills(user_message: str) -> str:
     """
-    Simple keyword-based routing.
-    In a more advanced system, use embedding similarity.
+    Dynamically injects skills based on context.
     """
-    skills = []
+    skills = [load_skill("general")] # Always include general rules
     msg = user_message.lower()
 
-    if "analyze" in msg or "market" in msg:
+    # Context Mapping
+    if any(x in msg for x in ["analyze", "market", "trend", "structure"]):
         skills.append(load_skill("market_analysis"))
 
-    if "strategy" in msg or "code" in msg or "create" in msg:
+    if any(x in msg for x in ["strategy", "code", "create", "write", "python"]):
         skills.append(load_skill("coding"))
 
-    if "fix" in msg or "error" in msg or "debug" in msg:
+    if any(x in msg for x in ["fix", "error", "debug", "fail", "broken"]):
         skills.append(load_skill("debugging"))
 
-    # Default to all if unclear? Or just coding/debugging as they are core.
-    if not skills:
-        skills.append(load_skill("coding"))
-        skills.append(load_skill("debugging"))
+    if any(x in msg for x in ["regime", "volatility"]):
+        skills.append(load_skill("regime"))
 
-    return "\n\n".join(skills)
+    return "\n\n".join(filter(None, skills))
 
 class AIAgent:
     def __init__(self):
-        self.client = AIClient() # Client now self-configures via Manager
+        self.client = AIClient()
         self.tools = AITools()
         self.store = ChatStore()
         self.brain = Brain(self.client, self.tools)
@@ -90,8 +104,10 @@ class AIAgent:
 
         # Dynamic Skill Injection
         relevant_skills = get_relevant_skills(user_message)
-        system_prompt = f"{BASE_PROMPT}\n\n## RELEVANT SKILLS\n{relevant_skills}\n\n{job_context}"
+        system_prompt = f"{BASE_PROMPT}\n\n## 📚 RELEVANT SKILLS\n{relevant_skills}\n\n{job_context}"
 
+        # Construct Context
+        # Keep system prompt + last 20 messages for context window efficiency
         context = [{"role": "system", "content": system_prompt}] + history[-20:]
 
         new_user_msg = {"role": "user", "content": user_message}
@@ -103,12 +119,18 @@ class AIAgent:
             self.store.add_message(session_id, msg)
 
         async def on_tool_success(name: str, args: Dict, result: Any):
+            # Intelligent Job Updates
             if name == "create_strategy":
                  self.job_manager.update_job(session_id, "Strategy Created", {"strategy_name": args.get("name")})
             elif name == "run_backtest":
-                 self.job_manager.update_job(session_id, "Backtest Run", {"backtest_status": "Complete"})
-            elif name == "list_datasets":
-                 self.job_manager.update_job(session_id, "Datasets Listed")
+                 self.job_manager.update_job(session_id, "Backtest Complete", {"status": "success"})
+            elif name == "import_dataset_from_url":
+                 self.job_manager.update_job(session_id, "Data Imported", {"id": result.get("id")})
+            elif name == "validate_strategy":
+                 if result.get("valid"):
+                     self.job_manager.update_job(session_id, "Validation Passed")
+                 else:
+                     self.job_manager.update_job(session_id, "Validation Failed")
 
         try:
             response = await self.brain.think(
@@ -125,7 +147,7 @@ class AIAgent:
         except Exception as e:
             logger.error(f"Agent Chat Error: {e}")
             traceback.print_exc()
-            return f"Error: {str(e)}"
+            return f"**System Error**: {str(e)}"
 
     # Proxy methods
     def create_session(self, title: str): return self.store.create_session(title)
