@@ -85,7 +85,6 @@ class BacktestEngine:
         risk = strategy.risk_model(df, vars_dict)
 
         # FIX: Handle cases where 'sl' or 'tp' are None or missing gracefully
-        # Create a default NaN series if key is missing or value is None
         default_nan_series = pd.Series([np.nan]*n_rows, index=df.index)
 
         sl_series = risk.get('sl')
@@ -96,7 +95,6 @@ class BacktestEngine:
         if tp_series is None:
             tp_series = default_nan_series
 
-        # Convert to numpy and fillna just in case
         sl_arr = sl_series.fillna(np.nan).values
         tp_arr = tp_series.fillna(np.nan).values
         
@@ -107,15 +105,9 @@ class BacktestEngine:
         active_trade = None
         
         # Metrics tracking
-        equity = 10000.0 # Initial Capital
-        
-        # Performance Optimization: Iterate only relevant indices?
-        # But we need to check exits every candle if in trade.
-        # And check entries if not in trade.
-        
-        # If dataset is huge (5M), iterating 5M times in python is slow.
-        # But for 'Candle-by-candle' simulation requirement, we must iterate or emulate it.
-        # To speed up: Use itertuples or numpy arrays.
+        initial_capital = 10000.0
+        equity = initial_capital
+        equity_curve = [] # List of {time, value}
         
         # Convert necessary columns to numpy arrays for speed
         opens = df['open'].values
@@ -128,18 +120,27 @@ class BacktestEngine:
         sig_long = long_signals.values
         sig_short = short_signals.values
         
+        # For OHLCV Chart (Downsampling if huge?)
+        # For now, just convert dataframe to list of dicts at the end
+        # Or build it here? Actually, standard dataframe to_dict is fast enough unless huge.
+
         for i in range(n_rows):
-            # Current Candle - CAST TO PYTHON TYPES FOR JSON SERIALIZATION
-            current_time = int(times[i])
+            # Current Candle
+            current_time_ns = int(times[i])
+            # Conversion for JSON (seconds)
+            current_time_sec = current_time_ns // 1_000_000_000
+
             open_p, high_p, low_p, close_p = float(opens[i]), float(highs[i]), float(lows[i]), float(closes[i])
             
-            # Progress Update (every 1% or so to avoid spam)
+            # Progress Update
             if callback and i % (max(1, n_rows // 100)) == 0:
                 progress = (i / n_rows) * 100
-                display_time = pd.to_datetime(current_time, unit='ns', utc=True).strftime('%Y-%m-%d %H:%M:%S')
+                display_time = pd.to_datetime(current_time_ns, unit='ns', utc=True).strftime('%Y-%m-%d %H:%M:%S')
                 callback(progress, "Running", {"current_time": display_time, "active_trade_count": 1 if active_trade else 0})
             
             # Check Active Trade Exit
+            trade_closed_pnl = 0.0
+
             if active_trade:
                 trade_pnl = 0
                 exit_price = 0
@@ -152,7 +153,7 @@ class BacktestEngine:
                 if active_trade['direction'] == 'long':
                     # Check SL (Low <= SL)
                     if curr_sl is not None and not np.isnan(curr_sl) and low_p <= curr_sl:
-                        exit_price = curr_sl # Slippage? For now exact
+                        exit_price = curr_sl
                         exit_reason = "SL Hit"
                     # Check TP (High >= TP)
                     elif curr_tp is not None and not np.isnan(curr_tp) and high_p >= curr_tp:
@@ -169,7 +170,7 @@ class BacktestEngine:
                         exit_price = curr_tp
                         exit_reason = "TP Hit"
 
-                # 2. Check Strategy Exit (Signal) - Only if not already hit SL/TP
+                # 2. Check Strategy Exit (Signal)
                 if not exit_reason:
                     trade_info = active_trade.copy()
                     trade_info['current_idx'] = i
@@ -180,22 +181,25 @@ class BacktestEngine:
                         exit_reason = "Signal"
                 
                 if exit_reason:
-                    # Calculate PnL
+                    # Calculate Realized PnL
                     trade_size = active_trade.get('size', 1.0)
                     if active_trade['direction'] == 'long':
                         trade_pnl = (exit_price - active_trade['entry_price']) * trade_size
                     else:
                         trade_pnl = (active_trade['entry_price'] - exit_price) * trade_size
                         
-                    # 5. Format Timestamps for Output (24h UTC)
-                    exit_dt = pd.to_datetime(current_time, unit='ns', utc=True)
+                    # Format for Output
+                    exit_dt = pd.to_datetime(current_time_ns, unit='ns', utc=True)
                     entry_dt = pd.to_datetime(active_trade['entry_time'], unit='ns', utc=True)
                     
                     active_trade['exit_time'] = exit_dt.strftime('%Y-%m-%d %H:%M:%S')
                     active_trade['entry_time'] = entry_dt.strftime('%Y-%m-%d %H:%M:%S')
 
-                    # Calculate Duration in Minutes
-                    duration_ns = current_time - int(entry_dt.value)
+                    # Store Unix timestamp for Chart markers
+                    active_trade['entry_ts'] = int(entry_dt.timestamp())
+                    active_trade['exit_ts'] = int(exit_dt.timestamp())
+
+                    duration_ns = current_time_ns - int(entry_dt.value)
                     duration_min = duration_ns / (1e9 * 60)
                     active_trade['duration'] = round(duration_min, 2)
 
@@ -203,19 +207,19 @@ class BacktestEngine:
                     active_trade['pnl'] = trade_pnl
                     active_trade['exit_reason'] = exit_reason
                     
-                    # Clean up numpy types for JSON
                     if active_trade['sl'] is not None and np.isnan(active_trade['sl']): active_trade['sl'] = None
                     if active_trade['tp'] is not None and np.isnan(active_trade['tp']): active_trade['tp'] = None
                     
                     trades.append(active_trade)
                     active_trade = None
-                    continue 
+
+                    trade_closed_pnl = trade_pnl
             
             # Check Entry
             if not active_trade:
                 if sig_long[i]:
                     active_trade = {
-                        "entry_time": current_time,
+                        "entry_time": current_time_ns,
                         "entry_price": close_p,
                         "direction": "long",
                         "sl": float(sl_arr[i]) if not np.isnan(sl_arr[i]) else None,
@@ -224,19 +228,55 @@ class BacktestEngine:
                     }
                 elif sig_short[i]:
                     active_trade = {
-                        "entry_time": current_time,
+                        "entry_time": current_time_ns,
                         "entry_price": close_p,
                         "direction": "short",
                         "sl": float(sl_arr[i]) if not np.isnan(sl_arr[i]) else None,
                         "tp": float(tp_arr[i]) if not np.isnan(tp_arr[i]) else None,
                         "size": float(pos_sizes[i]) if not np.isnan(pos_sizes[i]) else 1.0
                     }
-        
+
+            # Update Equity (Mark to Market + Closed PnL)
+            # Simple equity curve: Previous + Closed PnL + Unrealized PnL of active trade
+            # Note: accumulating closed PnL is simpler.
+            equity += trade_closed_pnl
+
+            current_equity = equity
+            if active_trade:
+                # Add unrealized PnL
+                size = active_trade.get('size', 1.0)
+                if active_trade['direction'] == 'long':
+                    unrealized = (close_p - active_trade['entry_price']) * size
+                else:
+                    unrealized = (active_trade['entry_price'] - close_p) * size
+                current_equity += unrealized
+
+            equity_curve.append({"time": current_time_sec, "value": current_equity})
+
         # Calculate Metrics
         metrics = PerformanceEngine.calculate_metrics(trades)
         
+        # Prepare Chart Data (Downsample if necessary)
+        # Limit OHLCV to e.g. 2000 points? For now, full dataset unless huge.
+        ohlcv_data = []
+        # Use simple iteration or vectorization to build list of dicts
+        # Vectorized approach:
+        # chart_df = df[['dtv', 'open', 'high', 'low', 'close']].copy()
+        # chart_df['time'] = chart_df['dtv'] // 1_000_000_000
+        # ohlcv_data = chart_df[['time', 'open', 'high', 'low', 'close']].to_dict(orient='records')
+
+        # Optimization: use numpy directly
+        times_sec = times // 1_000_000_000
+        ohlcv_data = [
+            {"time": int(t), "open": o, "high": h, "low": l, "close": c}
+            for t, o, h, l, c in zip(times_sec, opens, highs, lows, closes)
+        ]
+
         return {
             "metrics": metrics,
             "trades": trades, 
-            "chart_data": [] 
+            "chart_data": {
+                "ohlcv": ohlcv_data,
+                "equity": equity_curve
+            }
         }

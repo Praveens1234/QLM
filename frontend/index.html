@@ -44,6 +44,9 @@
     <!-- Monaco -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.js"></script>
 
+    <!-- Lightweight Charts -->
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/css/tailwind_custom.css">
 </head>
@@ -406,6 +409,18 @@
                                 <i class="fa-solid fa-chart-line text-4xl mb-4 opacity-30"></i>
                                 <span class="text-sm font-medium">Run a simulation to view metrics</span>
                             </div>
+                        </div>
+
+                        <!-- Charts Container -->
+                        <div id="bt-charts" class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm hidden">
+                            <div class="px-6 py-3 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+                                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Performance Visualization</h3>
+                                <div class="flex gap-2">
+                                    <span class="flex items-center gap-1 text-[10px] text-emerald-400"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Equity</span>
+                                    <span class="flex items-center gap-1 text-[10px] text-indigo-400"><span class="w-2 h-2 rounded-full bg-indigo-500"></span> Price</span>
+                                </div>
+                            </div>
+                            <div id="chart-container" class="w-full h-[500px] relative"></div>
                         </div>
                     </div>
                 </div>

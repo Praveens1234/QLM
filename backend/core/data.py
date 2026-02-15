@@ -55,22 +55,46 @@ class DataManager:
 
             if download_path.lower().endswith('.zip'):
                 logger.info("Detected ZIP file. Extracting...")
+
                 with zipfile.ZipFile(download_path, 'r') as zip_ref:
-                    zip_ref.extractall(temp_dir)
+                    # Security Check: Zip Slip
+                    # Validate all members before extraction
+                    members = zip_ref.namelist()
+                    safe_members = []
+
+                    for member in members:
+                        # Normalize path
+                        member_path = os.path.normpath(member)
+                        # Check for traversal
+                        if member_path.startswith("..") or os.path.isabs(member_path):
+                             logger.warning(f"Skipping unsafe file in zip: {member}")
+                             continue
+
+                        # We only care about CSVs in the root or direct folders for now,
+                        # but let's extract safe files.
+                        # Actually, we extract everything safe to temp_dir
+                        safe_members.append(member)
+
+                    if not safe_members:
+                        raise ValueError("No safe files found in ZIP archive.")
+
+                    zip_ref.extractall(temp_dir, members=safe_members)
 
                 # Find CSV
-                csv_files = [f for f in os.listdir(temp_dir) if f.lower().endswith('.csv')]
-
-                # Filter out __MACOSX garbage if present
-                csv_files = [f for f in csv_files if not f.startswith('__')]
+                csv_files = []
+                for root, dirs, files in os.walk(temp_dir):
+                    for file in files:
+                         if file.lower().endswith('.csv') and not file.startswith('__'):
+                             csv_files.append(os.path.join(root, file))
 
                 if len(csv_files) == 0:
                     raise ValueError("No CSV file found in the ZIP archive.")
                 if len(csv_files) > 1:
+                     # Strict rule: only 1 CSV allowed to avoid ambiguity
                     raise ValueError(f"Multiple CSV files found in ZIP ({len(csv_files)}). Please provide a ZIP with exactly one CSV.")
 
-                target_csv = os.path.join(temp_dir, csv_files[0])
-                logger.info(f"Found CSV: {csv_files[0]}")
+                target_csv = csv_files[0]
+                logger.info(f"Found CSV: {target_csv}")
 
             # 3. Process CSV
             return self._process_csv(target_csv, symbol, timeframe)

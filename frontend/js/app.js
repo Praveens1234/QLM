@@ -610,8 +610,9 @@ function renderAIStatus(msg) {
     document.getElementById('ai-status-detail').innerText = msg.detail;
 }
 
-function renderResults(results) {
+window.renderResults = function(results) {
     const container = document.getElementById('bt-results');
+    const chartContainerEl = document.getElementById('bt-charts');
     const m = results.metrics;
 
     const pnlColor = m.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400';
@@ -689,30 +690,124 @@ function renderResults(results) {
              </div>
         </div>
     `;
+
+    if (results.chart_data && results.chart_data.ohlcv) {
+        chartContainerEl.classList.remove('hidden');
+        window.renderBacktestCharts(results.chart_data, results.trades);
+    }
 }
 
-// Template Functions
-async function loadTemplates() {
-    const res = await fetch(`${API_URL}/strategies/templates/list`);
-    const templates = await res.json();
-    const select = document.getElementById('template-select');
-    select.innerHTML = `<option value="">Load Template...</option>` +
-        templates.map(t => `<option value="${t}">${t.toUpperCase()}</option>`).join('');
-}
+// Chart Manager
+let mainChart = null;
+let equitySeries = null;
+let candleSeries = null;
 
-async function applyTemplate() {
-    const name = document.getElementById('template-select').value;
-    if (!name) return;
+window.renderBacktestCharts = function(data, trades) {
+    const container = document.getElementById('chart-container');
+    container.innerHTML = ''; // Clear previous
 
-    if (editor && editor.getValue().length > 50 && !confirm("Replace current code with template?")) return;
+    if (mainChart) {
+        mainChart.remove();
+    }
 
-    const res = await fetch(`${API_URL}/strategies/templates/${name}`);
-    const data = await res.json();
+    const { createChart } = LightweightCharts;
 
-    if (editor) editor.setValue(data.code);
-    else document.getElementById('strategy-editor-fallback').value = data.code;
+    const chartOptions = {
+        layout: {
+            textColor: '#94a3b8', // slate-400
+            background: { type: 'solid', color: '#0f172a' }, // slate-900
+        },
+        grid: {
+            vertLines: { color: '#1e293b' },
+            horzLines: { color: '#1e293b' },
+        },
+        rightPriceScale: {
+            borderColor: '#334155',
+        },
+        timeScale: {
+            borderColor: '#334155',
+            timeVisible: true,
+        },
+    };
 
-    document.getElementById('strategy-name-input').value = `${name.toUpperCase()}_Strategy`;
+    mainChart = createChart(container, chartOptions);
+
+    // 1. Candlestick Series (Top)
+    candleSeries = mainChart.addCandlestickSeries({
+        upColor: '#10b981', // emerald-500
+        downColor: '#f43f5e', // rose-500
+        borderVisible: false,
+        wickUpColor: '#10b981',
+        wickDownColor: '#f43f5e',
+    });
+
+    // Sort and Ensure Unique Time
+    const sortedOHLCV = data.ohlcv.sort((a, b) => a.time - b.time);
+    const uniqueOHLCV = [];
+    if(sortedOHLCV.length > 0) {
+        uniqueOHLCV.push(sortedOHLCV[0]);
+        for(let i=1; i<sortedOHLCV.length; i++) {
+            if(sortedOHLCV[i].time > sortedOHLCV[i-1].time) {
+                uniqueOHLCV.push(sortedOHLCV[i]);
+            }
+        }
+    }
+
+    candleSeries.setData(uniqueOHLCV);
+
+    // 2. Markers for Trades
+    const markers = [];
+    trades.forEach(t => {
+        // Entry
+        markers.push({
+            time: t.entry_ts, // Unix timestamp from backend
+            position: t.direction === 'long' ? 'belowBar' : 'aboveBar',
+            color: t.direction === 'long' ? '#6366f1' : '#f59e0b', // indigo vs amber
+            shape: t.direction === 'long' ? 'arrowUp' : 'arrowDown',
+            text: 'Entry'
+        });
+        // Exit
+        markers.push({
+            time: t.exit_ts,
+            position: t.direction === 'long' ? 'aboveBar' : 'belowBar',
+            color: '#94a3b8',
+            shape: 'circle',
+            text: `Exit ($${t.pnl.toFixed(0)})`
+        });
+    });
+
+    markers.sort((a, b) => a.time - b.time);
+    candleSeries.setMarkers(markers);
+
+    // 3. Equity Curve
+    equitySeries = mainChart.addLineSeries({
+        color: '#fbbf24', // amber-400
+        lineWidth: 2,
+        priceScaleId: 'left', // Use left axis
+    });
+
+    // Configure Left Scale
+    mainChart.priceScale('left').applyOptions({
+        visible: true,
+        borderColor: '#334155',
+    });
+
+    // Sort equity data
+    const sortedEquity = data.equity.sort((a, b) => a.time - b.time);
+    const uniqueEquity = [];
+    if(sortedEquity.length > 0) {
+        uniqueEquity.push(sortedEquity[0]);
+        for(let i=1; i<sortedEquity.length; i++) {
+            if(sortedEquity[i].time > sortedEquity[i-1].time) {
+                uniqueEquity.push(sortedEquity[i]);
+            }
+        }
+    }
+
+    equitySeries.setData(uniqueEquity);
+
+    // Fit Content
+    mainChart.timeScale().fitContent();
 }
 
 // AI Assistant Logic (Persistent Sessions)
