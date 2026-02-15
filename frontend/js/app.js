@@ -64,6 +64,7 @@ const router = {
         }
         if (page === 'backtest') loadBacktestOptions();
         if (page === 'assistant') loadSessions();
+        if (page === 'mcp') loadMCPStatus();
     },
     init: () => {
         window.addEventListener('hashchange', () => router.navigate(window.location.hash.substring(1) || 'dashboard'));
@@ -202,6 +203,72 @@ async function saveActiveConfig() {
         body: JSON.stringify({provider_id: pid, model_id: mid})
     });
     alert("Active Configuration Updated!");
+}
+
+// MCP Service Functions
+async function loadMCPStatus() {
+    try {
+        const res = await fetch(`${API_URL}/mcp/status`);
+        const data = await res.json();
+
+        // Update Toggle
+        const toggle = document.getElementById('mcp-toggle');
+        const statusText = document.getElementById('mcp-status-text');
+        const statusDetail = document.getElementById('mcp-status-detail');
+
+        toggle.checked = data.is_active;
+        statusText.innerText = data.is_active ? "ON" : "OFF";
+
+        if (data.is_active) {
+            statusDetail.innerText = "Service Active & Listening";
+            statusDetail.className = "text-xs text-emerald-400";
+        } else {
+            statusDetail.innerText = "Service Offline";
+            statusDetail.className = "text-xs text-slate-400";
+        }
+
+        // Update Logs
+        const logContainer = document.getElementById('mcp-logs');
+        if (data.logs.length === 0) {
+            logContainer.innerHTML = '<div class="text-slate-500 italic">No activity recorded.</div>';
+        } else {
+            logContainer.innerHTML = data.logs.map(log => {
+                let color = "text-slate-300";
+                if(log.status === 'error') color = "text-rose-400";
+                if(log.status === 'crash') color = "text-rose-600 font-bold";
+
+                return `
+                <div class="border-b border-slate-900/50 pb-2 mb-2 last:border-0 font-mono">
+                    <div class="flex justify-between text-[10px] text-slate-500 mb-1">
+                        <span>${log.timestamp}</span>
+                        <span class="uppercase ${color}">${log.status}</span>
+                    </div>
+                    <div class="text-xs text-indigo-300 mb-0.5">${log.action}</div>
+                    <div class="text-[10px] text-slate-400 break-all">${log.details}</div>
+                </div>`;
+            }).join('');
+        }
+
+    } catch(e) {
+        console.error("MCP Status Error", e);
+    }
+}
+
+async function toggleMCPService() {
+    const toggle = document.getElementById('mcp-toggle');
+    const isActive = toggle.checked;
+
+    try {
+        await fetch(`${API_URL}/mcp/toggle`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({active: isActive})
+        });
+        loadMCPStatus();
+    } catch(e) {
+        alert("Failed to toggle service");
+        toggle.checked = !isActive; // revert
+    }
 }
 
 async function updateDashboardStats() {

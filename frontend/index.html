@@ -98,6 +98,11 @@
                 <span class="font-medium relative z-10">AI Architect</span>
                 <span class="ml-auto bg-indigo-500/20 text-indigo-300 text-[9px] font-bold px-1.5 py-0.5 rounded border border-indigo-500/20">BETA</span>
             </button>
+
+            <button onclick="router.navigate('mcp')" id="nav-mcp" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+                <i class="fa-solid fa-network-wired w-5 text-center text-slate-500 group-hover:text-orange-400 transition-colors"></i>
+                <span class="font-medium">MCP Service</span>
+            </button>
         </nav>
 
         <!-- Footer -->
@@ -454,6 +459,57 @@
                         </div>
                     </div>
                  </div>
+            </section>
+
+            <!-- MCP Dashboard -->
+            <section id="page-mcp" class="page hidden animate-fade-in max-w-5xl mx-auto space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white tracking-tight">MCP Service</h2>
+                        <p class="text-slate-400 text-sm mt-1">External AI Connection & Control</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="mcp-toggle" class="sr-only peer" onchange="toggleMCPService()">
+                        <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                        <span class="ml-3 text-sm font-medium text-slate-300" id="mcp-status-text">OFF</span>
+                    </label>
+                </div>
+
+                <!-- Connection Info -->
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide border-b border-slate-800 pb-2 mb-4">Connection Details</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">SSE Endpoint</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="mcp-endpoint" readonly value="http://localhost:8010/api/mcp/sse" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-indigo-300 font-mono focus:outline-none">
+                                <button onclick="navigator.clipboard.writeText(document.getElementById('mcp-endpoint').value)" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-3 py-2 rounded-lg transition-colors"><i class="fa-solid fa-copy"></i></button>
+                            </div>
+                            <p class="text-[10px] text-slate-500 mt-2">Use this URL in Claude Desktop or other MCP clients.</p>
+                        </div>
+                        <div class="flex items-center gap-4">
+                             <div class="p-3 bg-orange-500/10 rounded-lg border border-orange-500/20">
+                                <i class="fa-solid fa-plug text-orange-400 text-xl"></i>
+                             </div>
+                             <div>
+                                 <div class="text-sm font-medium text-white">Status</div>
+                                 <div class="text-xs text-slate-400" id="mcp-status-detail">Service is Offline</div>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activity Log -->
+                <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col h-[500px]">
+                    <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Activity Log</h3>
+                        <button onclick="loadMCPStatus()" class="text-slate-500 hover:text-white text-xs"><i class="fa-solid fa-refresh"></i> Refresh</button>
+                    </div>
+                    <div class="flex-1 overflow-auto bg-[#020617] p-4 font-mono text-xs space-y-2" id="mcp-logs">
+                        <!-- Logs -->
+                        <div class="text-slate-500 italic">No activity recorded.</div>
+                    </div>
+                </div>
             </section>
 
             <!-- Settings -->
