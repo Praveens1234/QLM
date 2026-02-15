@@ -202,12 +202,19 @@
                     </div>
                 </div>
 
-                <!-- Upload Card -->
+                <!-- Import Tabs -->
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                    <h3 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                        <i class="fa-solid fa-cloud-upload text-indigo-400"></i> Import Dataset
-                    </h3>
-                    <div class="flex flex-col md:flex-row gap-4 items-end">
+                    <div class="flex gap-4 border-b border-slate-800 pb-2 mb-4">
+                         <button id="tab-local" onclick="switchImportTab('local')" class="text-sm font-semibold text-indigo-400 border-b-2 border-indigo-400 pb-1">
+                            Local Upload
+                         </button>
+                         <button id="tab-url" onclick="switchImportTab('url')" class="text-sm font-semibold text-slate-500 hover:text-slate-300 pb-1 transition-colors">
+                            Import from URL
+                         </button>
+                    </div>
+
+                    <!-- Local Upload Form -->
+                    <div id="import-local" class="flex flex-col md:flex-row gap-4 items-end animate-fade-in">
                         <div class="flex-1 w-full">
                             <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">CSV File</label>
                             <input type="file" id="upload-file" accept=".csv" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-indigo-400 hover:file:bg-slate-700 cursor-pointer border border-slate-700 rounded-lg bg-slate-950 focus:outline-none focus:border-indigo-500 transition-colors">
@@ -222,6 +229,25 @@
                         </div>
                         <button onclick="uploadDataset()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-6 py-2 rounded-lg transition-colors shadow-lg shadow-indigo-900/20 text-sm flex items-center justify-center gap-2">
                             <i class="fa-solid fa-plus"></i> Upload
+                        </button>
+                    </div>
+
+                    <!-- URL Import Form -->
+                    <div id="import-url" class="hidden flex flex-col md:flex-row gap-4 items-end animate-fade-in">
+                        <div class="flex-1 w-full">
+                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Download URL (CSV/ZIP)</label>
+                            <input type="text" id="url-input" placeholder="https://example.com/data.zip" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono">
+                        </div>
+                        <div class="w-full md:w-48">
+                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Symbol</label>
+                            <input type="text" id="url-symbol" placeholder="e.g. XAUUSD" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono">
+                        </div>
+                        <div class="w-full md:w-32">
+                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Timeframe</label>
+                            <input type="text" id="url-tf" placeholder="e.g. 1H" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono">
+                        </div>
+                        <button onclick="importFromUrl()" id="btn-import-url" class="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-6 py-2 rounded-lg transition-colors shadow-lg shadow-emerald-900/20 text-sm flex items-center justify-center gap-2 whitespace-nowrap">
+                            <i class="fa-solid fa-cloud-download"></i> Download
                         </button>
                     </div>
                 </div>

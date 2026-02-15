@@ -30,7 +30,9 @@
 *   **Auto-Coder**: Generates high-quality, bug-free Python strategies strictly adhering to the QLM interface.
 
 ### 📊 Professional Data Management
-*   **Universal Ingestion**: Drag-and-drop CSV uploads with automatic parsing.
+*   **Universal Ingestion**:
+    *   **Local Upload**: Drag-and-drop CSV uploads.
+    *   **Remote Import**: Direct download from URLs (CSV or ZIP). Automatic extraction and validation.
 *   **Parquet Storage**: High-performance columnar storage for million-row datasets.
 *   **Market Structure Analytics**: Built-in tools for Trend, Volatility (ATR), and Support/Resistance analysis.
 
@@ -50,7 +52,7 @@
 ## 🛠️ Installation
 
 ### Prerequisites
-*   Python 3.9+
+*   Python 3.12+
 *   Git
 
 ### Quick Start
@@ -77,13 +79,16 @@
 ## 🚀 Usage Guide
 
 ### 1. Ingest Data
-Navigate to **Data Manager** and upload your OHLCV CSV files.
-*   **Format**: `Date, Open, High, Low, Close, Volume`
+Navigate to **Data Manager**.
+*   **Local**: Upload OHLCV CSV files.
+*   **URL**: Paste a direct link to a CSV or ZIP file (e.g., from Catbox, GitHub raw).
+*   **Format**: `Date, Open, High, Low, Close, Volume` (auto-detected).
 *   **Processing**: auto-converted to Parquet for speed.
 
 ### 2. AI Architect
 Go to the **AI Assistant** tab.
 *   **Ask**: "Analyze XAUUSD 1H structure and write a Trend Following strategy."
+*   **Advanced**: "Download dataset from [URL] for symbol BTCUSD 1H and test it."
 *   **Watch**: The "Status Pipeline" will show the agent analyzing data -> planning -> coding.
 *   **Auto-Fix**: If the code fails validation, the agent will see the error and fix it automatically.
 
@@ -105,7 +110,7 @@ Go to the **AI Assistant** tab.
 QLM/
 ├── backend/                # FastAPI Application
 │   ├── ai/                 # AI Brain, Agent, Tools, Memory, Store
-│   ├── core/               # Backtest Engine, Strategy Interface
+│   ├── core/               # Backtest Engine, Strategy Interface, Data
 │   ├── api/                # API Routes & WebSockets
 │   └── main.py             # Entry Point
 ├── frontend/               # UI Assets

@@ -280,6 +280,63 @@ async function deleteDataset(id) {
     loadDatasets();
 }
 
+// Data Import Tabs
+function switchImportTab(tab) {
+    const localForm = document.getElementById('import-local');
+    const urlForm = document.getElementById('import-url');
+    const tabLocal = document.getElementById('tab-local');
+    const tabUrl = document.getElementById('tab-url');
+
+    if (tab === 'local') {
+        localForm.classList.remove('hidden');
+        urlForm.classList.add('hidden');
+        tabLocal.className = "text-sm font-semibold text-indigo-400 border-b-2 border-indigo-400 pb-1";
+        tabUrl.className = "text-sm font-semibold text-slate-500 hover:text-slate-300 pb-1 transition-colors";
+    } else {
+        localForm.classList.add('hidden');
+        urlForm.classList.remove('hidden');
+        tabUrl.className = "text-sm font-semibold text-emerald-400 border-b-2 border-emerald-400 pb-1";
+        tabLocal.className = "text-sm font-semibold text-slate-500 hover:text-slate-300 pb-1 transition-colors";
+    }
+}
+
+async function importFromUrl() {
+    const url = document.getElementById('url-input').value;
+    const symbol = document.getElementById('url-symbol').value;
+    const timeframe = document.getElementById('url-tf').value;
+    const btn = document.getElementById('btn-import-url');
+
+    if (!url || !symbol || !timeframe) {
+        alert("Please fill all fields.");
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Downloading...`;
+
+    try {
+        const res = await fetch(`${API_URL}/data/url`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ url, symbol, timeframe })
+        });
+
+        if (res.ok) {
+            alert("Dataset imported successfully!");
+            document.getElementById('url-input').value = "";
+            loadDatasets();
+        } else {
+            const err = await res.json();
+            alert("Error: " + err.detail);
+        }
+    } catch (e) {
+        alert("Import failed: " + e);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-cloud-download"></i> Download`;
+    }
+}
+
 // Strategy Functions
 async function loadStrategies() {
     const res = await fetch(`${API_URL}/strategies/`);

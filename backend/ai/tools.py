@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 from backend.core.strategy import StrategyLoader
 from backend.core.store import MetadataStore
 from backend.core.engine import BacktestEngine
+from backend.core.data import DataManager
 from backend.ai.analytics import calculate_market_structure, optimize_strategy
 import os
 import shutil
@@ -20,6 +21,7 @@ class AITools:
     def __init__(self):
         self.strategy_loader = StrategyLoader()
         self.metadata_store = MetadataStore()
+        self.data_manager = DataManager()
         
     def get_definitions(self) -> List[Dict]:
         """
@@ -119,6 +121,22 @@ class AITools:
                             "timeframe": {"type": "string", "description": "Timeframe"}
                         },
                         "required": ["symbol", "timeframe"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "import_dataset_from_url",
+                    "description": "Import a dataset from a URL (CSV or ZIP).",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string", "description": "Direct download URL"},
+                            "symbol": {"type": "string", "description": "Symbol"},
+                            "timeframe": {"type": "string", "description": "Timeframe"}
+                        },
+                        "required": ["url", "symbol", "timeframe"]
                     }
                 }
             },
@@ -316,6 +334,18 @@ class AITools:
                     return {"data": head}
 
                 return await self._run_sync(_get_data)
+
+            elif tool_name == "import_dataset_from_url":
+                url = args.get("url")
+                symbol = args.get("symbol")
+                timeframe = args.get("timeframe")
+
+                def _import():
+                    metadata = self.data_manager.process_url(url, symbol, timeframe)
+                    self.metadata_store.add_dataset(metadata)
+                    return {"status": "success", "id": metadata['id'], "rows": metadata['row_count']}
+
+                return await self._run_sync(_import)
 
             elif tool_name == "read_file":
                 path = args.get("path")

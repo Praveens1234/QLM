@@ -1,15 +1,22 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
+from pydantic import BaseModel
 from backend.core.data import DataManager
 from backend.core.store import MetadataStore
 import shutil
 import os
 import uuid
+import asyncio
 from typing import List
 
 router = APIRouter()
 
 data_manager = DataManager()
 metadata_store = MetadataStore()
+
+class UrlImportRequest(BaseModel):
+    url: str
+    symbol: str
+    timeframe: str
 
 @router.post("/upload")
 async def upload_dataset(
@@ -24,8 +31,9 @@ async def upload_dataset(
             shutil.copyfileobj(file.file, buffer)
             
         try:
-            # Process via DataManager
-            metadata = data_manager.process_upload(temp_filename, symbol, timeframe)
+            # Process via DataManager (blocking, but fast for small files, maybe wrap if huge)
+            loop = asyncio.get_running_loop()
+            metadata = await loop.run_in_executor(None, data_manager.process_upload, temp_filename, symbol, timeframe)
             
             # Store Metadata
             metadata_store.add_dataset(metadata)
@@ -41,6 +49,33 @@ async def upload_dataset(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/url")
+async def import_from_url(request: UrlImportRequest):
+    """
+    Import dataset from a direct download URL (CSV or ZIP).
+    """
+    try:
+        # Offload to thread pool to avoid blocking event loop
+        loop = asyncio.get_running_loop()
+        metadata = await loop.run_in_executor(
+            None,
+            data_manager.process_url,
+            request.url,
+            request.symbol,
+            request.timeframe
+        )
+
+        metadata_store.add_dataset(metadata)
+        return {"status": "success", "data": metadata}
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        # Log error for debugging
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
 
 @router.get("/")
 async def list_datasets():
