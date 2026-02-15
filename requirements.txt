@@ -8,4 +8,7 @@ websockets>=11.0
 python-multipart>=0.0.6
 aiofiles>=23.0.0
 websocket-client>=1.6.0
-python-multipart>=0.0.6
+aiohttp>=3.8.0
+requests>=2.31.0
+mcp>=1.0.0
+psutil

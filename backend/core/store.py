@@ -10,6 +10,8 @@ class MetadataStore:
     
     def __init__(self, db_path: str = "data/metadata.db"):
         self.db_path = db_path
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self._init_db()
 
     def _init_db(self):

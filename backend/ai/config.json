@@ -1,6 +1,6 @@
 {
-    "active_provider_id": "test_provider",
-    "active_model_id": "model-b",
+    "active_provider_id": "test",
+    "active_model_id": "test-model",
     "providers": [
         {
             "id": "default",
