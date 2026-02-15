@@ -1,388 +1,122 @@
-const API_URL = "/api";
-const WS_URL = `ws://${window.location.host}/api/ws`;
+// QLM Frontend Application
+const API_BASE = '/api';
 
-// State
-let socket;
-let datasets = [];
-let strategies = [];
-let sessions = [];
-let currentSessionId = null;
-let currentStrategyCode = "";
-let editor; // Monaco instance
-
-// Router (Simple hash router)
+// --- Router ---
 const router = {
-    navigate: (page) => {
-        document.querySelectorAll('.page').forEach(el => {
-            el.classList.add('hidden');
-        });
-
-        const target = document.getElementById(`page-${page}`);
-        if(target) {
-            target.classList.remove('hidden');
-            target.classList.add('animate-fade-in');
-        }
-
-        window.location.hash = page;
-
-        // Update Nav Active State
-        document.querySelectorAll('.nav-item').forEach(btn => {
-            btn.classList.remove('bg-indigo-600/10', 'text-indigo-400', 'border-l-2', 'border-indigo-500');
-            // Remove icon active color
-            const icon = btn.querySelector('i');
-            if(icon) {
-                icon.classList.remove('text-indigo-400');
-                icon.classList.add('text-slate-500');
-            }
-            btn.classList.add('text-slate-400', 'hover:bg-slate-800');
-        });
-
-        const activeBtn = document.getElementById(`nav-${page}`);
-        if (activeBtn) {
-            activeBtn.classList.remove('text-slate-400', 'hover:bg-slate-800');
-            activeBtn.classList.add('bg-indigo-600/10', 'text-indigo-400', 'border-l-2', 'border-indigo-500');
-             const icon = activeBtn.querySelector('i');
-            if(icon) {
-                icon.classList.remove('text-slate-500');
-                icon.classList.add('text-indigo-400');
-            }
-        }
-
-        // Close mobile sidebar if open
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('sidebar-overlay');
-        if (sidebar && !sidebar.classList.contains('-translate-x-full') && window.innerWidth < 768) {
-            toggleSidebar();
-        }
-
-        // Page specific loads
-        if (page === 'dashboard') updateDashboardStats();
-        if (page === 'data') loadDatasets();
-        if (page === 'strategies') {
-            loadStrategies();
-            setTimeout(() => { if (editor) editor.layout(); }, 200);
-        }
-        if (page === 'backtest') loadBacktestOptions();
-        if (page === 'assistant') loadSessions();
-        if (page === 'mcp') loadMCPStatus();
+    routes: {
+        '': 'page-dashboard',
+        '#dashboard': 'page-dashboard',
+        '#data': 'page-data',
+        '#strategies': 'page-strategies',
+        '#backtest': 'page-backtest',
+        '#assistant': 'page-assistant', // Changed from #ai
+        '#mcp': 'page-mcp',
+        '#settings': 'page-settings'
     },
-    init: () => {
-        window.addEventListener('hashchange', () => router.navigate(window.location.hash.substring(1) || 'dashboard'));
-        router.navigate(window.location.hash.substring(1) || 'dashboard');
+
+    init: function() {
+        window.addEventListener('hashchange', this.handleRoute.bind(this));
+        window.addEventListener('load', this.handleRoute.bind(this));
+        this.handleRoute(); // Initial load
+    },
+
+    handleRoute: function() {
+        const hash = window.location.hash || '';
+        const pageId = this.routes[hash] || 'page-dashboard';
+
+        // Hide all pages
+        document.querySelectorAll('.page').forEach(page => {
+            page.classList.add('hidden');
+        });
+
+        // Show active page
+        const activePage = document.getElementById(pageId);
+        if (activePage) {
+            activePage.classList.remove('hidden');
+        }
+
+        // Update active nav link
+        document.querySelectorAll('.nav-item').forEach(link => { // Changed class selector
+            link.classList.remove('bg-slate-800', 'text-white');
+            link.classList.add('text-slate-400');
+            // Logic to match href or id
+            // Simple approach: map hash to nav id
+            const navIdMap = {
+                '': 'nav-dashboard',
+                '#dashboard': 'nav-dashboard',
+                '#data': 'nav-data',
+                '#strategies': 'nav-strategies',
+                '#backtest': 'nav-backtest',
+                '#assistant': 'nav-assistant',
+                '#mcp': 'nav-mcp',
+                '#settings': 'nav-settings'
+            };
+            const navId = navIdMap[hash] || 'nav-dashboard';
+            if (link.id === navId) {
+                link.classList.add('bg-slate-800', 'text-white');
+                link.classList.remove('text-slate-400');
+            }
+        });
+
+        // Page specific logic
+        if (pageId === 'page-data') loadData();
+        if (pageId === 'page-strategies') loadStrategies();
+        if (pageId === 'page-backtest') { loadStrategies(); loadData(); } // Populate dropdowns
+        if (pageId === 'page-mcp') initMCP();
+    },
+
+    navigate: function(hash) {
+        window.location.hash = hash;
     }
 };
 
-// UI Toggles
-function toggleSidebar() {
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('sidebar-overlay');
+// Expose router to window
+window.router = router;
 
-    if (sidebar.classList.contains('-translate-x-full')) {
-        // Open
-        sidebar.classList.remove('-translate-x-full');
-        overlay.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
-    } else {
-        // Close
-        sidebar.classList.add('-translate-x-full');
-        overlay.classList.add('opacity-0', 'pointer-events-none');
-        setTimeout(() => overlay.classList.add('hidden'), 300); // Wait for fade out
-    }
-}
-
-// AI Settings & Registry
-let providers = [];
-let activeConfig = {};
-
-async function loadProviders() {
+// --- Data Manager ---
+async function loadData() {
     try {
-        const res = await fetch(`${API_URL}/ai/config/providers`);
-        providers = await res.json();
-
-        // Render List
-        const list = document.getElementById('provider-list');
-        list.innerHTML = providers.map(p => `
-            <li class="px-6 py-3 flex justify-between items-center">
-                <div>
-                    <div class="font-medium text-slate-300">${p.name}</div>
-                    <div class="text-[10px] text-slate-500 font-mono">${p.base_url}</div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-[10px] ${p.has_key ? 'text-emerald-500' : 'text-rose-500'} bg-slate-800 px-2 py-0.5 rounded">
-                        ${p.has_key ? 'KEY SET' : 'NO KEY'}
-                    </span>
-                    <div class="text-xs text-slate-500">${p.models.length} Models</div>
-                </div>
-            </li>
-        `).join('');
-
-        // Populate Active Dropdown
-        const activeSelect = document.getElementById('active-provider');
-        activeSelect.innerHTML = `<option value="">Select Provider</option>` +
-            providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-
-        // Load Active Config
-        const confRes = await fetch(`${API_URL}/ai/config/active`);
-        activeConfig = await confRes.json();
-
-        if (activeConfig.base_url) { // infer provider by url matching or just select if active set
-             // Simple matching logic if provider_name is returned
-             if(activeConfig.provider_name) {
-                 // find id
-                 const p = providers.find(x => x.name === activeConfig.provider_name);
-                 if(p) {
-                     activeSelect.value = p.id;
-                     loadProviderModels(p.id, activeConfig.model);
-                 }
-             }
-        }
-    } catch (e) { console.error("Error loading providers", e); }
-}
-
-async function addProvider() {
-    const name = document.getElementById('new-prov-name').value;
-    const url = document.getElementById('new-prov-url').value;
-    const key = document.getElementById('new-prov-key').value;
-
-    if(!name || !url || !key) {
-        alert("Fill all fields");
-        return;
-    }
-
-    try {
-        await fetch(`${API_URL}/ai/config/providers`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name, base_url: url, api_key: key})
-        });
-
-        // Auto-fetch models
-        const provId = name.toLowerCase().replace(/ /g, "_");
-        // Reload list
-        await loadProviders();
-        // Trigger model fetch
-        alert("Provider added. Fetching models...");
-        await fetchModelsForProvider(provId);
-        await loadProviders(); // Reload with models
-
-        // Clear inputs
-        document.getElementById('new-prov-name').value = "";
-        document.getElementById('new-prov-url').value = "";
-        document.getElementById('new-prov-key').value = "";
-
-    } catch(e) {
-        alert("Error adding provider: " + e);
-    }
-}
-
-async function fetchModelsForProvider(providerId) {
-    try {
-        await fetch(`${API_URL}/ai/config/models/${providerId}`);
-    } catch (e) {
-        console.error("Model fetch failed", e);
-    }
-}
-
-function loadProviderModels(providerId, selectedModel = null) {
-    const provider = providers.find(p => p.id === providerId);
-    const modelSelect = document.getElementById('active-model');
-    modelSelect.innerHTML = "";
-
-    if (provider && provider.models) {
-        modelSelect.innerHTML = provider.models.map(m => `<option value="${m}">${m}</option>`).join('');
-        if (selectedModel) modelSelect.value = selectedModel;
-    }
-}
-
-async function saveActiveConfig() {
-    const pid = document.getElementById('active-provider').value;
-    const mid = document.getElementById('active-model').value;
-
-    await fetch(`${API_URL}/ai/config/active`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({provider_id: pid, model_id: mid})
-    });
-    alert("Active Configuration Updated!");
-}
-
-// MCP Service Functions
-async function loadMCPStatus() {
-    try {
-        const res = await fetch(`${API_URL}/mcp/status`);
+        const res = await fetch(`${API_BASE}/data`);
         const data = await res.json();
+        const tbody = document.getElementById('data-table-body');
+        if(tbody) tbody.innerHTML = '';
 
-        // Update Toggle
-        const toggle = document.getElementById('mcp-toggle');
-        const statusText = document.getElementById('mcp-status-text');
-        const statusDetail = document.getElementById('mcp-status-detail');
+        // Populate Backtest Dataset Dropdown
+        const btSelect = document.getElementById('bt-dataset');
+        if(btSelect) btSelect.innerHTML = '';
 
-        toggle.checked = data.is_active;
-        statusText.innerText = data.is_active ? "ON" : "OFF";
+        data.forEach(d => {
+            if(tbody) {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-800 hover:bg-slate-800/50 transition-colors';
+                tr.innerHTML = `
+                    <td class="px-6 py-4 text-white font-medium">${d.symbol}</td>
+                    <td class="px-6 py-4 text-slate-400">${d.timeframe}</td>
+                    <td class="px-6 py-4 text-slate-400">${d.start_date || '-'} to ${d.end_date || '-'}</td>
+                    <td class="px-6 py-4 text-right text-slate-400">${d.rows || 0}</td>
+                    <td class="px-6 py-4 text-right">
+                        <button class="text-rose-400 hover:text-rose-300 transition-colors" onclick="deleteData('${d.id}')">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
 
-        if (data.is_active) {
-            statusDetail.innerText = "Service Active & Listening";
-            statusDetail.className = "text-xs text-emerald-400";
-        } else {
-            statusDetail.innerText = "Service Offline";
-            statusDetail.className = "text-xs text-slate-400";
-        }
-
-        // Update Logs
-        const logContainer = document.getElementById('mcp-logs');
-        if (data.logs.length === 0) {
-            logContainer.innerHTML = '<div class="text-slate-500 italic">No activity recorded.</div>';
-        } else {
-            logContainer.innerHTML = data.logs.map(log => {
-                let color = "text-slate-300";
-                if(log.status === 'error') color = "text-rose-400";
-                if(log.status === 'crash') color = "text-rose-600 font-bold";
-
-                return `
-                <div class="border-b border-slate-900/50 pb-2 mb-2 last:border-0 font-mono">
-                    <div class="flex justify-between text-[10px] text-slate-500 mb-1">
-                        <span>${log.timestamp}</span>
-                        <span class="uppercase ${color}">${log.status}</span>
-                    </div>
-                    <div class="text-xs text-indigo-300 mb-0.5">${log.action}</div>
-                    <div class="text-[10px] text-slate-400 break-all">${log.details}</div>
-                </div>`;
-            }).join('');
-        }
-
-    } catch(e) {
-        console.error("MCP Status Error", e);
-    }
-}
-
-async function toggleMCPService() {
-    const toggle = document.getElementById('mcp-toggle');
-    const isActive = toggle.checked;
-
-    try {
-        await fetch(`${API_URL}/mcp/toggle`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({active: isActive})
+            if(btSelect) {
+                const opt = document.createElement('option');
+                opt.value = d.id;
+                opt.textContent = `${d.symbol} ${d.timeframe} (${d.rows} rows)`;
+                btSelect.appendChild(opt);
+            }
         });
-        loadMCPStatus();
-    } catch(e) {
-        alert("Failed to toggle service");
-        toggle.checked = !isActive; // revert
-    }
-}
 
-async function updateDashboardStats() {
-    try {
-        const dRes = await fetch(`${API_URL}/data/`);
-        const datasets = await dRes.json();
-        const sRes = await fetch(`${API_URL}/strategies/`);
-        const strategies = await sRes.json();
+        // Update Stats on Dashboard (if element exists)
+        const statEl = document.querySelector('[data-stat="datasets"]');
+        if(statEl) statEl.textContent = data.length;
 
-        const cards = document.querySelectorAll('.stat-value');
-        if (cards.length >= 2) {
-            cards[0].innerText = strategies.length;
-            cards[1].innerText = datasets.length;
-        }
-    } catch (e) { console.error("Stats error", e); }
-}
-
-// WebSocket
-function initWS() {
-    socket = new WebSocket(WS_URL);
-    socket.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'progress') {
-            updateProgress(msg);
-        } else if (msg.type === 'finished') {
-            updateProgress(msg);
-            renderResults(msg.results);
-        }
-    };
-    socket.onopen = () => console.log("WS Connected");
-    socket.onclose = () => setTimeout(initWS, 1000);
-}
-
-// Data Functions
-async function loadDatasets() {
-    const res = await fetch(`${API_URL}/data/`);
-    datasets = await res.json();
-    renderDatasets();
-}
-
-function renderDatasets() {
-    const tbody = document.getElementById('data-table-body');
-    if (datasets.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-4 text-center text-xs text-slate-500 uppercase tracking-wide">No Datasets Found</td></tr>`;
-        return;
-    }
-    tbody.innerHTML = datasets.map(d => `
-        <tr class="hover:bg-slate-800/50 transition-colors group">
-            <td class="px-6 py-4 font-mono font-medium text-white">${d.symbol}</td>
-            <td class="px-6 py-4">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-800 text-slate-300 border border-slate-700">
-                    ${d.timeframe}
-                </span>
-            </td>
-            <td class="px-6 py-4 text-xs text-slate-500 font-mono">
-                ${d.start_date.split('T')[0]} <span class="text-slate-600">to</span> ${d.end_date.split('T')[0]}
-            </td>
-            <td class="px-6 py-4 text-right text-xs text-slate-400 font-mono">${d.row_count.toLocaleString()}</td>
-            <td class="px-6 py-4 text-right">
-                <button onclick="deleteDataset('${d.id}')" class="text-slate-500 hover:text-rose-500 transition-colors p-1.5 rounded hover:bg-slate-800 opacity-0 group-hover:opacity-100">
-                    <i class="fa-solid fa-trash-can"></i>
-                </button>
-            </td>
-        </tr>
-    `).join('');
-}
-
-async function uploadDataset() {
-    const fileInput = document.getElementById('upload-file');
-    const symbolInput = document.getElementById('upload-symbol');
-    const tfInput = document.getElementById('upload-tf');
-
-    const formData = new FormData();
-    formData.append('file', fileInput.files[0]);
-    formData.append('symbol', symbolInput.value);
-    formData.append('timeframe', tfInput.value);
-
-    try {
-        const res = await fetch(`${API_URL}/data/upload`, { method: 'POST', body: formData });
-        if (res.ok) {
-            alert("Uploaded successfully");
-            loadDatasets();
-        } else {
-            const err = await res.json();
-            alert("Error: " + err.detail);
-        }
     } catch (e) {
-        alert("Upload failed: " + e);
-    }
-}
-
-async function deleteDataset(id) {
-    if (!confirm("Are you sure?")) return;
-    await fetch(`${API_URL}/data/${id}`, { method: 'DELETE' });
-    loadDatasets();
-}
-
-// Data Import Tabs
-function switchImportTab(tab) {
-    const localForm = document.getElementById('import-local');
-    const urlForm = document.getElementById('import-url');
-    const tabLocal = document.getElementById('tab-local');
-    const tabUrl = document.getElementById('tab-url');
-
-    if (tab === 'local') {
-        localForm.classList.remove('hidden');
-        urlForm.classList.add('hidden');
-        tabLocal.className = "text-sm font-semibold text-indigo-400 border-b-2 border-indigo-400 pb-2 transition-colors focus:outline-none";
-        tabUrl.className = "text-sm font-semibold text-slate-500 hover:text-slate-300 border-b-2 border-transparent pb-2 transition-colors focus:outline-none";
-    } else {
-        localForm.classList.add('hidden');
-        urlForm.classList.remove('hidden');
-        tabUrl.className = "text-sm font-semibold text-emerald-400 border-b-2 border-emerald-400 pb-2 transition-colors focus:outline-none";
-        tabLocal.className = "text-sm font-semibold text-slate-500 hover:text-slate-300 border-b-2 border-transparent pb-2 transition-colors focus:outline-none";
+        console.error("Load Data Error:", e);
     }
 }
 
@@ -390,332 +124,226 @@ async function importFromUrl() {
     const url = document.getElementById('url-input').value;
     const symbol = document.getElementById('url-symbol').value;
     const timeframe = document.getElementById('url-tf').value;
+
+    if (!url || !symbol) return alert("URL and Symbol are required");
+
     const btn = document.getElementById('btn-import-url');
-
-    if (!url || !symbol || !timeframe) {
-        alert("Please fill all fields.");
-        return;
-    }
-
     btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Downloading...`;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Importing...';
 
     try {
-        const res = await fetch(`${API_URL}/data/url`, {
+        const res = await fetch(`${API_BASE}/data/url`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ url, symbol, timeframe })
         });
 
+        const result = await res.json();
         if (res.ok) {
-            alert("Dataset imported successfully!");
-            document.getElementById('url-input').value = "";
-            loadDatasets();
+            alert(`Imported ${result.rows} rows.`);
+            loadData();
         } else {
-            const err = await res.json();
-            alert("Error: " + err.detail);
+            alert("Error: " + result.detail);
         }
     } catch (e) {
         alert("Import failed: " + e);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-cloud-download"></i> Download`;
+        btn.innerHTML = '<i class="fa-solid fa-cloud-download"></i> Download';
     }
 }
 
-// Strategy Functions
+function switchImportTab(tab) {
+    document.getElementById('import-local').classList.add('hidden');
+    document.getElementById('import-url').classList.add('hidden');
+    document.getElementById('tab-local').className = "text-sm font-semibold text-slate-500 hover:text-slate-300 border-b-2 border-transparent pb-2 transition-colors focus:outline-none";
+    document.getElementById('tab-url').className = "text-sm font-semibold text-slate-500 hover:text-slate-300 border-b-2 border-transparent pb-2 transition-colors focus:outline-none";
+
+    if(tab === 'local') {
+        document.getElementById('import-local').classList.remove('hidden');
+        document.getElementById('tab-local').className = "text-sm font-semibold text-indigo-400 border-b-2 border-indigo-400 pb-2 transition-colors focus:outline-none";
+    } else {
+        document.getElementById('import-url').classList.remove('hidden');
+        document.getElementById('tab-url').className = "text-sm font-semibold text-indigo-400 border-b-2 border-indigo-400 pb-2 transition-colors focus:outline-none";
+    }
+}
+window.switchImportTab = switchImportTab;
+
+// --- Strategy Lab ---
 async function loadStrategies() {
-    const res = await fetch(`${API_URL}/strategies/`);
-    strategies = await res.json();
-    const list = document.getElementById('strategy-list');
-
-    if (strategies.length === 0) {
-        list.innerHTML = `<div class="p-4 text-center text-xs text-slate-500">No strategies yet</div>`;
-        return;
-    }
-
-    list.innerHTML = strategies.map(s => `
-        <div class="group flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700" onclick="loadStrategyCode('${s.name}', ${s.latest_version})">
-            <div class="flex items-center gap-3 overflow-hidden">
-                <div class="h-8 w-8 rounded bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-xs font-mono font-bold border border-indigo-500/20">PY</div>
-                <div class="overflow-hidden">
-                    <h4 class="text-sm font-medium text-slate-200 truncate">${s.name}</h4>
-                    <p class="text-[10px] text-slate-500">v${s.latest_version}</p>
-                </div>
-            </div>
-            <button onclick="deleteStrategy('${s.name}'); event.stopPropagation();" class="text-slate-600 hover:text-rose-500 p-1.5 rounded transition-colors opacity-0 group-hover:opacity-100">
-                <i class="fa-solid fa-trash-can text-xs"></i>
-            </button>
-        </div>
-    `).join('');
-}
-
-function createNewStrategy() {
-    currentStrategyCode = "";
-    document.getElementById('strategy-name-input').value = "";
-    if (editor) editor.setValue("# New Strategy\n\nfrom backend.core.strategy import Strategy\n\nclass NewStrategy(Strategy):\n    pass");
-}
-
-async function deleteStrategy(name) {
-    if (!confirm(`Are you sure you want to delete strategy '${name}'? This action cannot be undone.`)) return;
-
     try {
-        const res = await fetch(`${API_URL}/strategies/${name}`, { method: 'DELETE' });
-        if (res.ok) {
-            loadStrategies();
-            if (document.getElementById('strategy-name-input').value === name) {
-                createNewStrategy();
-            }
-        } else {
-            const err = await res.json();
-            alert("Error: " + err.detail);
+        const res = await fetch(`${API_BASE}/strategies`);
+        const strategies = await res.json();
+
+        // Update Stats
+        const statEl = document.querySelector('[data-stat="strategies"]');
+        if(statEl) statEl.textContent = strategies.length;
+
+        // List
+        const list = document.getElementById('strategy-list');
+        if(list) {
+            list.innerHTML = '';
+            strategies.forEach(s => {
+                const div = document.createElement('div');
+                div.className = "px-3 py-2 hover:bg-slate-800 rounded cursor-pointer transition-colors group";
+                div.onclick = () => loadStrategyCode(s.name);
+                div.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-medium text-slate-300 group-hover:text-white">${s.name}</span>
+                        <span class="text-[10px] text-slate-500 font-mono">v${s.latest_version}</span>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        // Populate select in Backtest Runner
+        const select = document.getElementById('bt-strategy');
+        if(select) {
+            select.innerHTML = '';
+            strategies.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.name;
+                opt.textContent = s.name;
+                select.appendChild(opt);
+            });
         }
     } catch (e) {
-        alert("Delete failed: " + e);
+        console.error("Load Strategies Error:", e);
     }
 }
 
-async function loadStrategyCode(name, version) {
-    const res = await fetch(`${API_URL}/strategies/${name}/${version}`);
-    const data = await res.json();
-    currentStrategyCode = data.code;
-    document.getElementById('strategy-name-input').value = name;
-    if (editor) editor.setValue(data.code);
-}
+// --- Backtest Runner ---
+async function runBacktest() {
+    const strategy = document.getElementById('bt-strategy').value;
+    const dataset_id = document.getElementById('bt-dataset').value;
 
-async function saveStrategy() {
-    const name = document.getElementById('strategy-name-input').value;
-    const code = editor ? editor.getValue() : document.getElementById('strategy-editor-fallback').value;
+    if (!strategy || !dataset_id) return alert("Please select a strategy and dataset");
 
-    const res = await fetch(`${API_URL}/strategies/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, code })
-    });
+    // Status Update
+    const statusBadge = document.getElementById('bt-status-badge');
+    const statusText = document.getElementById('bt-status');
+    const progressBar = document.getElementById('bt-progress-bar');
 
-    if (res.ok) {
-        alert("Strategy Saved");
-        loadStrategies();
-    } else {
-        alert("Error saving strategy");
-    }
-}
-
-async function validateStrategy() {
-    const code = editor ? editor.getValue() : document.getElementById('strategy-editor-fallback').value;
+    statusBadge.classList.remove('hidden');
+    statusText.textContent = "INITIALIZING...";
+    progressBar.style.width = "5%";
 
     try {
-        const res = await fetch(`${API_URL}/strategies/validate`, {
+        const res = await fetch(`${API_BASE}/backtest/run`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: "temp", code })
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                strategy_name: strategy,
+                dataset_id: dataset_id
+            })
         });
 
         const result = await res.json();
 
-        if (result.valid) {
-            alert(`✅ Valid! \n${result.message}`);
+        if (res.ok && result.status === 'success') {
+             progressBar.style.width = "100%";
+             statusText.textContent = "COMPLETED";
+             statusBadge.className = "bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold border border-emerald-500/20";
+             statusBadge.textContent = "SUCCESS";
+
+             renderResults(result.results);
         } else {
-            alert(`❌ Invalid! \n${result.error}`);
+            progressBar.style.width = "100%";
+            progressBar.classList.add('bg-rose-500');
+            statusText.textContent = "FAILED";
+            statusBadge.className = "bg-rose-500/10 text-rose-400 text-[10px] px-2 py-0.5 rounded font-bold border border-rose-500/20";
+            statusBadge.textContent = "ERROR";
+            alert("Backtest failed: " + (result.detail || "Unknown error"));
         }
     } catch (e) {
-        alert("Validation request failed: " + e);
+        alert("Error running backtest: " + e);
     }
 }
-
-// Backtest Functions
-function loadBacktestOptions() {
-    const dSelect = document.getElementById('bt-dataset');
-    const sSelect = document.getElementById('bt-strategy');
-
-    dSelect.innerHTML = datasets.map(d => `<option value="${d.id}">${d.symbol} (${d.timeframe})</option>`).join('');
-    sSelect.innerHTML = strategies.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
-}
-
-async function runBacktest() {
-    const datasetId = document.getElementById('bt-dataset').value;
-    const strategyName = document.getElementById('bt-strategy').value;
-
-    document.getElementById('bt-progress-bar').style.width = '0%';
-    document.getElementById('bt-status').innerText = "Starting...";
-
-    // Show badge
-    const badge = document.getElementById('bt-status-badge');
-    badge.classList.remove('hidden');
-    badge.innerText = "STARTING";
-    badge.className = "bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
-
-    const res = await fetch(`${API_URL}/backtest/run`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataset_id: datasetId, strategy_name: strategyName })
-    });
-
-    if (!res.ok) {
-        alert("Backtest failed to start");
-        document.getElementById('bt-status').innerText = "Failed";
-        badge.innerText = "FAILED";
-        badge.className = "bg-rose-500/10 text-rose-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
-    }
-}
-
-function updateProgress(msg) {
-    const bar = document.getElementById('bt-progress-bar');
-    const status = document.getElementById('bt-status');
-    const badge = document.getElementById('bt-status-badge');
-
-    if (msg.type === 'progress') {
-        bar.style.width = `${msg.progress}%`;
-        status.innerText = `${msg.message} - ${msg.data.current_time}`;
-
-        badge.innerText = "RUNNING";
-        badge.className = "bg-indigo-500/10 text-indigo-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
-
-    } else if (msg.type === 'finished') {
-        bar.style.width = '100%';
-        status.innerText = "Completed";
-        badge.innerText = "COMPLETED";
-        badge.className = "bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
-    } else if (msg.type === 'ai_status') {
-        renderAIStatus(msg);
-    }
-}
-
-function renderAIStatus(msg) {
-    if (msg.session_id !== currentSessionId) return;
-
-    const container = document.getElementById('chat-container');
-    // Check if last element is a status indicator
-    let statusEl = document.getElementById('ai-status-indicator');
-
-    if (!statusEl) {
-        const div = document.createElement('div');
-        div.id = 'ai-status-indicator';
-        div.className = "flex w-full mb-4 justify-start";
-        div.innerHTML = `
-            <div class="max-w-[85%] p-3 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 text-xs flex items-center gap-3 animate-pulse">
-                <i class="fa-solid fa-circle-notch fa-spin text-indigo-500"></i>
-                <div class="flex flex-col">
-                    <span class="font-bold uppercase tracking-wide text-[10px] text-indigo-400" id="ai-status-step">Thinking</span>
-                    <span id="ai-status-detail">Processing...</span>
-                </div>
-            </div>
-        `;
-        container.appendChild(div);
-        container.scrollTop = container.scrollHeight;
-        statusEl = div;
-    }
-
-    document.getElementById('ai-status-step').innerText = msg.step;
-    document.getElementById('ai-status-detail').innerText = msg.detail;
-}
+window.runBacktest = runBacktest;
 
 window.renderResults = function(results) {
-    const container = document.getElementById('bt-results');
-    const chartContainerEl = document.getElementById('bt-charts');
-    const m = results.metrics;
-
-    const pnlColor = m.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400';
-
-    container.innerHTML = `
-        <!-- Metrics Grid -->
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
-                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Net Profit</span>
-                <div class="text-xl font-bold ${pnlColor} mt-1 font-mono tracking-tight">$${m.net_profit}</div>
+    // Show results section
+    const resultsContainer = document.getElementById('bt-results');
+    resultsContainer.innerHTML = `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Net Profit</div>
+                <div class="${results.metrics.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400'} text-xl font-bold font-mono">$${results.metrics.net_profit.toFixed(2)}</div>
              </div>
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
-                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Trades</span>
-                <div class="text-xl font-bold text-white mt-1 font-mono tracking-tight">${m.total_trades}</div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Win Rate</div>
+                <div class="text-white text-xl font-bold font-mono">${(results.metrics.win_rate * 100).toFixed(1)}%</div>
              </div>
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
-                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Win Rate</span>
-                <div class="text-xl font-bold text-white mt-1 font-mono tracking-tight">${m.win_rate}%</div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Max Drawdown</div>
+                <div class="text-rose-400 text-xl font-bold font-mono">${(results.metrics.max_drawdown * 100).toFixed(1)}%</div>
              </div>
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
-                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Profit Factor</span>
-                <div class="text-xl font-bold text-white mt-1 font-mono tracking-tight">${m.profit_factor}</div>
-             </div>
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
-                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Max DD</span>
-                <div class="text-xl font-bold text-rose-400 mt-1 font-mono tracking-tight">$${m.max_drawdown}</div>
-             </div>
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
-                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Avg Duration</span>
-                <div class="text-xl font-bold text-white mt-1 font-mono tracking-tight">${m.avg_duration}m</div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Profit Factor</div>
+                <div class="text-white text-xl font-bold font-mono">${results.metrics.profit_factor.toFixed(2)}</div>
              </div>
         </div>
         
-        <!-- Trade Ledger -->
         <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
              <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/50">
-                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Trade Ledger</h3>
-             </div>
-             <div class="overflow-x-auto max-h-[400px]">
-                <table class="w-full text-left text-sm text-slate-400">
-                    <thead class="bg-slate-950 text-[10px] uppercase font-bold text-slate-500 sticky top-0">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Trade List</h3>
+            </div>
+            <div class="max-h-64 overflow-y-auto">
+                 <table class="w-full text-left text-xs font-mono">
+                    <thead class="bg-slate-950 text-slate-500 sticky top-0">
                         <tr>
-                            <th class="px-6 py-3 tracking-wider">Entry Time (UTC)</th>
-                            <th class="px-6 py-3 tracking-wider">Dir</th>
-                            <th class="px-6 py-3 tracking-wider">Size</th>
-                            <th class="px-6 py-3 tracking-wider text-right">Entry</th>
-                            <th class="px-6 py-3 tracking-wider">Exit Time (UTC)</th>
-                            <th class="px-6 py-3 tracking-wider text-right">Exit</th>
-                            <th class="px-6 py-3 tracking-wider text-right">PnL</th>
-                            <th class="px-6 py-3 tracking-wider text-right">Reason</th>
+                            <th class="px-4 py-2">Entry Time</th>
+                            <th class="px-4 py-2">Dir</th>
+                            <th class="px-4 py-2 text-right">Price</th>
+                            <th class="px-4 py-2 text-right">Exit</th>
+                            <th class="px-4 py-2 text-right">PnL</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-800 font-mono text-xs">
-                        ${results.trades.map(t => {
-                            const pnlClass = t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400';
-                            const dirClass = t.direction === 'long' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20';
-
-                            return `
-                            <tr class="hover:bg-slate-800/50 transition-colors">
-                                <td class="px-6 py-3">${t.entry_time}</td>
-                                <td class="px-6 py-3">
-                                    <span class="px-2 py-0.5 rounded text-[9px] font-bold border uppercase ${dirClass}">${t.direction}</span>
-                                </td>
-                                <td class="px-6 py-3">${t.size ? t.size.toFixed(2) : '1.00'}</td>
-                                <td class="px-6 py-3 text-right text-white">${t.entry_price.toFixed(2)}</td>
-                                <td class="px-6 py-3">${t.exit_time}</td>
-                                <td class="px-6 py-3 text-right text-white">${t.exit_price.toFixed(2)}</td>
-                                <td class="px-6 py-3 text-right font-bold ${pnlClass}">${t.pnl.toFixed(2)}</td>
-                                <td class="px-6 py-3 text-right text-slate-500">${t.exit_reason}</td>
+                    <tbody class="divide-y divide-slate-800 text-slate-400">
+                        ${results.trades.map(t => `
+                            <tr class="hover:bg-slate-800/50">
+                                <td class="px-4 py-2">${t.entry_time}</td>
+                                <td class="px-4 py-2 ${t.direction === 'long' ? 'text-emerald-400' : 'text-rose-400'} uppercase font-bold">${t.direction}</td>
+                                <td class="px-4 py-2 text-right">${t.entry_price.toFixed(2)}</td>
+                                <td class="px-4 py-2 text-right">${t.exit_price.toFixed(2)}</td>
+                                <td class="px-4 py-2 text-right ${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${t.pnl.toFixed(2)}</td>
                             </tr>
-                            `;
-                        }).join('')}
+                        `).join('')}
                     </tbody>
-                </table>
-             </div>
+                 </table>
+            </div>
         </div>
     `;
 
+    // Chart
     if (results.chart_data && results.chart_data.ohlcv) {
-        chartContainerEl.classList.remove('hidden');
-        window.renderBacktestCharts(results.chart_data, results.trades);
+         document.getElementById('bt-charts').classList.remove('hidden');
+         renderBacktestCharts(results.chart_data, results.trades);
     }
 }
 
-// Chart Manager
+
+// --- Charting ---
 let mainChart = null;
-let equitySeries = null;
 let candleSeries = null;
+let equitySeries = null;
 
 window.renderBacktestCharts = function(data, trades) {
     const container = document.getElementById('chart-container');
-    container.innerHTML = ''; // Clear previous
+    container.innerHTML = '';
 
     if (mainChart) {
         mainChart.remove();
+        mainChart = null;
     }
 
     const { createChart } = LightweightCharts;
 
     const chartOptions = {
         layout: {
-            textColor: '#94a3b8', // slate-400
-            background: { type: 'solid', color: '#0f172a' }, // slate-900
+            textColor: '#94a3b8',
+            background: { type: 'solid', color: '#0f172a' },
         },
         grid: {
             vertLines: { color: '#1e293b' },
@@ -728,303 +356,167 @@ window.renderBacktestCharts = function(data, trades) {
             borderColor: '#334155',
             timeVisible: true,
         },
+        width: container.clientWidth,
+        height: 500
     };
 
     mainChart = createChart(container, chartOptions);
 
-    // 1. Candlestick Series (Top)
+    // 1. Candlestick
     candleSeries = mainChart.addCandlestickSeries({
-        upColor: '#10b981', // emerald-500
-        downColor: '#f43f5e', // rose-500
+        upColor: '#10b981',
+        downColor: '#f43f5e',
         borderVisible: false,
         wickUpColor: '#10b981',
         wickDownColor: '#f43f5e',
     });
 
-    // Sort and Ensure Unique Time
-    const sortedOHLCV = data.ohlcv.sort((a, b) => a.time - b.time);
-    const uniqueOHLCV = [];
-    if(sortedOHLCV.length > 0) {
-        uniqueOHLCV.push(sortedOHLCV[0]);
-        for(let i=1; i<sortedOHLCV.length; i++) {
-            if(sortedOHLCV[i].time > sortedOHLCV[i-1].time) {
-                uniqueOHLCV.push(sortedOHLCV[i]);
+    // Sort & Unique
+    const sorted = data.ohlcv.sort((a, b) => a.time - b.time);
+    const unique = [];
+    if (sorted.length > 0) {
+        unique.push(sorted[0]);
+        for (let i = 1; i < sorted.length; i++) {
+            if (sorted[i].time > sorted[i-1].time) {
+                unique.push(sorted[i]);
             }
         }
     }
+    candleSeries.setData(unique);
 
-    candleSeries.setData(uniqueOHLCV);
-
-    // 2. Markers for Trades
+    // 2. Markers
     const markers = [];
     trades.forEach(t => {
-        // Entry
         markers.push({
-            time: t.entry_ts, // Unix timestamp from backend
+            time: t.entry_ts,
             position: t.direction === 'long' ? 'belowBar' : 'aboveBar',
-            color: t.direction === 'long' ? '#6366f1' : '#f59e0b', // indigo vs amber
+            color: t.direction === 'long' ? '#6366f1' : '#f59e0b',
             shape: t.direction === 'long' ? 'arrowUp' : 'arrowDown',
             text: 'Entry'
         });
-        // Exit
         markers.push({
             time: t.exit_ts,
             position: t.direction === 'long' ? 'aboveBar' : 'belowBar',
             color: '#94a3b8',
             shape: 'circle',
-            text: `Exit ($${t.pnl.toFixed(0)})`
+            text: `Exit ${t.pnl > 0 ? '+' : ''}${t.pnl.toFixed(0)}`
         });
     });
-
     markers.sort((a, b) => a.time - b.time);
     candleSeries.setMarkers(markers);
 
-    // 3. Equity Curve
+    // 3. Equity Curve (Overlay on Left Scale)
     equitySeries = mainChart.addLineSeries({
-        color: '#fbbf24', // amber-400
+        color: '#fbbf24',
         lineWidth: 2,
-        priceScaleId: 'left', // Use left axis
+        priceScaleId: 'left',
     });
 
-    // Configure Left Scale
     mainChart.priceScale('left').applyOptions({
         visible: true,
         borderColor: '#334155',
     });
 
-    // Sort equity data
-    const sortedEquity = data.equity.sort((a, b) => a.time - b.time);
+    const equityData = data.equity.sort((a, b) => a.time - b.time);
+    // Ensure unique
     const uniqueEquity = [];
-    if(sortedEquity.length > 0) {
-        uniqueEquity.push(sortedEquity[0]);
-        for(let i=1; i<sortedEquity.length; i++) {
-            if(sortedEquity[i].time > sortedEquity[i-1].time) {
-                uniqueEquity.push(sortedEquity[i]);
+    if (equityData.length > 0) {
+        uniqueEquity.push(equityData[0]);
+        for (let i = 1; i < equityData.length; i++) {
+            if (equityData[i].time > equityData[i-1].time) {
+                uniqueEquity.push(equityData[i]);
             }
         }
     }
-
     equitySeries.setData(uniqueEquity);
 
-    // Fit Content
     mainChart.timeScale().fitContent();
-}
 
-// AI Assistant Logic (Persistent Sessions)
-async function loadSessions() {
-    try {
-        const res = await fetch(`${API_URL}/ai/sessions`);
-        sessions = await res.json();
-        renderSessions();
-
-        // Load first session if exists and none selected
-        if (!currentSessionId && sessions.length > 0) {
-            loadSession(sessions[0].id);
-        } else if (currentSessionId) {
-             // ensure active class
-             renderSessions();
-        }
-    } catch (e) {
-        console.error("Failed to load sessions", e);
-    }
-}
-
-function renderSessions() {
-    const list = document.getElementById('session-list');
-    list.innerHTML = sessions.map(s => `
-        <li class="flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors text-sm ${s.id === currentSessionId ? 'bg-indigo-600/10 text-indigo-400 font-medium' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}" onclick="loadSession('${s.id}')">
-            <span class="truncate pr-2">${s.title}</span>
-            <button onclick="deleteSession('${s.id}'); event.stopPropagation()" class="text-slate-600 hover:text-rose-500 p-1 rounded opacity-60 hover:opacity-100">
-                <i class="fa-solid fa-times text-xs"></i>
-            </button>
-        </li>
-    `).join('');
-}
-
-async function newSession() {
-    const title = prompt("Session Title:", "New Analysis");
-    if (!title) return;
-
-    try {
-        const res = await fetch(`${API_URL}/ai/sessions`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({title})
-        });
-        const session = await res.json();
-        currentSessionId = session.id;
-        sessions.unshift(session);
-        renderSessions();
-        document.getElementById('chat-container').innerHTML = '';
-        appendMessage('system', "Started new session. How can I help?");
-    } catch (e) {
-        alert("Failed to create session");
-    }
-}
-
-async function loadSession(id) {
-    currentSessionId = id;
-    renderSessions();
-    const container = document.getElementById('chat-container');
-    container.innerHTML = '<div class="text-center p-4 text-xs text-slate-500 animate-pulse">Loading History...</div>';
-
-    try {
-        const res = await fetch(`${API_URL}/ai/sessions/${id}/history`);
-        const history = await res.json();
-
-        container.innerHTML = '';
-        if(history.length === 0) {
-             appendMessage('system', "Started new session. How can I help?");
-        }
-
-        history.forEach(msg => {
-            if (msg.role === 'user') appendMessage('user', msg.content);
-            if (msg.role === 'assistant') appendMessage('ai', msg.content);
-            if (msg.role === 'tool') {
-                // Optional: Show tool outputs debug style?
-            }
-        });
-    } catch (e) {
-        container.innerHTML = '<div class="text-center p-4 text-xs text-rose-500">Error loading history.</div>';
-    }
-}
-
-async function deleteSession(id) {
-    if (!confirm("Delete this chat?")) return;
-    await fetch(`${API_URL}/ai/sessions/${id}`, { method: 'DELETE' });
-    if (currentSessionId === id) {
-        currentSessionId = null;
-        document.getElementById('chat-container').innerHTML = '';
-    }
-    loadSessions();
-}
-
-async function sendChatMessage() {
-    const input = document.getElementById('ai-input');
-    const message = input.value.trim();
-    if (!message) return;
-
-    if (!currentSessionId) await newSession();
-
-    input.value = '';
-    appendMessage('user', message);
-
-    const loadingId = appendMessage('ai', '<span class="animate-pulse">Thinking...</span>');
-
-    try {
-        const res = await fetch(`${API_URL}/ai/chat`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ message, session_id: currentSessionId })
-        });
-        const data = await res.json();
-
-        // Remove simple loading indicator if present
-        const loadingEl = document.getElementById(loadingId);
-        if(loadingEl) loadingEl.remove();
-
-        // Remove detailed status indicator if present
-        const statusEl = document.getElementById('ai-status-indicator');
-        if(statusEl) statusEl.remove();
-
-        appendMessage('ai', data.response);
-
-    } catch (e) {
-        const loadingEl = document.getElementById(loadingId);
-        if(loadingEl) loadingEl.innerHTML = `<span class="text-rose-400">Error: ${e.message}</span>`;
-    }
-}
-
-function appendMessage(role, text) {
-    const container = document.getElementById('chat-container');
-    const div = document.createElement('div');
-    const id = 'msg-' + Date.now();
-    div.id = id;
-
-    // Style based on role
-    div.className = "flex w-full mb-4 " + (role === 'user' ? "justify-end" : "justify-start");
-
-    const bubbleClass = role === 'user'
-        ? "chat-bubble-user text-white"
-        : (role === 'system' ? "bg-slate-800/50 text-slate-400 text-xs italic text-center w-full bg-transparent" : "chat-bubble-ai text-slate-200");
-
-    const innerDiv = document.createElement('div');
-    innerDiv.className = `max-w-[85%] p-4 shadow-sm ${bubbleClass}`;
-
-    // Markdown formatting
-    let html = text
-        .replace(/</g, "&lt;").replace(/>/g, "&gt;") // Escape HTML
-        .replace(/```python([\s\S]*?)```/g, (match, code) => {
-            return `<div class="mt-2 mb-2 bg-slate-950 rounded-lg border border-slate-900 overflow-hidden group relative">
-                <div class="bg-slate-900 px-3 py-1 text-[10px] text-slate-500 font-mono uppercase border-b border-slate-800 flex justify-between items-center">
-                    <span>Python</span>
-                    <button onclick="applyCodeToEditor(this)" data-code="${encodeURIComponent(code)}" class="text-indigo-400 hover:text-indigo-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                        <i class="fa-solid fa-arrow-right-to-bracket"></i> Apply
-                    </button>
-                </div>
-                <pre class="p-3 overflow-x-auto text-xs"><code class="language-python">${code}</code></pre>
-            </div>`;
-        })
-        .replace(/```([\s\S]*?)```/g, '<pre class="bg-slate-950 p-3 rounded-lg text-xs border border-slate-900 overflow-x-auto mt-2 mb-2"><code>$1</code></pre>')
-        .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
-        .replace(/\n/g, '<br>');
-
-    innerDiv.innerHTML = html;
-    div.appendChild(innerDiv);
-
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
-    return id;
-}
-
-function applyCodeToEditor(btn) {
-    const code = decodeURIComponent(btn.getAttribute('data-code'));
-    if(editor) {
-        editor.setValue(code);
-        router.navigate('strategies');
-        alert("Code applied to editor!");
-    }
-}
-
-// Bind Chat Input
-document.getElementById('ai-send-btn').addEventListener('click', sendChatMessage);
-document.getElementById('ai-input').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendChatMessage();
-});
-
-// Init
-window.onload = () => {
-    initWS();
-    router.init();
-    loadTemplates();
-
-    // Load config
-    fetch(`${API_URL}/ai/config`)
-        .then(res => res.json())
-        .then(config => {
-            if (config.api_key) document.getElementById('cfg-api-key').value = config.api_key;
-            if (config.base_url) document.getElementById('cfg-base-url').value = config.base_url;
-            if (config.model) document.getElementById('cfg-model').value = config.model;
-        })
-        .catch(e => console.error("Failed to load config", e));
-
-    // Init Monaco
-    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
-    require(['vs/editor/editor.main'], function () {
-        const container = document.getElementById('editor-container');
-        if (container) {
-            editor = monaco.editor.create(container, {
-                value: "# Select a strategy or create one",
-                language: 'python',
-                theme: 'vs-dark',
-                automaticLayout: true,
-                minimap: { enabled: false },
-                padding: { top: 16, bottom: 16 },
-                fontSize: 13,
-                fontFamily: "'JetBrains Mono', 'Fira Code', monospace"
-            });
-            // Initial Layout
-            setTimeout(() => editor.layout(), 100);
-        }
-    });
+    // Resize Observer
+    new ResizeObserver(entries => {
+        if (entries.length === 0 || entries[0].target !== container) { return; }
+        const newRect = entries[0].contentRect;
+        mainChart.applyOptions({ width: newRect.width, height: newRect.height });
+    }).observe(container);
 };
+
+// --- MCP Service ---
+async function initMCP() {
+    const statusEl = document.getElementById('mcp-status-detail');
+    const logsEl = document.getElementById('mcp-logs');
+    const toggleCheckbox = document.getElementById('mcp-toggle');
+    const statusText = document.getElementById('mcp-status-text');
+
+    if(!statusEl) return;
+
+    // Update MCP Endpoint Display dynamically
+    const endpointInput = document.getElementById('mcp-endpoint');
+    if(endpointInput) {
+        endpointInput.value = `${window.location.protocol}//${window.location.host}/api/mcp/sse`;
+    }
+
+    async function updateStatus() {
+        try {
+            const res = await fetch(`${API_BASE}/mcp/status`);
+            const data = await res.json();
+
+            toggleCheckbox.checked = data.is_active;
+
+            if (data.is_active) {
+                statusEl.textContent = "Service is Online";
+                statusEl.className = "text-xs text-emerald-400";
+                statusText.textContent = "ON";
+                statusText.className = "ml-3 text-sm font-medium text-emerald-400";
+            } else {
+                statusEl.textContent = "Service is Offline";
+                statusEl.className = "text-xs text-rose-400";
+                statusText.textContent = "OFF";
+                statusText.className = "ml-3 text-sm font-medium text-slate-300";
+            }
+
+            // Logs
+            if(logsEl) {
+                logsEl.innerHTML = '';
+                if(data.logs.length === 0) {
+                     logsEl.innerHTML = '<div class="text-slate-500 italic">No activity recorded.</div>';
+                } else {
+                    data.logs.forEach(log => {
+                        const div = document.createElement('div');
+                        div.className = "border-b border-slate-800 pb-2 last:border-0";
+                        const color = log.status === 'error' ? 'text-rose-400' : (log.status === 'crash' ? 'text-rose-600' : 'text-emerald-400');
+                        div.innerHTML = `
+                            <span class="text-slate-500 mr-2">[${new Date(log.timestamp).toLocaleTimeString()}]</span>
+                            <span class="${color} font-bold mr-2">${log.action}</span>
+                            <span class="text-slate-400">${log.details}</span>
+                        `;
+                        logsEl.appendChild(div);
+                    });
+                }
+            }
+
+        } catch (e) {
+            console.error("MCP Status Error:", e);
+        }
+    }
+
+    window.toggleMCPService = async () => {
+        const isActive = toggleCheckbox.checked;
+        await fetch(`${API_BASE}/mcp/toggle`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ active: isActive })
+        });
+        updateStatus();
+    };
+
+    updateStatus();
+    // Poll
+    if(!window.mcpInterval) {
+        window.mcpInterval = setInterval(updateStatus, 5000);
+    }
+}
+
+// --- Init ---
+router.init();
+loadStrategies();
+loadData();

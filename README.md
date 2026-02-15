@@ -14,7 +14,7 @@ Now fully compatible with the **Model Context Protocol (MCP)**, allowing externa
 
 ## 📸 Interface Preview
 
-### Desktop Terminal
+### Financial Terminal UI
 | **Dashboard** | **AI Architect** |
 |:---:|:---:|
 | <img src="public/screenshots/01_dashboard.png" width="400" /> | <img src="public/screenshots/05_ai_assistant.png" width="400" /> |
@@ -23,8 +23,8 @@ Now fully compatible with the **Model Context Protocol (MCP)**, allowing externa
 |:---:|:---:|
 | <img src="public/screenshots/03_strategy_lab.png" width="400" /> | <img src="public/screenshots/07_mcp_dashboard.png" width="400" /> |
 
-### Mobile Responsive
-<img src="public/screenshots/06_mobile_dashboard.png" width="200" />
+### 📈 Interactive Backtest Results
+<img src="public/screenshots/04_backtest_results.png" width="800" />
 
 ---
 
@@ -49,7 +49,7 @@ Now fully compatible with the **Model Context Protocol (MCP)**, allowing externa
 ### ⚡ Institutional-Grade Backtesting
 *   **Event-Driven Engine**: Simulates realistic market conditions candle-by-candle.
 *   **Advanced Metrics**: Max Drawdown (Abs), Profit Factor, Sharpe Ratio, Expectancy.
-*   **Position Sizing**: Dynamic sizing logic embedded in strategies.
+*   **Interactive Charts**: Lightweight Charts integration for visualizing signals, equity curves, and trade markers.
 
 ---
 
