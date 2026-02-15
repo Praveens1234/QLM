@@ -52,39 +52,27 @@ Now fully compatible with the **Model Context Protocol (MCP)**, allowing externa
 
 ---
 
-## 🛠️ Installation
+## 🛠️ Installation & Setup
 
-### Prerequisites
-*   Python 3.12+
-*   Git
+### 1. Quick Start (One-Liner)
+```bash
+git clone https://github.com/Praveens1234/QLM.git && cd QLM && pip install -r requirements.txt && python -m backend.main
+```
 
-### Quick Start
+### 2. Manual Setup
+1.  **Clone**: `git clone https://github.com/Praveens1234/QLM.git`
+2.  **Install**: `pip install -r requirements.txt`
+3.  **Run**: `python -m backend.main`
 
-1.  **Clone the Repository**
-    ```bash
-    git clone https://github.com/Praveens1234/QLM.git
-    cd QLM
-    ```
-
-2.  **Install Dependencies**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-3.  **Run the Application**
-    ```bash
-    python -m backend.main
-    ```
-    Access the terminal at `http://localhost:8010`.
+### 3. Usage
+*   **Web UI**: Open `http://localhost:8010` in your browser to access the Dashboard, Strategy Lab, and Backtester.
+*   **MCP**: Connect your AI Client (Claude Desktop) to `http://<YOUR_IP>:8010/api/mcp/sse`.
 
 ---
 
 ## 🚀 MCP Connection Guide
 
 Use any MCP-compliant client (e.g., Claude Desktop, Zed Editor) to connect to QLM.
-
-1.  **Start QLM**: Ensure the server is running on `0.0.0.0:8010`.
-2.  **Configure Client**: Add the SSE endpoint.
 
 **Claude Desktop Config (`claude_desktop_config.json`):**
 ```json
@@ -100,13 +88,14 @@ Use any MCP-compliant client (e.g., Claude Desktop, Zed Editor) to connect to QL
 
 ### 🧰 MCP Tool Reference
 
-Once connected, you have full control via these tools:
+Once connected, you can ask the AI to **"Get the tools manifest"** to see full documentation.
 
 | Tool Name | Description |
 | :--- | :--- |
+| **`get_tools_manifest`** | 📖 Returns detailed documentation for all tools and the QLM system. |
 | **`create_strategy`** | Write/Update a Python strategy file. |
 | **`validate_strategy`** | Dry-run code validation and syntax check. |
-| **`run_backtest`** | Execute a simulation on a specific dataset. |
+| **`run_backtest`** | Execute a simulation. Returns JSON metrics (Net Profit, Win Rate, etc). |
 | **`optimize_parameters`** | Run parameter optimization simulations. |
 | **`list_datasets`** | View available OHLCV data. |
 | **`import_dataset_from_url`** | Download & ingest CSV/ZIP from a direct link. |

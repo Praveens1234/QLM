@@ -245,6 +245,17 @@ class AITools:
                         "required": ["provider_id", "model_id"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_tools_manifest",
+                    "description": "Get detailed documentation for all available tools and QLM introduction.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
             }
         ]
 
@@ -476,6 +487,25 @@ class AITools:
                     self.config_manager.set_active(pid, mid)
                     return {"status": "success", "message": f"Active AI set to {mid} via {pid}"}
                 return await self._run_sync(_update)
+
+            elif tool_name == "get_tools_manifest":
+                def _manifest():
+                    intro = """# QLM (QuantLogic Framework)
+QLM is an institutional-grade algorithmic trading platform designed for quantitative researchers. It provides a robust event-driven backtester, market data management, and an AI agent for strategy development.
+
+## Available Tools
+"""
+                    tools_doc = ""
+                    for d in self.get_definitions():
+                        fn = d['function']
+                        name = fn['name']
+                        desc = fn['description']
+                        params = json.dumps(fn['parameters'], indent=2)
+                        tools_doc += f"\n### `{name}`\n{desc}\n**Parameters**:\n```json\n{params}\n```\n"
+
+                    return intro + tools_doc
+
+                return await self._run_sync(_manifest)
             
             else:
                 return {"error": f"Tool '{tool_name}' not found."}
