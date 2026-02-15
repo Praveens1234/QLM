@@ -11,6 +11,7 @@
 
 ## 📸 Interface Preview
 
+### Desktop Terminal
 | **Dashboard** | **AI Architect** |
 |:---:|:---:|
 | <img src="public/screenshots/01_dashboard.png" width="400" /> | <img src="public/screenshots/05_ai_assistant.png" width="400" /> |
@@ -18,6 +19,9 @@
 | **Strategy Lab** | **Backtest Runner** |
 |:---:|:---:|
 | <img src="public/screenshots/03_strategy_lab.png" width="400" /> | <img src="public/screenshots/04_backtest_runner.png" width="400" /> |
+
+### Mobile Responsive
+<img src="public/screenshots/06_mobile_dashboard.png" width="200" />
 
 ---
 

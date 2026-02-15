@@ -27,20 +27,31 @@ const router = {
 
         // Update Nav Active State
         document.querySelectorAll('.nav-item').forEach(btn => {
-            btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg', 'shadow-indigo-500/20');
-            btn.classList.add('text-slate-400', 'hover:bg-slate-800', 'hover:text-white');
+            btn.classList.remove('bg-indigo-600/10', 'text-indigo-400', 'border-l-2', 'border-indigo-500');
+            // Remove icon active color
+            const icon = btn.querySelector('i');
+            if(icon) {
+                icon.classList.remove('text-indigo-400');
+                icon.classList.add('text-slate-500');
+            }
+            btn.classList.add('text-slate-400', 'hover:bg-slate-800');
         });
 
         const activeBtn = document.getElementById(`nav-${page}`);
         if (activeBtn) {
             activeBtn.classList.remove('text-slate-400', 'hover:bg-slate-800');
-            activeBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-lg', 'shadow-indigo-500/20');
+            activeBtn.classList.add('bg-indigo-600/10', 'text-indigo-400', 'border-l-2', 'border-indigo-500');
+             const icon = activeBtn.querySelector('i');
+            if(icon) {
+                icon.classList.remove('text-slate-500');
+                icon.classList.add('text-indigo-400');
+            }
         }
 
         // Close mobile sidebar if open
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('sidebar-overlay');
-        if (!sidebar.classList.contains('-translate-x-full')) {
+        if (sidebar && !sidebar.classList.contains('-translate-x-full') && window.innerWidth < 768) {
             toggleSidebar();
         }
 
@@ -65,8 +76,16 @@ function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
 
-    sidebar.classList.toggle('-translate-x-full');
-    overlay.classList.toggle('hidden');
+    if (sidebar.classList.contains('-translate-x-full')) {
+        // Open
+        sidebar.classList.remove('-translate-x-full');
+        overlay.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+    } else {
+        // Close
+        sidebar.classList.add('-translate-x-full');
+        overlay.classList.add('opacity-0', 'pointer-events-none');
+        setTimeout(() => overlay.classList.add('hidden'), 300); // Wait for fade out
+    }
 }
 
 // AI Settings & Registry
@@ -233,7 +252,7 @@ function renderDatasets() {
         <tr class="hover:bg-slate-800/50 transition-colors group">
             <td class="px-6 py-4 font-mono font-medium text-white">${d.symbol}</td>
             <td class="px-6 py-4">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-800 text-slate-300 border border-slate-700">
                     ${d.timeframe}
                 </span>
             </td>
@@ -242,7 +261,7 @@ function renderDatasets() {
             </td>
             <td class="px-6 py-4 text-right text-xs text-slate-400 font-mono">${d.row_count.toLocaleString()}</td>
             <td class="px-6 py-4 text-right">
-                <button onclick="deleteDataset('${d.id}')" class="text-slate-500 hover:text-rose-500 transition-colors p-1 opacity-0 group-hover:opacity-100">
+                <button onclick="deleteDataset('${d.id}')" class="text-slate-500 hover:text-rose-500 transition-colors p-1.5 rounded hover:bg-slate-800 opacity-0 group-hover:opacity-100">
                     <i class="fa-solid fa-trash-can"></i>
                 </button>
             </td>
@@ -290,13 +309,13 @@ function switchImportTab(tab) {
     if (tab === 'local') {
         localForm.classList.remove('hidden');
         urlForm.classList.add('hidden');
-        tabLocal.className = "text-sm font-semibold text-indigo-400 border-b-2 border-indigo-400 pb-1";
-        tabUrl.className = "text-sm font-semibold text-slate-500 hover:text-slate-300 pb-1 transition-colors";
+        tabLocal.className = "text-sm font-semibold text-indigo-400 border-b-2 border-indigo-400 pb-2 transition-colors focus:outline-none";
+        tabUrl.className = "text-sm font-semibold text-slate-500 hover:text-slate-300 border-b-2 border-transparent pb-2 transition-colors focus:outline-none";
     } else {
         localForm.classList.add('hidden');
         urlForm.classList.remove('hidden');
-        tabUrl.className = "text-sm font-semibold text-emerald-400 border-b-2 border-emerald-400 pb-1";
-        tabLocal.className = "text-sm font-semibold text-slate-500 hover:text-slate-300 pb-1 transition-colors";
+        tabUrl.className = "text-sm font-semibold text-emerald-400 border-b-2 border-emerald-400 pb-2 transition-colors focus:outline-none";
+        tabLocal.className = "text-sm font-semibold text-slate-500 hover:text-slate-300 border-b-2 border-transparent pb-2 transition-colors focus:outline-none";
     }
 }
 
@@ -533,68 +552,68 @@ function renderResults(results) {
     container.innerHTML = `
         <!-- Metrics Grid -->
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
                 <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Net Profit</span>
-                <div class="text-xl font-bold ${pnlColor} mt-1">$${m.net_profit}</div>
+                <div class="text-xl font-bold ${pnlColor} mt-1 font-mono tracking-tight">$${m.net_profit}</div>
              </div>
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
                 <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Trades</span>
-                <div class="text-xl font-bold text-white mt-1">${m.total_trades}</div>
+                <div class="text-xl font-bold text-white mt-1 font-mono tracking-tight">${m.total_trades}</div>
              </div>
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
                 <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Win Rate</span>
-                <div class="text-xl font-bold text-white mt-1">${m.win_rate}%</div>
+                <div class="text-xl font-bold text-white mt-1 font-mono tracking-tight">${m.win_rate}%</div>
              </div>
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
                 <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Profit Factor</span>
-                <div class="text-xl font-bold text-white mt-1">${m.profit_factor}</div>
+                <div class="text-xl font-bold text-white mt-1 font-mono tracking-tight">${m.profit_factor}</div>
              </div>
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
                 <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Max DD</span>
-                <div class="text-xl font-bold text-rose-400 mt-1">$${m.max_drawdown}</div>
+                <div class="text-xl font-bold text-rose-400 mt-1 font-mono tracking-tight">$${m.max_drawdown}</div>
              </div>
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
                 <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Avg Duration</span>
-                <div class="text-xl font-bold text-white mt-1">${m.avg_duration}m</div>
+                <div class="text-xl font-bold text-white mt-1 font-mono tracking-tight">${m.avg_duration}m</div>
              </div>
         </div>
         
         <!-- Trade Ledger -->
-        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
              <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/50">
-                <h3 class="text-sm font-semibold text-white">Trade Ledger</h3>
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Trade Ledger</h3>
              </div>
              <div class="overflow-x-auto max-h-[400px]">
                 <table class="w-full text-left text-sm text-slate-400">
-                    <thead class="bg-slate-950 text-xs uppercase font-medium text-slate-500 sticky top-0">
+                    <thead class="bg-slate-950 text-[10px] uppercase font-bold text-slate-500 sticky top-0">
                         <tr>
-                            <th class="px-6 py-3">Entry Time (UTC)</th>
-                            <th class="px-6 py-3">Dir</th>
-                            <th class="px-6 py-3">Size</th>
-                            <th class="px-6 py-3 text-right">Entry</th>
-                            <th class="px-6 py-3">Exit Time (UTC)</th>
-                            <th class="px-6 py-3 text-right">Exit</th>
-                            <th class="px-6 py-3 text-right">PnL</th>
-                            <th class="px-6 py-3 text-right">Reason</th>
+                            <th class="px-6 py-3 tracking-wider">Entry Time (UTC)</th>
+                            <th class="px-6 py-3 tracking-wider">Dir</th>
+                            <th class="px-6 py-3 tracking-wider">Size</th>
+                            <th class="px-6 py-3 tracking-wider text-right">Entry</th>
+                            <th class="px-6 py-3 tracking-wider">Exit Time (UTC)</th>
+                            <th class="px-6 py-3 tracking-wider text-right">Exit</th>
+                            <th class="px-6 py-3 tracking-wider text-right">PnL</th>
+                            <th class="px-6 py-3 tracking-wider text-right">Reason</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-800 font-mono">
+                    <tbody class="divide-y divide-slate-800 font-mono text-xs">
                         ${results.trades.map(t => {
                             const pnlClass = t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400';
                             const dirClass = t.direction === 'long' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20';
 
                             return `
                             <tr class="hover:bg-slate-800/50 transition-colors">
-                                <td class="px-6 py-3 text-xs">${t.entry_time}</td>
+                                <td class="px-6 py-3">${t.entry_time}</td>
                                 <td class="px-6 py-3">
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${dirClass}">${t.direction}</span>
+                                    <span class="px-2 py-0.5 rounded text-[9px] font-bold border uppercase ${dirClass}">${t.direction}</span>
                                 </td>
-                                <td class="px-6 py-3 text-xs">${t.size ? t.size.toFixed(2) : '1.00'}</td>
-                                <td class="px-6 py-3 text-right text-xs text-white">${t.entry_price.toFixed(2)}</td>
-                                <td class="px-6 py-3 text-xs">${t.exit_time}</td>
-                                <td class="px-6 py-3 text-right text-xs text-white">${t.exit_price.toFixed(2)}</td>
+                                <td class="px-6 py-3">${t.size ? t.size.toFixed(2) : '1.00'}</td>
+                                <td class="px-6 py-3 text-right text-white">${t.entry_price.toFixed(2)}</td>
+                                <td class="px-6 py-3">${t.exit_time}</td>
+                                <td class="px-6 py-3 text-right text-white">${t.exit_price.toFixed(2)}</td>
                                 <td class="px-6 py-3 text-right font-bold ${pnlClass}">${t.pnl.toFixed(2)}</td>
-                                <td class="px-6 py-3 text-right text-xs">${t.exit_reason}</td>
+                                <td class="px-6 py-3 text-right text-slate-500">${t.exit_reason}</td>
                             </tr>
                             `;
                         }).join('')}
@@ -764,8 +783,8 @@ function appendMessage(role, text) {
     div.className = "flex w-full mb-4 " + (role === 'user' ? "justify-end" : "justify-start");
 
     const bubbleClass = role === 'user'
-        ? "bg-indigo-600 text-white chat-bubble-user"
-        : (role === 'system' ? "bg-slate-800/50 text-slate-400 text-xs italic text-center w-full bg-transparent" : "bg-slate-800 border border-slate-700 text-slate-200 chat-bubble-ai");
+        ? "chat-bubble-user text-white"
+        : (role === 'system' ? "bg-slate-800/50 text-slate-400 text-xs italic text-center w-full bg-transparent" : "chat-bubble-ai text-slate-200");
 
     const innerDiv = document.createElement('div');
     innerDiv.className = `max-w-[85%] p-4 shadow-sm ${bubbleClass}`;

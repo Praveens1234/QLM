@@ -1,6 +1,13 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
 :root {
   --bg-color: #0f172a;
   --text-primary: #f8fafc;
+}
+
+body {
+    background-color: #020617; /* Slate 950 */
+    color: #e2e8f0; /* Slate 200 */
 }
 
 /* Custom Scrollbar */
@@ -14,73 +21,79 @@
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(99, 102, 241, 0.2); /* Indigo 500/20 */
+    background: #334155; /* Slate 700 */
     border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(99, 102, 241, 0.5);
+    background: #475569; /* Slate 600 */
 }
 
-/* Glassmorphism Utilities */
+/* Utilities */
 .glass-panel {
     background: rgba(15, 23, 42, 0.6);
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.glass-card {
-    background: linear-gradient(145deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.4));
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+.card-gradient {
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-/* Neon Glows */
-.glow-text-indigo {
-    text-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
-}
-
-.glow-border-indigo {
-    box-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
+.input-field {
+    @apply w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder-slate-600;
 }
 
 /* Animations */
-@keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 5px rgba(16, 185, 129, 0.5); }
-    50% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.8); }
-}
-
-.animate-pulse-glow {
-    animation: pulse-glow 2s infinite;
-}
-
-.animate-fade-in-up {
-    animation: fadeInUp 0.4s ease-out forwards;
-}
-
-@keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(10px); }
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* Monaco Editor */
-.monaco-editor {
-    border-radius: 0.75rem;
-    overflow: hidden;
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
 }
 
 /* Chat Bubbles */
 .chat-bubble-user {
+    background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
     border-radius: 1.25rem 1.25rem 0.25rem 1.25rem;
+    box-shadow: 0 4px 6px -1px rgba(67, 56, 202, 0.3);
 }
+
 .chat-bubble-ai {
+    background: #1e293b;
+    border: 1px solid #334155;
     border-radius: 1.25rem 1.25rem 1.25rem 0.25rem;
 }
 
-/* Grid Pattern Background */
-.bg-grid-pattern {
-    background-image: linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px),
-                      linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px);
-    background-size: 24px 24px;
+/* Monaco Editor Container Override */
+.monaco-editor-container {
+    border-radius: 0.75rem;
+    overflow: hidden;
+    border: 1px solid #1e293b;
+}
+
+/* Grid Background for Dashboard */
+.bg-grid {
+    background-size: 40px 40px;
+    background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
+/* Table Styles */
+.table-header {
+    @apply px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider bg-slate-900/50 sticky top-0 backdrop-blur-sm z-10;
+}
+
+.table-row {
+    @apply border-b border-slate-800 hover:bg-slate-800/40 transition-colors;
+}
+
+/* Mobile Sidebar Transition */
+.sidebar-transition {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }

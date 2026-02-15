@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="dark h-full">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>QLM - QuantLogic Framework</title>
 
     <!-- Tailwind CSS -->
@@ -17,13 +17,16 @@
                         slate: {
                             800: '#1e293b',
                             900: '#0f172a',
+                            950: '#020617', // Deeper background
+                        },
+                        indigo: {
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            900: '#312e81',
                         },
                         emerald: {
                             500: '#10b981',
                         },
-                        rose: {
-                            500: '#f43f5e',
-                        }
                     },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
@@ -36,8 +39,6 @@
 
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-
-    <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- Monaco -->
@@ -47,67 +48,73 @@
     <link rel="stylesheet" href="/css/tailwind_custom.css">
 </head>
 
-<body class="bg-slate-950 text-slate-100 h-screen w-screen overflow-hidden flex font-sans text-sm">
+<body class="bg-[#020617] text-slate-200 h-full w-full overflow-hidden flex font-sans text-sm selection:bg-indigo-500/30 selection:text-indigo-200">
+
+    <!-- Mobile Sidebar Overlay -->
+    <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 hidden md:hidden transition-opacity opacity-0 pointer-events-none" style="transition: opacity 0.3s;"></div>
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between transition-transform duration-300 fixed md:relative z-50 h-full md:translate-x-0 -translate-x-full">
+    <aside id="sidebar" class="w-64 bg-slate-900/95 border-r border-slate-800 flex flex-col justify-between transition-transform duration-300 fixed md:relative z-50 h-full md:translate-x-0 -translate-x-full shadow-2xl md:shadow-none">
         <!-- Header -->
-        <div class="p-6 border-b border-slate-800 flex items-center gap-3">
-            <div class="h-8 w-8 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
+        <div class="h-16 px-6 border-b border-slate-800 flex items-center gap-3 bg-slate-900">
+            <div class="h-8 w-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20 ring-1 ring-white/10">
                 <i class="fa-solid fa-layer-group text-white text-xs"></i>
             </div>
             <div>
-                <h1 class="text-lg font-bold tracking-tight text-white leading-tight">QLM</h1>
-                <p class="text-[10px] text-slate-400 font-medium tracking-wide uppercase">QuantLogic</p>
+                <h1 class="text-lg font-bold tracking-tight text-white leading-none">QLM</h1>
+                <p class="text-[10px] text-slate-400 font-medium tracking-wide uppercase mt-0.5">QuantLogic</p>
             </div>
         </div>
 
         <!-- Navigation -->
-        <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+        <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
             <button onclick="router.navigate('dashboard')" id="nav-dashboard" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
-                <i class="fa-solid fa-chart-line w-5 text-center group-hover:text-indigo-400 transition-colors"></i>
+                <i class="fa-solid fa-chart-pie w-5 text-center text-slate-500 group-hover:text-indigo-400 transition-colors"></i>
                 <span class="font-medium">Dashboard</span>
             </button>
 
             <button onclick="router.navigate('data')" id="nav-data" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
-                <i class="fa-solid fa-database w-5 text-center group-hover:text-emerald-400 transition-colors"></i>
+                <i class="fa-solid fa-database w-5 text-center text-slate-500 group-hover:text-emerald-400 transition-colors"></i>
                 <span class="font-medium">Data Manager</span>
             </button>
 
             <button onclick="router.navigate('strategies')" id="nav-strategies" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
-                <i class="fa-solid fa-code w-5 text-center group-hover:text-amber-400 transition-colors"></i>
+                <i class="fa-solid fa-code w-5 text-center text-slate-500 group-hover:text-amber-400 transition-colors"></i>
                 <span class="font-medium">Strategy Lab</span>
             </button>
 
             <button onclick="router.navigate('backtest')" id="nav-backtest" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
-                <i class="fa-solid fa-play w-5 text-center group-hover:text-rose-400 transition-colors"></i>
+                <i class="fa-solid fa-play w-5 text-center text-slate-500 group-hover:text-rose-400 transition-colors"></i>
                 <span class="font-medium">Backtest Runner</span>
             </button>
 
-            <button onclick="router.navigate('assistant')" id="nav-assistant" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all mt-6 border-t border-slate-800 pt-6">
-                <i class="fa-solid fa-robot w-5 text-center group-hover:text-cyan-400 transition-colors"></i>
-                <span class="font-medium">AI Assistant</span>
-                <span class="ml-auto bg-indigo-500/20 text-indigo-300 text-[10px] font-bold px-1.5 py-0.5 rounded">BETA</span>
+            <div class="pt-4 pb-1">
+                <div class="h-px bg-slate-800 mx-3"></div>
+            </div>
+
+            <button onclick="router.navigate('assistant')" id="nav-assistant" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <i class="fa-solid fa-robot w-5 text-center text-indigo-400 group-hover:text-indigo-300 transition-colors relative z-10"></i>
+                <span class="font-medium relative z-10">AI Architect</span>
+                <span class="ml-auto bg-indigo-500/20 text-indigo-300 text-[9px] font-bold px-1.5 py-0.5 rounded border border-indigo-500/20">BETA</span>
             </button>
         </nav>
 
         <!-- Footer -->
-        <div class="p-4 border-t border-slate-800">
-            <button onclick="router.navigate('settings')" id="nav-settings" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
-                <i class="fa-solid fa-cog w-5 text-center"></i>
+        <div class="p-4 border-t border-slate-800 bg-slate-900">
+            <button onclick="router.navigate('settings')" id="nav-settings" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all text-xs font-medium">
+                <i class="fa-solid fa-sliders w-5 text-center"></i>
                 <span>Settings</span>
             </button>
-            <div class="mt-4 text-center text-[10px] text-slate-600 font-mono">
-                v1.2.0-beta
+            <div class="mt-3 flex justify-between items-center px-3">
+                <span class="text-[10px] text-slate-600 font-mono">v2.0.0</span>
+                <div class="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
             </div>
         </div>
     </aside>
 
-    <!-- Overlay for mobile -->
-    <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden md:hidden transition-opacity"></div>
-
     <!-- Main Content -->
-    <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 relative">
+    <main class="flex-1 flex flex-col h-full overflow-hidden relative bg-grid">
 
         <!-- Mobile Header -->
         <header class="md:hidden h-14 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
@@ -115,9 +122,9 @@
                 <div class="h-6 w-6 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded flex items-center justify-center">
                     <i class="fa-solid fa-layer-group text-white text-[10px]"></i>
                 </div>
-                <span class="font-bold text-white">QLM</span>
+                <span class="font-bold text-white tracking-tight">QLM</span>
             </div>
-            <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white p-2">
+            <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white p-2 focus:outline-none">
                 <i class="fa-solid fa-bars text-lg"></i>
             </button>
         </header>
@@ -126,150 +133,157 @@
         <div id="page-container" class="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 space-y-8 scroll-smooth">
 
             <!-- Dashboard -->
-            <section id="page-dashboard" class="page hidden animate-fade-in space-y-8">
-                <div class="flex items-center justify-between">
+            <section id="page-dashboard" class="page hidden animate-fade-in space-y-8 max-w-7xl mx-auto">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <h2 class="text-2xl font-bold text-white tracking-tight">Dashboard</h2>
-                        <p class="text-slate-400 text-sm mt-1">System Overview & Status</p>
+                        <p class="text-slate-400 text-sm mt-1">Platform Overview & Market Status</p>
                     </div>
-                    <div class="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-medium border border-emerald-500/20">
-                        <span class="relative flex h-2 w-2">
-                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                        </span>
-                        System Online
+                    <div class="flex items-center gap-3">
+                         <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-400 font-mono">
+                            <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            API: CONNECTED
+                        </div>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <!-- Stat Card 1 -->
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors group">
+                    <div class="bg-slate-900/50 backdrop-blur border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-all hover:shadow-lg hover:shadow-indigo-500/5 group">
                         <div class="flex justify-between items-start mb-4">
-                            <div class="p-2 bg-indigo-500/10 rounded-lg text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                            <div class="h-10 w-10 bg-indigo-500/10 rounded-lg flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
                                 <i class="fa-solid fa-code"></i>
                             </div>
-                            <!-- Trend indicator (dummy) -->
-                            <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                <i class="fa-solid fa-arrow-trend-up"></i> +2
+                            <span class="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                <i class="fa-solid fa-arrow-trend-up"></i> ACTIVE
                             </span>
                         </div>
-                        <div class="text-3xl font-bold text-white stat-value" data-stat="strategies">--</div>
-                        <div class="text-xs text-slate-500 font-medium uppercase tracking-wide mt-1">Active Strategies</div>
+                        <div class="text-3xl font-bold text-white stat-value font-mono tracking-tight" data-stat="strategies">--</div>
+                        <div class="text-xs text-slate-500 font-medium uppercase tracking-wide mt-1">Strategies</div>
                     </div>
 
                     <!-- Stat Card 2 -->
-                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors group">
+                    <div class="bg-slate-900/50 backdrop-blur border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-all hover:shadow-lg hover:shadow-emerald-500/5 group">
                         <div class="flex justify-between items-start mb-4">
-                            <div class="p-2 bg-emerald-500/10 rounded-lg text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                            <div class="h-10 w-10 bg-emerald-500/10 rounded-lg flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
                                 <i class="fa-solid fa-database"></i>
                             </div>
-                             <span class="text-xs font-mono text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">
-                                UPDATED
-                            </span>
                         </div>
-                        <div class="text-3xl font-bold text-white stat-value" data-stat="datasets">--</div>
-                        <div class="text-xs text-slate-500 font-medium uppercase tracking-wide mt-1">Datasets Available</div>
+                        <div class="text-3xl font-bold text-white stat-value font-mono tracking-tight" data-stat="datasets">--</div>
+                        <div class="text-xs text-slate-500 font-medium uppercase tracking-wide mt-1">Datasets</div>
                     </div>
 
                     <!-- Stat Card 3 -->
-                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors group">
+                     <div class="bg-slate-900/50 backdrop-blur border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-all hover:shadow-lg hover:shadow-amber-500/5 group">
                         <div class="flex justify-between items-start mb-4">
-                            <div class="p-2 bg-amber-500/10 rounded-lg text-amber-400 group-hover:bg-amber-500 group-hover:text-white transition-colors">
-                                <i class="fa-solid fa-play"></i>
+                            <div class="h-10 w-10 bg-amber-500/10 rounded-lg flex items-center justify-center text-amber-400 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+                                <i class="fa-solid fa-server"></i>
                             </div>
                         </div>
-                        <div class="text-3xl font-bold text-white stat-value">Ready</div>
+                        <div class="text-3xl font-bold text-white stat-value font-mono tracking-tight text-sm uppercase">Idle</div>
                         <div class="text-xs text-slate-500 font-medium uppercase tracking-wide mt-1">Engine Status</div>
                     </div>
 
-                     <!-- Stat Card 4 (Welcome) -->
-                     <div class="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-5 text-white flex flex-col justify-center items-start shadow-lg shadow-indigo-900/50 col-span-1 md:col-span-2 lg:col-span-1">
-                        <h3 class="font-bold text-lg mb-1">Welcome back!</h3>
-                        <p class="text-indigo-100 text-xs leading-relaxed mb-3">Ready to build your next alpha strategy?</p>
-                        <button onclick="router.navigate('strategies')" class="text-xs bg-white text-indigo-600 font-bold px-3 py-1.5 rounded hover:bg-indigo-50 transition-colors w-full text-center">
-                            Open Lab
+                     <!-- Welcome Card -->
+                     <div class="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-5 text-white flex flex-col justify-center items-start shadow-xl shadow-indigo-900/20 col-span-1 md:col-span-2 lg:col-span-1 group">
+                        <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all"></div>
+                        <h3 class="font-bold text-lg mb-1 relative z-10">AI Architect</h3>
+                        <p class="text-indigo-100 text-xs leading-relaxed mb-4 relative z-10 opacity-90">Design strategies with natural language.</p>
+                        <button onclick="router.navigate('assistant')" class="text-xs bg-white text-indigo-600 font-bold px-4 py-2 rounded-lg hover:bg-indigo-50 transition-colors w-full text-center relative z-10 shadow-sm">
+                            Launch Assistant
                         </button>
                     </div>
+                </div>
+
+                <!-- Recent Activity Placeholder -->
+                <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-6 min-h-[300px] flex flex-col items-center justify-center text-slate-600">
+                    <i class="fa-solid fa-chart-simple text-4xl mb-4 opacity-20"></i>
+                    <p class="text-sm font-medium">Recent Activity will appear here</p>
                 </div>
             </section>
 
             <!-- Data Manager -->
-            <section id="page-data" class="page hidden animate-fade-in space-y-6">
+            <section id="page-data" class="page hidden animate-fade-in space-y-6 max-w-7xl mx-auto">
                  <div class="flex items-center justify-between">
                     <div>
                         <h2 class="text-2xl font-bold text-white tracking-tight">Data Manager</h2>
-                        <p class="text-slate-400 text-sm mt-1">Manage historical datasets (CSV/Parquet)</p>
+                        <p class="text-slate-400 text-sm mt-1">Import & Manage Historical Data</p>
                     </div>
                 </div>
 
-                <!-- Import Tabs -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                    <div class="flex gap-4 border-b border-slate-800 pb-2 mb-4">
-                         <button id="tab-local" onclick="switchImportTab('local')" class="text-sm font-semibold text-indigo-400 border-b-2 border-indigo-400 pb-1">
-                            Local Upload
+                <!-- Import Card -->
+                <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+                    <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/50 flex gap-6">
+                         <button id="tab-local" onclick="switchImportTab('local')" class="text-sm font-semibold text-indigo-400 border-b-2 border-indigo-400 pb-2 transition-colors focus:outline-none">
+                            <i class="fa-solid fa-upload mr-1.5"></i> Local Upload
                          </button>
-                         <button id="tab-url" onclick="switchImportTab('url')" class="text-sm font-semibold text-slate-500 hover:text-slate-300 pb-1 transition-colors">
-                            Import from URL
+                         <button id="tab-url" onclick="switchImportTab('url')" class="text-sm font-semibold text-slate-500 hover:text-slate-300 border-b-2 border-transparent pb-2 transition-colors focus:outline-none">
+                            <i class="fa-solid fa-globe mr-1.5"></i> Import URL
                          </button>
                     </div>
 
-                    <!-- Local Upload Form -->
-                    <div id="import-local" class="flex flex-col md:flex-row gap-4 items-end animate-fade-in">
-                        <div class="flex-1 w-full">
-                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">CSV File</label>
-                            <input type="file" id="upload-file" accept=".csv" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-indigo-400 hover:file:bg-slate-700 cursor-pointer border border-slate-700 rounded-lg bg-slate-950 focus:outline-none focus:border-indigo-500 transition-colors">
+                    <div class="p-6 bg-slate-900/30">
+                        <!-- Local Upload Form -->
+                        <div id="import-local" class="flex flex-col lg:flex-row gap-4 items-end animate-fade-in">
+                            <div class="flex-1 w-full">
+                                <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">CSV File</label>
+                                <input type="file" id="upload-file" accept=".csv" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:uppercase file:bg-slate-800 file:text-indigo-400 hover:file:bg-slate-700 cursor-pointer border border-slate-700 rounded-lg bg-slate-950 focus:outline-none focus:border-indigo-500 transition-colors h-[42px]">
+                            </div>
+                            <div class="w-full lg:w-48">
+                                <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Symbol</label>
+                                <input type="text" id="upload-symbol" placeholder="BTCUSD" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono uppercase">
+                            </div>
+                            <div class="w-full lg:w-32">
+                                <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Timeframe</label>
+                                <input type="text" id="upload-tf" placeholder="1H" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono uppercase">
+                            </div>
+                            <button onclick="uploadDataset()" class="w-full lg:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-6 py-2.5 rounded-lg transition-all shadow-lg shadow-indigo-500/20 text-sm flex items-center justify-center gap-2 h-[42px]">
+                                <i class="fa-solid fa-plus"></i> Import
+                            </button>
                         </div>
-                        <div class="w-full md:w-48">
-                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Symbol</label>
-                            <input type="text" id="upload-symbol" placeholder="e.g. BTCUSD" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono">
-                        </div>
-                        <div class="w-full md:w-32">
-                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Timeframe</label>
-                            <input type="text" id="upload-tf" placeholder="e.g. 1H" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono">
-                        </div>
-                        <button onclick="uploadDataset()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-6 py-2 rounded-lg transition-colors shadow-lg shadow-indigo-900/20 text-sm flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-plus"></i> Upload
-                        </button>
-                    </div>
 
-                    <!-- URL Import Form -->
-                    <div id="import-url" class="hidden flex flex-col md:flex-row gap-4 items-end animate-fade-in">
-                        <div class="flex-1 w-full">
-                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Download URL (CSV/ZIP)</label>
-                            <input type="text" id="url-input" placeholder="https://example.com/data.zip" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono">
+                        <!-- URL Import Form -->
+                        <div id="import-url" class="hidden flex flex-col lg:flex-row gap-4 items-end animate-fade-in">
+                            <div class="flex-1 w-full">
+                                <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Direct Download URL</label>
+                                <div class="relative">
+                                    <i class="fa-solid fa-link absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-xs"></i>
+                                    <input type="text" id="url-input" placeholder="https://example.com/data.zip" class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-8 pr-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono h-[42px]">
+                                </div>
+                            </div>
+                            <div class="w-full lg:w-48">
+                                <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Symbol</label>
+                                <input type="text" id="url-symbol" placeholder="XAUUSD" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono uppercase">
+                            </div>
+                            <div class="w-full lg:w-32">
+                                <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Timeframe</label>
+                                <input type="text" id="url-tf" placeholder="1H" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono uppercase">
+                            </div>
+                            <button onclick="importFromUrl()" id="btn-import-url" class="w-full lg:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-6 py-2.5 rounded-lg transition-all shadow-lg shadow-emerald-500/20 text-sm flex items-center justify-center gap-2 whitespace-nowrap h-[42px]">
+                                <i class="fa-solid fa-cloud-download"></i> Download
+                            </button>
                         </div>
-                        <div class="w-full md:w-48">
-                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Symbol</label>
-                            <input type="text" id="url-symbol" placeholder="e.g. XAUUSD" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono">
-                        </div>
-                        <div class="w-full md:w-32">
-                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Timeframe</label>
-                            <input type="text" id="url-tf" placeholder="e.g. 1H" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono">
-                        </div>
-                        <button onclick="importFromUrl()" id="btn-import-url" class="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-6 py-2 rounded-lg transition-colors shadow-lg shadow-emerald-900/20 text-sm flex items-center justify-center gap-2 whitespace-nowrap">
-                            <i class="fa-solid fa-cloud-download"></i> Download
-                        </button>
                     </div>
                 </div>
 
                 <!-- Table -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
                     <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-                        <h3 class="text-sm font-semibold text-white">Available Datasets</h3>
-                        <button onclick="loadDatasets()" class="text-slate-500 hover:text-white transition-colors text-xs"><i class="fa-solid fa-refresh"></i></button>
+                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Available Datasets</h3>
+                        <button onclick="loadDatasets()" class="text-slate-500 hover:text-white transition-colors text-xs p-1 rounded hover:bg-slate-800"><i class="fa-solid fa-refresh"></i></button>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm text-slate-400">
-                            <thead class="bg-slate-950 text-xs uppercase font-medium text-slate-500">
+                            <thead class="bg-slate-950 text-[10px] uppercase font-bold text-slate-500">
                                 <tr>
-                                    <th class="px-6 py-3">Symbol</th>
-                                    <th class="px-6 py-3">Timeframe</th>
-                                    <th class="px-6 py-3">Range</th>
-                                    <th class="px-6 py-3 text-right">Rows</th>
-                                    <th class="px-6 py-3 text-right">Actions</th>
+                                    <th class="px-6 py-3 tracking-wider">Symbol</th>
+                                    <th class="px-6 py-3 tracking-wider">Timeframe</th>
+                                    <th class="px-6 py-3 tracking-wider">Range</th>
+                                    <th class="px-6 py-3 tracking-wider text-right">Rows</th>
+                                    <th class="px-6 py-3 tracking-wider text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="data-table-body" class="divide-y divide-slate-800">
+                            <tbody id="data-table-body" class="divide-y divide-slate-800 font-mono text-xs">
                                 <!-- Dynamic Rows -->
                             </tbody>
                         </table>
@@ -277,28 +291,28 @@
                 </div>
             </section>
 
-            <!-- Strategy Editor -->
-            <section id="page-strategies" class="page hidden animate-fade-in h-[calc(100vh-8rem)] flex flex-col">
+            <!-- Strategy Lab -->
+            <section id="page-strategies" class="page hidden animate-fade-in h-[calc(100vh-8rem)] flex flex-col max-w-[1920px] mx-auto">
                 <div class="flex items-center justify-between mb-4 flex-shrink-0">
                     <div>
                         <h2 class="text-2xl font-bold text-white tracking-tight">Strategy Lab</h2>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="validateStrategy()" class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                        <button onclick="validateStrategy()" class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-colors flex items-center gap-2">
                             <i class="fa-solid fa-check-double"></i> Validate
                         </button>
-                        <button onclick="saveStrategy()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-indigo-900/20 flex items-center gap-2">
+                        <button onclick="saveStrategy()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-colors shadow-lg shadow-indigo-900/20 flex items-center gap-2">
                             <i class="fa-solid fa-save"></i> Save
                         </button>
                     </div>
                 </div>
 
-                <div class="flex-1 flex gap-4 overflow-hidden min-h-0">
+                <div class="flex-1 flex flex-col lg:flex-row gap-4 overflow-hidden min-h-0">
                     <!-- Sidebar List -->
-                    <div class="w-64 flex-shrink-0 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                    <div class="w-full lg:w-64 flex-shrink-0 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm h-48 lg:h-auto">
                         <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Files</span>
-                            <button onclick="createNewStrategy()" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition-colors" title="New Strategy">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Strategy Files</span>
+                            <button onclick="createNewStrategy()" class="text-slate-400 hover:text-white p-1.5 rounded hover:bg-slate-800 transition-colors" title="New Strategy">
                                 <i class="fa-solid fa-plus text-xs"></i>
                             </button>
                         </div>
@@ -308,14 +322,14 @@
                     </div>
 
                     <!-- Editor Area -->
-                    <div class="flex-1 flex flex-col gap-2 min-w-0">
+                    <div class="flex-1 flex flex-col gap-3 min-w-0 h-full">
                         <!-- Toolbar -->
-                        <div class="flex gap-2 items-center">
+                        <div class="flex gap-3 items-center">
                              <div class="relative flex-1">
-                                <i class="fa-solid fa-pen absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-                                <input type="text" id="strategy-name-input" placeholder="StrategyName" class="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none font-mono">
+                                <i class="fa-solid fa-file-code absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                                <input type="text" id="strategy-name-input" placeholder="StrategyName" class="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none font-mono">
                              </div>
-                             <select id="template-select" onchange="applyTemplate()" class="bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5">
+                             <select id="template-select" onchange="applyTemplate()" class="bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2">
                                 <option value="">Load Template...</option>
                             </select>
                         </div>
@@ -328,7 +342,7 @@
             </section>
 
             <!-- Backtest Runner -->
-            <section id="page-backtest" class="page hidden animate-fade-in space-y-6">
+            <section id="page-backtest" class="page hidden animate-fade-in space-y-6 max-w-7xl mx-auto">
                  <div class="flex items-center justify-between">
                     <div>
                         <h2 class="text-2xl font-bold text-white tracking-tight">Backtest Runner</h2>
@@ -339,35 +353,43 @@
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <!-- Config -->
                     <div class="lg:col-span-1 space-y-6">
-                         <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-                            <h3 class="text-sm font-semibold text-white uppercase tracking-wide border-b border-slate-800 pb-2 mb-2">Configuration</h3>
+                         <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5 shadow-sm">
+                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide border-b border-slate-800 pb-2">Configuration</h3>
 
                             <div>
-                                <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Dataset</label>
-                                <select id="bt-dataset" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"></select>
+                                <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Dataset</label>
+                                <div class="relative">
+                                     <i class="fa-solid fa-database absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-xs"></i>
+                                    <select id="bt-dataset" class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono appearance-none"></select>
+                                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 text-xs pointer-events-none"></i>
+                                </div>
                             </div>
 
                             <div>
-                                <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Strategy</label>
-                                <select id="bt-strategy" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"></select>
+                                <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Strategy</label>
+                                <div class="relative">
+                                    <i class="fa-solid fa-code absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-xs"></i>
+                                    <select id="bt-strategy" class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono appearance-none"></select>
+                                    <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 text-xs pointer-events-none"></i>
+                                </div>
                             </div>
 
-                            <button onclick="runBacktest()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2 mt-4">
+                            <button onclick="runBacktest()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 mt-2 uppercase tracking-wide text-xs">
                                 <i class="fa-solid fa-rocket"></i> Run Simulation
                             </button>
                          </div>
 
                          <!-- Status -->
-                         <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                            <div class="flex justify-between items-center mb-2">
-                                <h3 class="text-xs font-semibold text-slate-500 uppercase">Status</h3>
-                                <span id="bt-status-badge" class="hidden bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold">RUNNING</span>
+                         <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Status</h3>
+                                <span id="bt-status-badge" class="hidden bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold border border-emerald-500/20">RUNNING</span>
                             </div>
 
-                            <div class="w-full bg-slate-800 rounded-full h-2.5 mb-2 overflow-hidden">
-                              <div id="bt-progress-bar" class="bg-indigo-500 h-2.5 rounded-full transition-all duration-300 w-0 progress-bar-striped"></div>
+                            <div class="w-full bg-slate-950 rounded-full h-1.5 mb-2 overflow-hidden border border-slate-800">
+                              <div id="bt-progress-bar" class="bg-indigo-500 h-1.5 rounded-full transition-all duration-300 w-0 shadow-[0_0_10px_rgba(99,102,241,0.5)]"></div>
                             </div>
-                            <p id="bt-status" class="text-xs text-slate-400 font-mono text-right">Ready</p>
+                            <p id="bt-status" class="text-[10px] text-slate-400 font-mono text-right uppercase">Ready</p>
                          </div>
                     </div>
 
@@ -375,9 +397,9 @@
                     <div class="lg:col-span-2 space-y-6">
                         <div id="bt-results" class="space-y-6">
                             <!-- Placeholder -->
-                            <div class="h-64 border-2 border-dashed border-slate-800 rounded-xl flex flex-col items-center justify-center text-slate-600">
-                                <i class="fa-solid fa-chart-area text-4xl mb-4 opacity-50"></i>
-                                <span class="text-sm font-medium">No backtest results yet</span>
+                            <div class="h-64 border border-dashed border-slate-800 bg-slate-900/30 rounded-xl flex flex-col items-center justify-center text-slate-600">
+                                <i class="fa-solid fa-chart-line text-4xl mb-4 opacity-30"></i>
+                                <span class="text-sm font-medium">Run a simulation to view metrics</span>
                             </div>
                         </div>
                     </div>
@@ -385,11 +407,11 @@
             </section>
 
             <!-- AI Assistant -->
-            <section id="page-assistant" class="page hidden animate-fade-in h-[calc(100vh-8rem)] flex gap-6">
+            <section id="page-assistant" class="page hidden animate-fade-in h-[calc(100vh-8rem)] flex gap-6 max-w-[1920px] mx-auto">
                  <!-- Sessions Sidebar -->
-                 <div class="w-64 flex-shrink-0 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hidden md:flex">
+                 <div class="w-64 flex-shrink-0 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hidden lg:flex shadow-sm">
                     <div class="p-4 border-b border-slate-800">
-                        <button onclick="newSession()" class="w-full bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-600/20 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                        <button onclick="newSession()" class="w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 rounded-lg py-2.5 text-xs font-bold uppercase tracking-wide transition-colors flex items-center justify-center gap-2">
                             <i class="fa-solid fa-plus"></i> New Chat
                         </button>
                     </div>
@@ -400,28 +422,33 @@
                  <div class="flex-1 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl relative">
                     <!-- Chat Header -->
                     <div class="h-14 border-b border-slate-800 flex items-center px-6 justify-between bg-slate-900/50 backdrop-blur z-10">
-                        <div class="flex items-center gap-2">
-                             <div class="h-2 w-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                             <span class="text-sm font-semibold text-white">QLM Assistant</span>
+                        <div class="flex items-center gap-3">
+                             <div class="h-2 w-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
+                             <span class="text-sm font-bold text-white tracking-tight">QLM Assistant</span>
                         </div>
-                        <button class="md:hidden text-slate-400" onclick="alert('Session list on mobile coming soon')"><i class="fa-solid fa-history"></i></button>
+                        <button class="lg:hidden text-slate-400 hover:text-white" onclick="alert('Session list on mobile coming soon')"><i class="fa-solid fa-history"></i></button>
                     </div>
 
                     <!-- Messages -->
-                    <div id="chat-container" class="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth">
+                    <div id="chat-container" class="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth bg-slate-950/50">
                         <!-- Messages go here -->
                          <div class="flex justify-start">
-                            <div class="max-w-[80%] rounded-2xl rounded-tl-none bg-slate-800 border border-slate-700 p-4 text-sm text-slate-300">
-                                <p>Hello! I am your Quantitative Trading Assistant. I can help you create strategies, run backtests, or analyze performance. How can I help?</p>
+                            <div class="max-w-[85%] rounded-2xl rounded-tl-none bg-slate-800 border border-slate-700 p-5 text-sm text-slate-300 shadow-md">
+                                <p class="leading-relaxed">Hello! I am your <strong>Quantitative Trading Assistant</strong>. I can help you:</p>
+                                <ul class="list-disc list-inside mt-2 space-y-1 text-slate-400 text-xs">
+                                    <li>Analyze Market Structure</li>
+                                    <li>Write & Fix Strategy Code</li>
+                                    <li>Run Backtests & Optimize Parameters</li>
+                                </ul>
                             </div>
                         </div>
                     </div>
 
                     <!-- Input -->
                     <div class="p-4 border-t border-slate-800 bg-slate-900/80 backdrop-blur">
-                        <div class="flex gap-2 relative">
-                             <input type="text" id="ai-input" placeholder="Type your message..." autocomplete="off" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all pr-12 shadow-inner">
-                             <button id="ai-send-btn" class="absolute right-2 top-1.5 bottom-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg px-4 transition-colors flex items-center justify-center">
+                        <div class="flex gap-3 relative max-w-4xl mx-auto">
+                             <input type="text" id="ai-input" placeholder="Ask me to create a strategy..." autocomplete="off" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-5 py-3.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all pr-14 shadow-inner">
+                             <button id="ai-send-btn" class="absolute right-2 top-2 bottom-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg w-10 transition-colors flex items-center justify-center shadow-md">
                                 <i class="fa-solid fa-paper-plane text-xs"></i>
                              </button>
                         </div>
@@ -431,45 +458,45 @@
 
             <!-- Settings -->
             <section id="page-settings" class="page hidden animate-fade-in max-w-3xl mx-auto space-y-6">
-                 <h2 class="text-2xl font-bold text-white tracking-tight mb-6">AI Model Registry</h2>
+                 <h2 class="text-2xl font-bold text-white tracking-tight mb-6">Settings</h2>
 
                  <!-- Active Selection -->
-                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                    <h3 class="text-sm font-semibold text-white border-b border-slate-800 pb-2 mb-4">Active Configuration</h3>
+                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide border-b border-slate-800 pb-2 mb-4">AI Configuration</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Provider</label>
-                            <select id="active-provider" onchange="loadProviderModels(this.value)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"></select>
+                            <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Provider</label>
+                            <select id="active-provider" onchange="loadProviderModels(this.value)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"></select>
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Model</label>
-                            <select id="active-model" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"></select>
+                            <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Model</label>
+                            <select id="active-model" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"></select>
                         </div>
                     </div>
                     <div class="flex justify-end pt-4">
-                        <button onclick="saveActiveConfig()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-lg text-sm">Apply Active</button>
+                        <button onclick="saveActiveConfig()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase px-4 py-2.5 rounded-lg transition-colors">Apply Configuration</button>
                     </div>
                  </div>
 
                  <!-- Add Provider -->
-                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                    <h3 class="text-sm font-semibold text-white border-b border-slate-800 pb-2 mb-4">Add New Provider</h3>
+                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide border-b border-slate-800 pb-2 mb-4">Add Provider</h3>
                     <div class="grid grid-cols-1 gap-4">
                         <div class="grid grid-cols-2 gap-4">
-                            <input type="text" id="new-prov-name" placeholder="Provider Name (e.g. NVIDIA)" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
-                            <input type="text" id="new-prov-url" placeholder="Base URL" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+                            <input type="text" id="new-prov-name" placeholder="Name (e.g. OpenAI)" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white">
+                            <input type="text" id="new-prov-url" placeholder="Base URL" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white">
                         </div>
-                        <input type="password" id="new-prov-key" placeholder="API Key" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+                        <input type="password" id="new-prov-key" placeholder="API Key" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white">
                     </div>
                     <div class="flex justify-end pt-4 gap-2">
-                        <button onclick="addProvider()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-lg text-sm">Add Provider</button>
+                        <button onclick="addProvider()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase px-4 py-2.5 rounded-lg transition-colors">Add Provider</button>
                     </div>
                  </div>
 
                  <!-- List Providers -->
-                 <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                 <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
                     <div class="px-6 py-4 bg-slate-800/30 border-b border-slate-800">
-                        <h3 class="text-sm font-semibold text-white">Registered Providers</h3>
+                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Registered Providers</h3>
                     </div>
                     <ul id="provider-list" class="divide-y divide-slate-800 text-sm text-slate-400"></ul>
                  </div>
