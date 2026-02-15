@@ -19,9 +19,9 @@ Now fully compatible with the **Model Context Protocol (MCP)**, allowing externa
 |:---:|:---:|
 | <img src="public/screenshots/01_dashboard.png" width="400" /> | <img src="public/screenshots/05_ai_assistant.png" width="400" /> |
 
-| **Strategy Lab** | **Backtest Runner** |
+| **Strategy Lab** | **MCP Service** |
 |:---:|:---:|
-| <img src="public/screenshots/03_strategy_lab.png" width="400" /> | <img src="public/screenshots/04_backtest_runner.png" width="400" /> |
+| <img src="public/screenshots/03_strategy_lab.png" width="400" /> | <img src="public/screenshots/07_mcp_dashboard.png" width="400" /> |
 
 ### Mobile Responsive
 <img src="public/screenshots/06_mobile_dashboard.png" width="200" />
@@ -33,6 +33,7 @@ Now fully compatible with the **Model Context Protocol (MCP)**, allowing externa
 ### 🔌 MCP Service (New!)
 *   **Protocol**: Exposes QLM via Server-Sent Events (SSE).
 *   **Endpoint**: `http://<IP>:8010/api/mcp/sse`
+*   **Control Panel**: Dedicated UI to toggle service and view live activity logs.
 *   **Capabilities**: Full control over Data, Strategies, and Backtesting.
 
 ### 🧠 Agentic AI Core
