@@ -4,8 +4,11 @@
 ![Python](https://img.shields.io/badge/Python-3.12%2B-yellow?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 ![AI-Powered](https://img.shields.io/badge/AI-Agentic-purple?style=for-the-badge)
+![MCP-Ready](https://img.shields.io/badge/MCP-Enabled-orange?style=for-the-badge)
 
 **QuantLogic Framework (QLM)** is an institutional-grade algorithmic trading platform designed for quantitative researchers. It integrates a high-performance **Event-Driven Backtester** with an autonomous **AI Research Agent** capable of self-healing, multi-step reasoning, and full strategy lifecycle management.
+
+Now fully compatible with the **Model Context Protocol (MCP)**, allowing external AI clients (Claude Desktop, Zed, etc.) to control the QLM engine directly.
 
 ---
 
@@ -27,16 +30,21 @@
 
 ## ✨ Key Features
 
+### 🔌 MCP Service (New!)
+*   **Protocol**: Exposes QLM via Server-Sent Events (SSE).
+*   **Endpoint**: `http://<IP>:8010/api/mcp/sse`
+*   **Capabilities**:
+    *   **Tools**: Access to `create_strategy`, `run_backtest`, `analyze_market`, and more.
+    *   **Resources**: Read access to Strategies (`qlm://strategy/...`) and Datasets (`qlm://data/...`).
+    *   **Prompts**: Built-in "Senior Quant" persona.
+
 ### 🧠 Agentic AI Core
 *   **ReAct "Brain" Architecture**: The AI reasons in loops (Thought -> Action -> Observation) to solve complex tasks.
 *   **Self-Healing Workflow**: If a tool fails (e.g., syntax error in generated code), the agent analyzes the stack trace and autonomously pushes a fix.
-*   **Context & Job Management**: Maintains awareness of long-running goals ("Create a mean reversion strategy for BTC") across multiple chat turns.
 *   **Auto-Coder**: Generates high-quality, bug-free Python strategies strictly adhering to the QLM interface.
 
 ### 📊 Professional Data Management
-*   **Universal Ingestion**:
-    *   **Local Upload**: Drag-and-drop CSV uploads.
-    *   **Remote Import**: Direct download from URLs (CSV or ZIP). Automatic extraction and validation.
+*   **Universal Ingestion**: Local uploads and Direct URL imports (CSV/ZIP).
 *   **Parquet Storage**: High-performance columnar storage for million-row datasets.
 *   **Market Structure Analytics**: Built-in tools for Trend, Volatility (ATR), and Support/Resistance analysis.
 
@@ -44,12 +52,10 @@
 *   **Event-Driven Engine**: Simulates realistic market conditions candle-by-candle.
 *   **Advanced Metrics**: Max Drawdown (Abs), Profit Factor, Sharpe Ratio, Expectancy.
 *   **Position Sizing**: Dynamic sizing logic embedded in strategies.
-*   **Vectorized & Loop Hybrid**: Optimized for both speed and complex logic.
 
 ### 🖥️ "Financial Terminal" UI
 *   **Modern Design**: Dark-themed, Slate/Zinc aesthetics using **Tailwind CSS**.
 *   **Mobile Responsive**: Fully functional on desktop and mobile devices.
-*   **Real-Time Visualization**: WebSocket-powered progress bars and live "Thinking" status updates from the AI.
 
 ---
 
@@ -76,55 +82,27 @@
     ```bash
     python -m backend.main
     ```
-    Access the terminal at `http://localhost:8000`.
+    Access the terminal at `http://localhost:8010`.
 
 ---
 
-## 🚀 Usage Guide
+## 🚀 MCP Connection Guide
 
-### 1. Ingest Data
-Navigate to **Data Manager**.
-*   **Local**: Upload OHLCV CSV files.
-*   **URL**: Paste a direct link to a CSV or ZIP file (e.g., from Catbox, GitHub raw).
-*   **Format**: `Date, Open, High, Low, Close, Volume` (auto-detected).
-*   **Processing**: auto-converted to Parquet for speed.
+To connect an MCP Client (like Claude Desktop) to QLM:
 
-### 2. AI Architect
-Go to the **AI Assistant** tab.
-*   **Ask**: "Analyze XAUUSD 1H structure and write a Trend Following strategy."
-*   **Advanced**: "Download dataset from [URL] for symbol BTCUSD 1H and test it."
-*   **Watch**: The "Status Pipeline" will show the agent analyzing data -> planning -> coding.
-*   **Auto-Fix**: If the code fails validation, the agent will see the error and fix it automatically.
-
-### 3. Strategy Lab
-*   Review and edit the generated Python code.
-*   Click **"Validate"** to run a safety check and dry-run simulation.
-*   Click **"Save"** to version control your strategy.
-
-### 4. Backtest Runner
-*   Select your Dataset and Strategy.
-*   Click **"Run Simulation"**.
-*   View real-time progress and detailed performance metrics.
-
----
-
-## 📂 Project Structure
-
-```
-QLM/
-├── backend/                # FastAPI Application
-│   ├── ai/                 # AI Brain, Agent, Tools, Memory, Store
-│   ├── core/               # Backtest Engine, Strategy Interface, Data
-│   ├── api/                # API Routes & WebSockets
-│   └── main.py             # Entry Point
-├── frontend/               # UI Assets
-│   ├── css/                # Tailwind & Custom Styles
-│   ├── js/                 # App Logic
-│   └── index.html          # Single Page Application
-├── strategies/             # User Strategies (Versioned)
-├── data/                   # Data Storage (Parquet/SQLite)
-└── requirements.txt        # Dependencies
-```
+1.  Start QLM (`python -m backend.main`).
+2.  Configure your client:
+    ```json
+    {
+      "mcpServers": {
+        "qlm": {
+          "command": "",
+          "url": "http://127.0.0.1:8010/api/mcp/sse"
+        }
+      }
+    }
+    ```
+    *(Note: If using `mcp-cli` or similar, point to the SSE endpoint).*
 
 ---
 
