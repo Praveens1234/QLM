@@ -15,12 +15,13 @@ INTERFACE REQUIREMENTS:
    - `exit(self, df: pd.DataFrame, vars: Dict[str, pd.Series], trade: Dict[str, Any]) -> bool`
    - `position_size(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series` (optional, default 1.0)
 
-RULES:
-- Do NOT use `df.iloc` in vectorized methods (`define_variables`, `entry_*`). Use `shift()` for previous values.
-- `entry_long` and `entry_short` MUST return boolean Series.
-- Handle NaNs explicitly (e.g., `fillna(False)` for signals).
-- Imports allowed: `pandas`, `numpy`, `typing`, `backend.core.strategy.Strategy`.
-- Output ONLY the Python code block. No markdown chatter.
+ROBUSTNESS RULES:
+- **Check Data Length**: In `define_variables`, strictly check if `len(df) < window_size` and return empty/NaN series if so to avoid `IndexError`.
+- **Handle NaNs**: Use `.fillna(False)` for boolean signals. Use `.bfill()` or `.ffill()` for indicators where appropriate.
+- **Vectorization**: Do NOT use `df.iloc` in vectorized methods. Use `shift()` for previous values.
+- **Imports**: `import pandas as pd`, `import numpy as np`, `from typing import Dict, Any`, `from backend.core.strategy import Strategy`.
+
+Output ONLY the Python code block. No markdown chatter.
 """
 
 class AutoCoder:

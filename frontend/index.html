@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QLM - Quantum Engine</title>
+    <title>QLM - QuantLogic Framework</title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -15,18 +15,19 @@
                 extend: {
                     colors: {
                         slate: {
-                            850: '#1a202c', // Custom darker slate
+                            800: '#1e293b',
                             900: '#0f172a',
-                            950: '#020617',
                         },
-                        indigo: {
-                            500: '#6366f1',
-                            600: '#4f46e5',
+                        emerald: {
+                            500: '#10b981',
                         },
+                        rose: {
+                            500: '#f43f5e',
+                        }
                     },
                     fontFamily: {
-                        sans: ['Space Grotesk', 'Inter', 'sans-serif'], // Stitch suggested Space Grotesk
-                        mono: ['JetBrains Mono', 'monospace'],
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
                     },
                 },
             },
@@ -34,7 +35,7 @@
     </script>
 
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -46,302 +47,400 @@
     <link rel="stylesheet" href="/css/tailwind_custom.css">
 </head>
 
-<body class="bg-slate-950 text-slate-100 h-screen w-screen overflow-hidden flex font-sans text-sm bg-grid-pattern selection:bg-indigo-500/30 selection:text-indigo-200">
+<body class="bg-slate-950 text-slate-100 h-screen w-screen overflow-hidden flex font-sans text-sm">
 
-    <!-- Sidebar (Glass) -->
-    <aside id="sidebar" class="w-[72px] hover:w-64 group bg-slate-900/80 backdrop-blur-md border-r border-slate-800/50 flex flex-col justify-between transition-all duration-300 fixed md:sticky top-0 left-0 bottom-0 z-50 h-screen overflow-hidden md:translate-x-0 -translate-x-full">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between transition-transform duration-300 fixed md:relative z-50 h-full md:translate-x-0 -translate-x-full">
         <!-- Header -->
-        <div class="h-20 flex items-center justify-center group-hover:justify-start group-hover:px-6 transition-all border-b border-slate-800/50">
-            <div class="h-10 w-10 bg-gradient-to-tr from-indigo-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30 flex-shrink-0">
-                <i class="fa-solid fa-cube text-white text-lg"></i>
+        <div class="p-6 border-b border-slate-800 flex items-center gap-3">
+            <div class="h-8 w-8 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <i class="fa-solid fa-layer-group text-white text-xs"></i>
             </div>
-            <div class="ml-3 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap overflow-hidden">
-                <h1 class="text-lg font-bold tracking-tight text-white glow-text-indigo">QUANTUM</h1>
-                <p class="text-[10px] text-indigo-400 font-mono tracking-widest uppercase">Engine v2.0</p>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight text-white leading-tight">QLM</h1>
+                <p class="text-[10px] text-slate-400 font-medium tracking-wide uppercase">QuantLogic</p>
             </div>
         </div>
 
         <!-- Navigation -->
-        <nav class="flex-1 py-6 flex flex-col gap-2 px-3">
-            <button onclick="router.navigate('dashboard')" id="nav-dashboard" class="nav-item h-12 w-full flex items-center rounded-xl text-slate-400 hover:bg-slate-800/50 hover:text-white transition-all group/btn relative">
-                <div class="w-[48px] flex justify-center flex-shrink-0"><i class="fa-solid fa-grid-2 text-lg group-hover/btn:text-indigo-400 transition-colors"></i></div>
-                <span class="opacity-0 group-hover:opacity-100 transition-opacity font-medium whitespace-nowrap delay-75">Dashboard</span>
-                <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-0 bg-indigo-500 rounded-r-full transition-all group-[.active]/btn:h-8"></div>
+        <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+            <button onclick="router.navigate('dashboard')" id="nav-dashboard" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+                <i class="fa-solid fa-chart-line w-5 text-center group-hover:text-indigo-400 transition-colors"></i>
+                <span class="font-medium">Dashboard</span>
             </button>
 
-            <button onclick="router.navigate('data')" id="nav-data" class="nav-item h-12 w-full flex items-center rounded-xl text-slate-400 hover:bg-slate-800/50 hover:text-white transition-all group/btn relative">
-                <div class="w-[48px] flex justify-center flex-shrink-0"><i class="fa-solid fa-database text-lg group-hover/btn:text-emerald-400 transition-colors"></i></div>
-                <span class="opacity-0 group-hover:opacity-100 transition-opacity font-medium whitespace-nowrap delay-75">Data Feeds</span>
+            <button onclick="router.navigate('data')" id="nav-data" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+                <i class="fa-solid fa-database w-5 text-center group-hover:text-emerald-400 transition-colors"></i>
+                <span class="font-medium">Data Manager</span>
             </button>
 
-            <button onclick="router.navigate('strategies')" id="nav-strategies" class="nav-item h-12 w-full flex items-center rounded-xl text-slate-400 hover:bg-slate-800/50 hover:text-white transition-all group/btn relative">
-                <div class="w-[48px] flex justify-center flex-shrink-0"><i class="fa-solid fa-microchip text-lg group-hover/btn:text-amber-400 transition-colors"></i></div>
-                <span class="opacity-0 group-hover:opacity-100 transition-opacity font-medium whitespace-nowrap delay-75">Strategies</span>
+            <button onclick="router.navigate('strategies')" id="nav-strategies" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+                <i class="fa-solid fa-code w-5 text-center group-hover:text-amber-400 transition-colors"></i>
+                <span class="font-medium">Strategy Lab</span>
             </button>
 
-            <button onclick="router.navigate('backtest')" id="nav-backtest" class="nav-item h-12 w-full flex items-center rounded-xl text-slate-400 hover:bg-slate-800/50 hover:text-white transition-all group/btn relative">
-                <div class="w-[48px] flex justify-center flex-shrink-0"><i class="fa-solid fa-play text-lg group-hover/btn:text-rose-400 transition-colors"></i></div>
-                <span class="opacity-0 group-hover:opacity-100 transition-opacity font-medium whitespace-nowrap delay-75">Simulation</span>
+            <button onclick="router.navigate('backtest')" id="nav-backtest" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+                <i class="fa-solid fa-play w-5 text-center group-hover:text-rose-400 transition-colors"></i>
+                <span class="font-medium">Backtest Runner</span>
             </button>
 
-            <button onclick="router.navigate('assistant')" id="nav-assistant" class="nav-item h-12 w-full flex items-center rounded-xl text-slate-400 hover:bg-slate-800/50 hover:text-white transition-all group/btn relative mt-auto">
-                <div class="w-[48px] flex justify-center flex-shrink-0 relative">
-                    <i class="fa-solid fa-robot text-lg group-hover/btn:text-cyan-400 transition-colors"></i>
-                    <span class="absolute top-2 right-2 h-2 w-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                </div>
-                <span class="opacity-0 group-hover:opacity-100 transition-opacity font-medium whitespace-nowrap delay-75">AI Architect</span>
+            <button onclick="router.navigate('assistant')" id="nav-assistant" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all mt-6 border-t border-slate-800 pt-6">
+                <i class="fa-solid fa-robot w-5 text-center group-hover:text-cyan-400 transition-colors"></i>
+                <span class="font-medium">AI Assistant</span>
+                <span class="ml-auto bg-indigo-500/20 text-indigo-300 text-[10px] font-bold px-1.5 py-0.5 rounded">BETA</span>
             </button>
         </nav>
 
         <!-- Footer -->
-        <div class="p-4 border-t border-slate-800/50 flex items-center justify-center group-hover:justify-start overflow-hidden">
-            <button onclick="router.navigate('settings')" class="flex items-center gap-3 text-slate-500 hover:text-white transition-colors w-full">
-                <div class="w-[40px] flex justify-center"><i class="fa-solid fa-gear"></i></div>
-                <span class="opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-xs">Settings</span>
+        <div class="p-4 border-t border-slate-800">
+            <button onclick="router.navigate('settings')" id="nav-settings" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
+                <i class="fa-solid fa-cog w-5 text-center"></i>
+                <span>Settings</span>
             </button>
+            <div class="mt-4 text-center text-[10px] text-slate-600 font-mono">
+                v1.2.0-beta
+            </div>
         </div>
     </aside>
 
-    <!-- Main Content -->
-    <main class="flex-1 flex flex-col h-full overflow-hidden relative">
+    <!-- Overlay for mobile -->
+    <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden md:hidden transition-opacity"></div>
 
-        <!-- Top Bar (Mobile Only for now, desktop uses sidebar header) -->
-        <header class="md:hidden h-16 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-900/90 backdrop-blur z-30">
-            <span class="font-bold text-white tracking-wider">QUANTUM</span>
-            <button onclick="document.getElementById('sidebar').classList.toggle('w-64'); document.getElementById('sidebar').classList.toggle('fixed');" class="text-slate-400"><i class="fa-solid fa-bars"></i></button>
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 relative">
+
+        <!-- Mobile Header -->
+        <header class="md:hidden h-14 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
+            <div class="flex items-center gap-2">
+                <div class="h-6 w-6 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded flex items-center justify-center">
+                    <i class="fa-solid fa-layer-group text-white text-[10px]"></i>
+                </div>
+                <span class="font-bold text-white">QLM</span>
+            </div>
+            <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white p-2">
+                <i class="fa-solid fa-bars text-lg"></i>
+            </button>
         </header>
 
-        <!-- Page Content -->
-        <div id="page-container" class="flex-1 overflow-y-auto overflow-x-hidden p-6 md:p-8 space-y-8 scroll-smooth">
+        <!-- Page Container -->
+        <div id="page-container" class="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 space-y-8 scroll-smooth">
 
             <!-- Dashboard -->
-            <section id="page-dashboard" class="page hidden animate-fade-in-up space-y-8">
-                <!-- Header Stats -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <!-- Metric Card -->
-                    <div class="glass-card p-6 rounded-2xl relative overflow-hidden group">
-                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <i class="fa-solid fa-code text-6xl text-indigo-500"></i>
-                        </div>
-                        <h3 class="text-slate-400 text-xs font-mono uppercase tracking-widest">Active Strategies</h3>
-                        <div class="text-3xl font-bold text-white mt-2 stat-value" data-stat="strategies">--</div>
-                        <div class="mt-4 flex items-center text-xs text-emerald-400 font-medium">
-                            <i class="fa-solid fa-arrow-trend-up mr-1"></i> +12% Efficiency
-                        </div>
+            <section id="page-dashboard" class="page hidden animate-fade-in space-y-8">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white tracking-tight">Dashboard</h2>
+                        <p class="text-slate-400 text-sm mt-1">System Overview & Status</p>
                     </div>
-
-                    <div class="glass-card p-6 rounded-2xl relative overflow-hidden group">
-                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <i class="fa-solid fa-database text-6xl text-emerald-500"></i>
-                        </div>
-                        <h3 class="text-slate-400 text-xs font-mono uppercase tracking-widest">Data Clusters</h3>
-                        <div class="text-3xl font-bold text-white mt-2 stat-value" data-stat="datasets">--</div>
-                        <div class="mt-4 flex items-center text-xs text-slate-500">
-                            <i class="fa-solid fa-check-circle mr-1 text-emerald-500"></i> Synced with Storage
-                        </div>
-                    </div>
-
-                    <div class="glass-card p-6 rounded-2xl relative overflow-hidden group">
-                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <i class="fa-solid fa-server text-6xl text-amber-500"></i>
-                        </div>
-                        <h3 class="text-slate-400 text-xs font-mono uppercase tracking-widest">Engine Status</h3>
-                        <div class="text-3xl font-bold text-white mt-2">LIVE</div>
-                        <div class="mt-4 flex items-center text-xs text-emerald-400">
-                            <span class="relative flex h-2 w-2 mr-2">
-                              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </span>
-                            System Nominal
-                        </div>
-                    </div>
-
-                    <div class="glass-card p-6 rounded-2xl border-indigo-500/30 bg-indigo-500/5 relative overflow-hidden">
-                        <h3 class="text-indigo-200 text-xs font-mono uppercase tracking-widest">Net Profit (24h)</h3>
-                        <div class="text-3xl font-bold text-white mt-2 glow-text-indigo">+$12,482</div>
-                        <div class="mt-4 text-xs text-indigo-300 font-medium">
-                            <i class="fa-solid fa-bolt mr-1"></i> Outperforming Benchmark
-                        </div>
+                    <div class="flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-medium border border-emerald-500/20">
+                        <span class="relative flex h-2 w-2">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        System Online
                     </div>
                 </div>
 
-                <!-- Main Content: Data Table -->
-                <div class="glass-panel rounded-2xl overflow-hidden flex flex-col h-[500px]">
-                    <div class="p-6 border-b border-slate-800/50 flex justify-between items-center bg-slate-900/30">
-                        <div>
-                            <h3 class="text-lg font-bold text-white">Available Data Clusters</h3>
-                            <p class="text-slate-500 text-xs mt-1">Manage high-frequency trading datasets</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Stat Card 1 -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors group">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-2 bg-indigo-500/10 rounded-lg text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                                <i class="fa-solid fa-code"></i>
+                            </div>
+                            <!-- Trend indicator (dummy) -->
+                            <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                <i class="fa-solid fa-arrow-trend-up"></i> +2
+                            </span>
                         </div>
-                        <div class="flex gap-2">
-                            <button onclick="loadDatasets()" class="h-8 w-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"><i class="fa-solid fa-refresh"></i></button>
-                            <button onclick="router.navigate('data')" class="h-8 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold uppercase tracking-wide transition-all shadow-lg shadow-indigo-500/20">Manage</button>
-                        </div>
+                        <div class="text-3xl font-bold text-white stat-value" data-stat="strategies">--</div>
+                        <div class="text-xs text-slate-500 font-medium uppercase tracking-wide mt-1">Active Strategies</div>
                     </div>
-                    <div class="flex-1 overflow-auto">
-                        <table class="w-full text-left">
-                            <thead class="bg-slate-900/50 text-xs uppercase text-slate-500 font-mono sticky top-0 backdrop-blur-md">
+
+                    <!-- Stat Card 2 -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors group">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-2 bg-emerald-500/10 rounded-lg text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                                <i class="fa-solid fa-database"></i>
+                            </div>
+                             <span class="text-xs font-mono text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">
+                                UPDATED
+                            </span>
+                        </div>
+                        <div class="text-3xl font-bold text-white stat-value" data-stat="datasets">--</div>
+                        <div class="text-xs text-slate-500 font-medium uppercase tracking-wide mt-1">Datasets Available</div>
+                    </div>
+
+                    <!-- Stat Card 3 -->
+                     <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors group">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="p-2 bg-amber-500/10 rounded-lg text-amber-400 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+                                <i class="fa-solid fa-play"></i>
+                            </div>
+                        </div>
+                        <div class="text-3xl font-bold text-white stat-value">Ready</div>
+                        <div class="text-xs text-slate-500 font-medium uppercase tracking-wide mt-1">Engine Status</div>
+                    </div>
+
+                     <!-- Stat Card 4 (Welcome) -->
+                     <div class="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-5 text-white flex flex-col justify-center items-start shadow-lg shadow-indigo-900/50 col-span-1 md:col-span-2 lg:col-span-1">
+                        <h3 class="font-bold text-lg mb-1">Welcome back!</h3>
+                        <p class="text-indigo-100 text-xs leading-relaxed mb-3">Ready to build your next alpha strategy?</p>
+                        <button onclick="router.navigate('strategies')" class="text-xs bg-white text-indigo-600 font-bold px-3 py-1.5 rounded hover:bg-indigo-50 transition-colors w-full text-center">
+                            Open Lab
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Data Manager -->
+            <section id="page-data" class="page hidden animate-fade-in space-y-6">
+                 <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white tracking-tight">Data Manager</h2>
+                        <p class="text-slate-400 text-sm mt-1">Manage historical datasets (CSV/Parquet)</p>
+                    </div>
+                </div>
+
+                <!-- Upload Card -->
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-upload text-indigo-400"></i> Import Dataset
+                    </h3>
+                    <div class="flex flex-col md:flex-row gap-4 items-end">
+                        <div class="flex-1 w-full">
+                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">CSV File</label>
+                            <input type="file" id="upload-file" accept=".csv" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-indigo-400 hover:file:bg-slate-700 cursor-pointer border border-slate-700 rounded-lg bg-slate-950 focus:outline-none focus:border-indigo-500 transition-colors">
+                        </div>
+                        <div class="w-full md:w-48">
+                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Symbol</label>
+                            <input type="text" id="upload-symbol" placeholder="e.g. BTCUSD" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono">
+                        </div>
+                        <div class="w-full md:w-32">
+                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Timeframe</label>
+                            <input type="text" id="upload-tf" placeholder="e.g. 1H" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono">
+                        </div>
+                        <button onclick="uploadDataset()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-6 py-2 rounded-lg transition-colors shadow-lg shadow-indigo-900/20 text-sm flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-plus"></i> Upload
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                        <h3 class="text-sm font-semibold text-white">Available Datasets</h3>
+                        <button onclick="loadDatasets()" class="text-slate-500 hover:text-white transition-colors text-xs"><i class="fa-solid fa-refresh"></i></button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-400">
+                            <thead class="bg-slate-950 text-xs uppercase font-medium text-slate-500">
                                 <tr>
-                                    <th class="px-6 py-4 font-medium">Identifier</th>
-                                    <th class="px-6 py-4 font-medium">Timeframe</th>
-                                    <th class="px-6 py-4 font-medium">Range</th>
-                                    <th class="px-6 py-4 font-medium text-right">Confidence</th>
-                                    <th class="px-6 py-4 font-medium text-right">Status</th>
+                                    <th class="px-6 py-3">Symbol</th>
+                                    <th class="px-6 py-3">Timeframe</th>
+                                    <th class="px-6 py-3">Range</th>
+                                    <th class="px-6 py-3 text-right">Rows</th>
+                                    <th class="px-6 py-3 text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="data-table-body" class="divide-y divide-slate-800/50 text-sm">
-                                <!-- Dynamic Content -->
+                            <tbody id="data-table-body" class="divide-y divide-slate-800">
+                                <!-- Dynamic Rows -->
                             </tbody>
                         </table>
                     </div>
                 </div>
             </section>
 
-            <!-- Data Manager (Simplified for Redesign) -->
-            <section id="page-data" class="page hidden animate-fade-in-up space-y-6">
-                <div class="glass-card p-8 rounded-2xl">
-                    <h2 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-                        <span class="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-sm"><i class="fa-solid fa-cloud-arrow-up"></i></span>
-                        Data Ingestion
-                    </h2>
-
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                        <div class="md:col-span-2">
-                            <label class="text-xs uppercase text-slate-500 font-bold mb-2 block">Source File (CSV)</label>
-                            <input type="file" id="upload-file" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-800 file:text-indigo-400 hover:file:bg-slate-700 cursor-pointer border border-slate-800 rounded-xl bg-slate-900/50 focus:outline-none focus:border-indigo-500 transition-colors h-12 pt-1">
-                        </div>
-                        <div>
-                            <label class="text-xs uppercase text-slate-500 font-bold mb-2 block">Symbol Tag</label>
-                            <input type="text" id="upload-symbol" placeholder="BTC-USDT" class="w-full bg-slate-900/50 border border-slate-800 rounded-xl px-4 h-12 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-mono transition-all">
-                        </div>
-                        <button onclick="uploadDataset()" class="h-12 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-bolt"></i> Ingest
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- AI Assistant (Stitch Inspired) -->
-            <section id="page-assistant" class="page hidden animate-fade-in-up h-[calc(100vh-6rem)] flex gap-6">
-                <!-- Session History Sidebar -->
-                <div class="w-80 flex-shrink-0 glass-panel rounded-2xl flex flex-col overflow-hidden hidden lg:flex">
-                    <div class="p-5 border-b border-slate-800/50">
-                        <button onclick="newSession()" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-xl py-3 text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-inner">
-                            <i class="fa-solid fa-plus text-indigo-400"></i> New Context
-                        </button>
-                    </div>
-                    <div class="p-3">
-                        <h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest px-2 mb-2">History</h4>
-                        <ul id="session-list" class="space-y-1 overflow-y-auto h-[500px]">
-                            <!-- Sessions -->
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- Chat Interface -->
-                <div class="flex-1 glass-card rounded-2xl flex flex-col overflow-hidden relative shadow-2xl shadow-black/50">
-                    <!-- Header -->
-                    <div class="h-16 border-b border-slate-800/50 flex items-center justify-between px-6 bg-slate-900/50 backdrop-blur-md z-10">
-                        <div class="flex items-center gap-3">
-                            <div class="h-2 w-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_#10b981]"></div>
-                            <div>
-                                <h3 class="text-sm font-bold text-white tracking-wide">AI ARCHITECT</h3>
-                                <p class="text-[10px] text-slate-400 font-mono">Model: M2.1-Reasoning</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Chat Area -->
-                    <div id="chat-container" class="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth bg-slate-900/30">
-                        <!-- Messages injected by JS -->
-                    </div>
-
-                    <!-- Input Area -->
-                    <div class="p-6 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800/50">
-                        <div class="relative group">
-                            <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-cyan-500 rounded-2xl opacity-20 group-hover:opacity-40 transition duration-500 blur"></div>
-                            <div class="relative flex items-center bg-slate-950 rounded-2xl border border-slate-800 p-1">
-                                <input type="text" id="ai-input" placeholder="Describe a strategy or ask for market analysis..." class="flex-1 bg-transparent border-none text-white px-4 py-3 focus:ring-0 placeholder-slate-600 text-sm">
-                                <button id="ai-send-btn" class="h-10 w-10 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl flex items-center justify-center transition-transform hover:scale-105 shadow-lg shadow-indigo-500/20 mr-1">
-                                    <i class="fa-solid fa-paper-plane text-xs"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Strategy Lab (Simplified) -->
-            <section id="page-strategies" class="page hidden animate-fade-in-up h-[calc(100vh-6rem)] flex flex-col gap-4">
-                <div class="flex justify-between items-center glass-panel p-4 rounded-xl">
-                    <div class="flex items-center gap-4">
-                        <i class="fa-solid fa-flask text-amber-400 text-xl"></i>
-                        <h2 class="text-lg font-bold text-white">Strategy Lab</h2>
+            <!-- Strategy Editor -->
+            <section id="page-strategies" class="page hidden animate-fade-in h-[calc(100vh-8rem)] flex flex-col">
+                <div class="flex items-center justify-between mb-4 flex-shrink-0">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white tracking-tight">Strategy Lab</h2>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="validateStrategy()" class="px-4 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold uppercase hover:bg-emerald-500/20 transition-colors">Validate</button>
-                        <button onclick="saveStrategy()" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold uppercase shadow-lg shadow-indigo-500/20 transition-colors">Save Code</button>
+                        <button onclick="validateStrategy()" class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                            <i class="fa-solid fa-check-double"></i> Validate
+                        </button>
+                        <button onclick="saveStrategy()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-indigo-900/20 flex items-center gap-2">
+                            <i class="fa-solid fa-save"></i> Save
+                        </button>
                     </div>
                 </div>
-                <div class="flex-1 flex gap-4 overflow-hidden">
-                    <div class="w-64 glass-panel rounded-xl overflow-hidden flex flex-col">
-                        <div class="p-3 bg-slate-900/50 border-b border-slate-800 text-xs font-bold text-slate-500 uppercase">Explorer</div>
-                        <div id="strategy-list" class="p-2 space-y-1 overflow-y-auto flex-1"></div>
-                    </div>
-                    <div class="flex-1 glass-panel rounded-xl overflow-hidden flex flex-col">
-                        <div class="p-2 border-b border-slate-800 flex gap-2">
-                            <input type="text" id="strategy-name-input" class="bg-slate-900 border border-slate-700 rounded px-3 py-1 text-xs text-white w-48 font-mono">
-                            <div class="flex-1"></div>
-                            <select id="template-select" onchange="applyTemplate()" class="bg-slate-900 border border-slate-700 rounded px-3 py-1 text-xs text-slate-300"></select>
+
+                <div class="flex-1 flex gap-4 overflow-hidden min-h-0">
+                    <!-- Sidebar List -->
+                    <div class="w-64 flex-shrink-0 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                        <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Files</span>
+                            <button onclick="createNewStrategy()" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition-colors" title="New Strategy">
+                                <i class="fa-solid fa-plus text-xs"></i>
+                            </button>
                         </div>
-                        <div id="editor-container" class="flex-1 bg-[#1e1e1e]"></div>
+                        <div class="flex-1 overflow-y-auto p-2 space-y-1" id="strategy-list">
+                            <!-- Items -->
+                        </div>
+                    </div>
+
+                    <!-- Editor Area -->
+                    <div class="flex-1 flex flex-col gap-2 min-w-0">
+                        <!-- Toolbar -->
+                        <div class="flex gap-2 items-center">
+                             <div class="relative flex-1">
+                                <i class="fa-solid fa-pen absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                                <input type="text" id="strategy-name-input" placeholder="StrategyName" class="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none font-mono">
+                             </div>
+                             <select id="template-select" onchange="applyTemplate()" class="bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5">
+                                <option value="">Load Template...</option>
+                            </select>
+                        </div>
+
+                        <!-- Monaco Container -->
+                        <div id="editor-container" class="flex-1 border border-slate-800 rounded-xl bg-[#1e1e1e] overflow-hidden shadow-inner"></div>
                         <textarea id="strategy-editor-fallback" class="hidden"></textarea>
                     </div>
                 </div>
             </section>
 
-            <!-- Backtest (Simplified) -->
-            <section id="page-backtest" class="page hidden animate-fade-in-up space-y-6">
-                <div class="glass-panel p-6 rounded-2xl">
-                    <div class="grid grid-cols-3 gap-6">
-                        <div>
-                            <label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Dataset</label>
-                            <select id="bt-dataset" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:ring-1 focus:ring-indigo-500 outline-none"></select>
-                        </div>
-                        <div>
-                            <label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Strategy</label>
-                            <select id="bt-strategy" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:ring-1 focus:ring-indigo-500 outline-none"></select>
-                        </div>
-                        <div class="flex items-end">
-                            <button onclick="runBacktest()" class="w-full h-[46px] bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl shadow-lg shadow-rose-900/20 transition-all uppercase text-sm tracking-wide">
-                                <i class="fa-solid fa-play mr-2"></i> Run Simulation
-                            </button>
-                        </div>
+            <!-- Backtest Runner -->
+            <section id="page-backtest" class="page hidden animate-fade-in space-y-6">
+                 <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white tracking-tight">Backtest Runner</h2>
+                        <p class="text-slate-400 text-sm mt-1">Simulate strategies on historical data</p>
                     </div>
-                    <div class="mt-6">
-                        <div class="flex justify-between text-xs font-mono text-slate-400 mb-2">
-                            <span>PROGRESS</span>
-                            <span id="bt-status">READY</span>
-                        </div>
-                        <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
-                            <div id="bt-progress-bar" class="h-full bg-gradient-to-r from-indigo-500 to-rose-500 w-0 transition-all duration-300"></div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Config -->
+                    <div class="lg:col-span-1 space-y-6">
+                         <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+                            <h3 class="text-sm font-semibold text-white uppercase tracking-wide border-b border-slate-800 pb-2 mb-2">Configuration</h3>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Dataset</label>
+                                <select id="bt-dataset" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"></select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Strategy</label>
+                                <select id="bt-strategy" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"></select>
+                            </div>
+
+                            <button onclick="runBacktest()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2 mt-4">
+                                <i class="fa-solid fa-rocket"></i> Run Simulation
+                            </button>
+                         </div>
+
+                         <!-- Status -->
+                         <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="text-xs font-semibold text-slate-500 uppercase">Status</h3>
+                                <span id="bt-status-badge" class="hidden bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold">RUNNING</span>
+                            </div>
+
+                            <div class="w-full bg-slate-800 rounded-full h-2.5 mb-2 overflow-hidden">
+                              <div id="bt-progress-bar" class="bg-indigo-500 h-2.5 rounded-full transition-all duration-300 w-0 progress-bar-striped"></div>
+                            </div>
+                            <p id="bt-status" class="text-xs text-slate-400 font-mono text-right">Ready</p>
+                         </div>
+                    </div>
+
+                    <!-- Results -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <div id="bt-results" class="space-y-6">
+                            <!-- Placeholder -->
+                            <div class="h-64 border-2 border-dashed border-slate-800 rounded-xl flex flex-col items-center justify-center text-slate-600">
+                                <i class="fa-solid fa-chart-area text-4xl mb-4 opacity-50"></i>
+                                <span class="text-sm font-medium">No backtest results yet</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div id="bt-results" class="space-y-6"></div>
+            </section>
+
+            <!-- AI Assistant -->
+            <section id="page-assistant" class="page hidden animate-fade-in h-[calc(100vh-8rem)] flex gap-6">
+                 <!-- Sessions Sidebar -->
+                 <div class="w-64 flex-shrink-0 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hidden md:flex">
+                    <div class="p-4 border-b border-slate-800">
+                        <button onclick="newSession()" class="w-full bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-600/20 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-plus"></i> New Chat
+                        </button>
+                    </div>
+                    <ul id="session-list" class="flex-1 overflow-y-auto p-2 space-y-1"></ul>
+                 </div>
+
+                 <!-- Chat Area -->
+                 <div class="flex-1 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl relative">
+                    <!-- Chat Header -->
+                    <div class="h-14 border-b border-slate-800 flex items-center px-6 justify-between bg-slate-900/50 backdrop-blur z-10">
+                        <div class="flex items-center gap-2">
+                             <div class="h-2 w-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                             <span class="text-sm font-semibold text-white">QLM Assistant</span>
+                        </div>
+                        <button class="md:hidden text-slate-400" onclick="alert('Session list on mobile coming soon')"><i class="fa-solid fa-history"></i></button>
+                    </div>
+
+                    <!-- Messages -->
+                    <div id="chat-container" class="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth">
+                        <!-- Messages go here -->
+                         <div class="flex justify-start">
+                            <div class="max-w-[80%] rounded-2xl rounded-tl-none bg-slate-800 border border-slate-700 p-4 text-sm text-slate-300">
+                                <p>Hello! I am your Quantitative Trading Assistant. I can help you create strategies, run backtests, or analyze performance. How can I help?</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Input -->
+                    <div class="p-4 border-t border-slate-800 bg-slate-900/80 backdrop-blur">
+                        <div class="flex gap-2 relative">
+                             <input type="text" id="ai-input" placeholder="Type your message..." autocomplete="off" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all pr-12 shadow-inner">
+                             <button id="ai-send-btn" class="absolute right-2 top-1.5 bottom-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg px-4 transition-colors flex items-center justify-center">
+                                <i class="fa-solid fa-paper-plane text-xs"></i>
+                             </button>
+                        </div>
+                    </div>
+                 </div>
             </section>
 
             <!-- Settings -->
-            <section id="page-settings" class="page hidden animate-fade-in-up">
-                <div class="max-w-2xl mx-auto glass-card p-8 rounded-2xl">
-                    <h2 class="text-xl font-bold text-white mb-6">System Configuration</h2>
-                    <!-- Existing Inputs with new styles -->
-                    <div class="space-y-4">
-                        <input type="password" id="cfg-api-key" placeholder="API Key" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white">
-                        <input type="text" id="cfg-base-url" placeholder="Base URL" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white">
-                        <input type="text" id="cfg-model" placeholder="Model ID" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white">
-                        <button onclick="saveConfig()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl">Save</button>
+            <section id="page-settings" class="page hidden animate-fade-in max-w-2xl mx-auto space-y-6">
+                 <h2 class="text-2xl font-bold text-white tracking-tight mb-6">Settings</h2>
+
+                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
+                    <h3 class="text-sm font-semibold text-white border-b border-slate-800 pb-2">AI Configuration</h3>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">OpenAI API Key</label>
+                        <input type="password" id="cfg-api-key" placeholder="sk-..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono">
                     </div>
-                </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Base URL</label>
+                            <input type="text" id="cfg-base-url" placeholder="https://api.openai.com/v1" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono">
+                        </div>
+                         <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1.5 uppercase">Model</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="cfg-model" list="model-list" placeholder="gpt-4-turbo" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono">
+                                <datalist id="model-list">
+                                    <option value="gpt-4-turbo"></option>
+                                    <option value="gpt-3.5-turbo"></option>
+                                </datalist>
+                                <button onclick="fetchModels()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg px-3 border border-slate-700 transition-colors" title="Fetch Models">
+                                    <i class="fa-solid fa-sync"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end pt-4">
+                        <button onclick="saveConfig()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-6 py-2 rounded-lg transition-colors shadow-lg shadow-emerald-900/20 text-sm">
+                            Save Changes
+                        </button>
+                    </div>
+                 </div>
             </section>
 
         </div>

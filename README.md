@@ -5,17 +5,29 @@
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 ![AI-Powered](https://img.shields.io/badge/AI-Agentic-purple?style=for-the-badge)
 
-**QuantLogic Framework (QLM)** is a next-generation, high-performance algorithmic trading platform designed for quantitative researchers and traders. It combines a robust **Event-Driven Backtester** with a **State-of-the-Art AI Agent** capable of reasoning, coding, and optimizing strategies autonomously.
+**QuantLogic Framework (QLM)** is an institutional-grade algorithmic trading platform designed for quantitative researchers. It integrates a high-performance **Event-Driven Backtester** with an autonomous **AI Research Agent** capable of self-healing, multi-step reasoning, and full strategy lifecycle management.
 
 ---
 
-## ✨ Features
+## 📸 Interface Preview
+
+| **Dashboard** | **AI Architect** |
+|:---:|:---:|
+| <img src="public/screenshots/01_dashboard.png" width="400" /> | <img src="public/screenshots/05_ai_assistant.png" width="400" /> |
+
+| **Strategy Lab** | **Backtest Runner** |
+|:---:|:---:|
+| <img src="public/screenshots/03_strategy_lab.png" width="400" /> | <img src="public/screenshots/04_backtest_runner.png" width="400" /> |
+
+---
+
+## ✨ Key Features
 
 ### 🧠 Agentic AI Core
 *   **ReAct "Brain" Architecture**: The AI reasons in loops (Thought -> Action -> Observation) to solve complex tasks.
+*   **Self-Healing Workflow**: If a tool fails (e.g., syntax error in generated code), the agent analyzes the stack trace and autonomously pushes a fix.
+*   **Context & Job Management**: Maintains awareness of long-running goals ("Create a mean reversion strategy for BTC") across multiple chat turns.
 *   **Auto-Coder**: Generates high-quality, bug-free Python strategies strictly adhering to the QLM interface.
-*   **Full Control**: The agent can manage datasets, run backtests, analyze market structure, and debug code.
-*   **Live Status Pipeline**: Watch the agent "think" and execute tools in real-time via the UI.
 
 ### 📊 Professional Data Management
 *   **Universal Ingestion**: Drag-and-drop CSV uploads with automatic parsing.
@@ -29,10 +41,9 @@
 *   **Vectorized & Loop Hybrid**: Optimized for both speed and complex logic.
 
 ### 🖥️ "Financial Terminal" UI
-*   **Modern Design**: Dark-themed, Glassmorphism aesthetics using **Tailwind CSS**.
+*   **Modern Design**: Dark-themed, Slate/Zinc aesthetics using **Tailwind CSS**.
 *   **Mobile Responsive**: Fully functional on desktop and mobile devices.
-*   **Strategy Lab**: Integrated Monaco Editor with "Apply Code" from AI chat.
-*   **Real-Time Visualization**: WebSocket-powered progress bars and status updates.
+*   **Real-Time Visualization**: WebSocket-powered progress bars and live "Thinking" status updates from the AI.
 
 ---
 
@@ -70,11 +81,11 @@ Navigate to **Data Manager** and upload your OHLCV CSV files.
 *   **Format**: `Date, Open, High, Low, Close, Volume`
 *   **Processing**: auto-converted to Parquet for speed.
 
-### 2. AI Assistant (The "Brain")
+### 2. AI Architect
 Go to the **AI Assistant** tab.
 *   **Ask**: "Analyze XAUUSD 1H structure and write a Trend Following strategy."
 *   **Watch**: The "Status Pipeline" will show the agent analyzing data -> planning -> coding.
-*   **Apply**: Click **"Apply"** on the generated code block to push it to the Editor.
+*   **Auto-Fix**: If the code fails validation, the agent will see the error and fix it automatically.
 
 ### 3. Strategy Lab
 *   Review and edit the generated Python code.
@@ -93,7 +104,7 @@ Go to the **AI Assistant** tab.
 ```
 QLM/
 ├── backend/                # FastAPI Application
-│   ├── ai/                 # AI Brain, Agent, Tools, Store
+│   ├── ai/                 # AI Brain, Agent, Tools, Memory, Store
 │   ├── core/               # Backtest Engine, Strategy Interface
 │   ├── api/                # API Routes & WebSockets
 │   └── main.py             # Entry Point
