@@ -56,6 +56,12 @@ class BacktestEngine:
             results['version'] = version
             results['symbol'] = metadata['symbol']
             
+            # 5. Generate CSV (Now that we have the symbol)
+            for t in results['trades']:
+                t['symbol'] = metadata['symbol']
+
+            results['csv_export'] = PerformanceEngine.generate_metrics_csv(results['trades']) if hasattr(PerformanceEngine, 'generate_metrics_csv') else PerformanceEngine.generate_csv(results['trades'])
+
             return results
 
         except Exception as e:
@@ -142,6 +148,18 @@ class BacktestEngine:
             trade_closed_pnl = 0.0
 
             if active_trade:
+                # Update MAE/MFE Tracking
+                if active_trade['direction'] == 'long':
+                    runup = high_p - active_trade['entry_price']
+                    drawdown = active_trade['entry_price'] - low_p
+                else: # short
+                    runup = active_trade['entry_price'] - low_p
+                    drawdown = high_p - active_trade['entry_price']
+
+                # Store absolute values (always positive distance)
+                active_trade['max_runup'] = max(active_trade.get('max_runup', 0.0), runup)
+                active_trade['max_drawdown_trade'] = max(active_trade.get('max_drawdown_trade', 0.0), drawdown)
+
                 trade_pnl = 0
                 exit_price = 0
                 exit_reason = ""
@@ -180,6 +198,11 @@ class BacktestEngine:
                         exit_price = close_p
                         exit_reason = "Signal"
                 
+                # Check for End of Data
+                if not exit_reason and i == n_rows - 1:
+                    exit_price = close_p
+                    exit_reason = "End of Data"
+
                 if exit_reason:
                     # Calculate Realized PnL
                     trade_size = active_trade.get('size', 1.0)
@@ -207,6 +230,19 @@ class BacktestEngine:
                     active_trade['pnl'] = trade_pnl
                     active_trade['exit_reason'] = exit_reason
                     
+                    # Determine Status
+                    if trade_pnl > 0:
+                        active_trade['status'] = "Profitable"
+                        if exit_reason == "TP Hit":
+                            active_trade['status'] = "TP Hit"
+                    elif trade_pnl < 0:
+                        active_trade['status'] = "Unprofitable"
+                        if exit_reason == "SL Hit":
+                            active_trade['status'] = "SL Hit"
+                    else:
+                        active_trade['status'] = "Breakeven"
+
+                    # Ensure SL/TP are JSON compliant (None instead of NaN)
                     if active_trade['sl'] is not None and np.isnan(active_trade['sl']): active_trade['sl'] = None
                     if active_trade['tp'] is not None and np.isnan(active_trade['tp']): active_trade['tp'] = None
                     
@@ -218,22 +254,44 @@ class BacktestEngine:
             # Check Entry
             if not active_trade:
                 if sig_long[i]:
+                    sl_val = float(sl_arr[i]) if not np.isnan(sl_arr[i]) else None
+                    tp_val = float(tp_arr[i]) if not np.isnan(tp_arr[i]) else None
+
+                    # Calculate Initial Risk (R)
+                    initial_risk = 0.0
+                    if sl_val is not None:
+                        initial_risk = abs(close_p - sl_val)
+
                     active_trade = {
                         "entry_time": current_time_ns,
                         "entry_price": close_p,
                         "direction": "long",
-                        "sl": float(sl_arr[i]) if not np.isnan(sl_arr[i]) else None,
-                        "tp": float(tp_arr[i]) if not np.isnan(tp_arr[i]) else None,
-                        "size": float(pos_sizes[i]) if not np.isnan(pos_sizes[i]) else 1.0
+                        "sl": sl_val,
+                        "tp": tp_val,
+                        "size": float(pos_sizes[i]) if not np.isnan(pos_sizes[i]) else 1.0,
+                        "initial_risk": initial_risk,
+                        "max_runup": 0.0,
+                        "max_drawdown_trade": 0.0
                     }
                 elif sig_short[i]:
+                    sl_val = float(sl_arr[i]) if not np.isnan(sl_arr[i]) else None
+                    tp_val = float(tp_arr[i]) if not np.isnan(tp_arr[i]) else None
+
+                    # Calculate Initial Risk (R)
+                    initial_risk = 0.0
+                    if sl_val is not None:
+                        initial_risk = abs(close_p - sl_val)
+
                     active_trade = {
                         "entry_time": current_time_ns,
                         "entry_price": close_p,
                         "direction": "short",
-                        "sl": float(sl_arr[i]) if not np.isnan(sl_arr[i]) else None,
-                        "tp": float(tp_arr[i]) if not np.isnan(tp_arr[i]) else None,
-                        "size": float(pos_sizes[i]) if not np.isnan(pos_sizes[i]) else 1.0
+                        "sl": sl_val,
+                        "tp": tp_val,
+                        "size": float(pos_sizes[i]) if not np.isnan(pos_sizes[i]) else 1.0,
+                        "initial_risk": initial_risk,
+                        "max_runup": 0.0,
+                        "max_drawdown_trade": 0.0
                     }
 
             # Update Equity (Mark to Market + Closed PnL)

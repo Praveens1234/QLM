@@ -498,51 +498,117 @@ window.runBacktest = runBacktest;
 
 window.renderResults = function(results) {
     const resultsContainer = document.getElementById('bt-results');
+    const m = results.metrics;
+
+    // Store CSV for download
+    window.currentCsvData = results.csv_export;
+
     resultsContainer.innerHTML = `
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 animate-fade-in">
+             <!-- Primary Metrics -->
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl col-span-1">
                 <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Net Profit</div>
-                <div class="${results.metrics.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400'} text-xl font-bold font-mono">$${results.metrics.net_profit.toFixed(2)}</div>
+                <div class="${m.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400'} text-lg font-bold font-mono">$${m.net_profit.toFixed(2)}</div>
              </div>
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl col-span-1">
                 <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Win Rate</div>
-                <div class="text-white text-xl font-bold font-mono">${(results.metrics.win_rate * 100).toFixed(1)}%</div>
+                <div class="text-white text-lg font-bold font-mono">${m.win_rate}%</div>
+                <div class="text-[9px] text-slate-500 mt-1">L: ${m.win_rate_long}% | S: ${m.win_rate_short}%</div>
              </div>
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Max Drawdown</div>
-                <div class="text-rose-400 text-xl font-bold font-mono">${(results.metrics.max_drawdown * 100).toFixed(1)}%</div>
-             </div>
-             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl col-span-1">
                 <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Profit Factor</div>
-                <div class="text-white text-xl font-bold font-mono">${results.metrics.profit_factor.toFixed(2)}</div>
+                <div class="text-white text-lg font-bold font-mono">${m.profit_factor}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl col-span-1">
+                <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Max DD</div>
+                <div class="text-rose-400 text-lg font-bold font-mono">${m.max_drawdown_pct}%</div>
+                <div class="text-[9px] text-slate-500 mt-1">${m.max_drawdown_r} R</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl col-span-1">
+                <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Total Trades</div>
+                <div class="text-white text-lg font-bold font-mono">${m.total_trades}</div>
+                <div class="text-[9px] text-slate-500 mt-1">W: ${m.long_wins + m.short_wins} | L: ${m.long_losses + m.short_losses}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl col-span-1">
+                <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Expectancy</div>
+                <div class="text-white text-lg font-bold font-mono">${m.expectancy_r} R</div>
+                <div class="text-[9px] text-slate-500 mt-1">$${m.expectancy}</div>
+             </div>
+
+             <!-- Secondary Metrics Row -->
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl col-span-1">
+                <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Avg PnL (R)</div>
+                <div class="${m.avg_r_trade >= 0 ? 'text-emerald-400' : 'text-rose-400'} text-base font-bold font-mono">${m.avg_r_trade} R</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl col-span-1">
+                <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Total R</div>
+                <div class="${m.total_r >= 0 ? 'text-emerald-400' : 'text-rose-400'} text-base font-bold font-mono">${m.total_r} R</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl col-span-1">
+                <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Avg Trades/Day</div>
+                <div class="text-white text-base font-bold font-mono">${m.avg_trades_day}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl col-span-1">
+                <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Avg Trades/Week</div>
+                <div class="text-white text-base font-bold font-mono">${m.avg_trades_week}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl col-span-1">
+                <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Avg Trades/Month</div>
+                <div class="text-white text-base font-bold font-mono">${m.avg_trades_month}</div>
+             </div>
+              <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl col-span-1">
+                <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Avg Duration</div>
+                <div class="text-white text-base font-bold font-mono">${m.avg_duration}m</div>
              </div>
         </div>
         
         <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm animate-fade-in">
-             <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+             <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
                 <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Trade List</h3>
+                <button onclick="downloadCSV()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold uppercase px-3 py-1.5 rounded transition-colors flex items-center gap-2">
+                    <i class="fa-solid fa-download"></i> Export CSV
+                </button>
             </div>
-            <div class="max-h-64 overflow-y-auto">
-                 <table class="w-full text-left text-xs font-mono">
+            <div class="max-h-96 overflow-y-auto overflow-x-auto">
+                 <table class="w-full text-left text-xs font-mono whitespace-nowrap">
                     <thead class="bg-slate-950 text-slate-500 sticky top-0">
                         <tr>
                             <th class="px-4 py-2">Entry Time</th>
+                            <th class="px-4 py-2">Exit Time</th>
                             <th class="px-4 py-2">Dir</th>
-                            <th class="px-4 py-2 text-right">Price</th>
+                            <th class="px-4 py-2">Status</th>
+                            <th class="px-4 py-2 text-right">Entry</th>
                             <th class="px-4 py-2 text-right">Exit</th>
+                            <th class="px-4 py-2 text-right">SL</th>
+                            <th class="px-4 py-2 text-right">TP</th>
                             <th class="px-4 py-2 text-right">PnL</th>
+                            <th class="px-4 py-2 text-right">R</th>
+                            <th class="px-4 py-2 text-right">DD</th>
+                            <th class="px-4 py-2 text-right">Runup</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800 text-slate-400">
-                        ${results.trades.map(t => `
+                        ${results.trades.map(t => {
+                            // Calculate R for display if missing
+                            const rVal = (t.initial_risk && t.initial_risk > 0) ? (t.pnl / t.initial_risk).toFixed(2) : '-';
+                            const statusColor = t.pnl > 0 ? 'text-emerald-400' : (t.pnl < 0 ? 'text-rose-400' : 'text-slate-400');
+
+                            return `
                             <tr class="hover:bg-slate-800/50">
                                 <td class="px-4 py-2">${t.entry_time}</td>
+                                <td class="px-4 py-2">${t.exit_time}</td>
                                 <td class="px-4 py-2 ${t.direction === 'long' ? 'text-emerald-400' : 'text-rose-400'} uppercase font-bold">${t.direction}</td>
+                                <td class="px-4 py-2 ${statusColor}">${t.status || (t.pnl > 0 ? 'Win' : 'Loss')}</td>
                                 <td class="px-4 py-2 text-right">${t.entry_price.toFixed(2)}</td>
                                 <td class="px-4 py-2 text-right">${t.exit_price.toFixed(2)}</td>
-                                <td class="px-4 py-2 text-right ${t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${t.pnl.toFixed(2)}</td>
+                                <td class="px-4 py-2 text-right text-rose-300">${t.sl ? t.sl.toFixed(2) : '-'}</td>
+                                <td class="px-4 py-2 text-right text-emerald-300">${t.tp ? t.tp.toFixed(2) : '-'}</td>
+                                <td class="px-4 py-2 text-right ${statusColor}">${t.pnl.toFixed(2)}</td>
+                                <td class="px-4 py-2 text-right ${rVal > 0 ? 'text-emerald-400' : (rVal < 0 ? 'text-rose-400' : '')}">${rVal}</td>
+                                <td class="px-4 py-2 text-right text-rose-400">${t.max_drawdown_trade ? t.max_drawdown_trade.toFixed(2) : '0.00'}</td>
+                                <td class="px-4 py-2 text-right text-emerald-400">${t.max_runup ? t.max_runup.toFixed(2) : '0.00'}</td>
                             </tr>
-                        `).join('')}
+                        `}).join('')}
                     </tbody>
                  </table>
             </div>
@@ -554,6 +620,20 @@ window.renderResults = function(results) {
          renderBacktestCharts(results.chart_data, results.trades);
     }
 }
+
+window.downloadCSV = function() {
+    if (!window.currentCsvData) return showToast("No CSV data available", 'warning');
+
+    const blob = new Blob([window.currentCsvData], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('hidden', '');
+    a.setAttribute('href', url);
+    a.setAttribute('download', 'backtest_ledger.csv');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+};
 
 
 // --- Charting ---
