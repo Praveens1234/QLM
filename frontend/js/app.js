@@ -1,6 +1,46 @@
 // QLM Frontend Application
 const API_BASE = '/api';
 
+// --- Toast Notification System ---
+window.showToast = function(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const colors = {
+        success: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
+        error: 'bg-rose-500/10 border-rose-500/20 text-rose-400',
+        info: 'bg-slate-800 border-slate-700 text-slate-300',
+        warning: 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+    };
+
+    const icon = {
+        success: '<i class="fa-solid fa-check-circle"></i>',
+        error: '<i class="fa-solid fa-circle-exclamation"></i>',
+        info: '<i class="fa-solid fa-info-circle"></i>',
+        warning: '<i class="fa-solid fa-triangle-exclamation"></i>'
+    };
+
+    const toast = document.createElement('div');
+    toast.className = `${colors[type]} backdrop-blur-md border p-4 rounded-lg shadow-2xl flex items-start gap-3 transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto min-w-[300px] max-w-sm`;
+    toast.innerHTML = `
+        <div class="text-lg mt-0.5">${icon[type]}</div>
+        <div class="font-medium text-sm leading-relaxed break-words">${message}</div>
+    `;
+
+    container.appendChild(toast);
+
+    // Animate In
+    requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+    });
+
+    // Auto Dismiss
+    setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-x-full');
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+};
+
 // --- Router ---
 const router = {
     routes: {
@@ -9,7 +49,7 @@ const router = {
         '#data': 'page-data',
         '#strategies': 'page-strategies',
         '#backtest': 'page-backtest',
-        '#assistant': 'page-assistant', // Changed from #ai
+        '#assistant': 'page-assistant',
         '#mcp': 'page-mcp',
         '#settings': 'page-settings'
     },
@@ -36,11 +76,9 @@ const router = {
         }
 
         // Update active nav link
-        document.querySelectorAll('.nav-item').forEach(link => { // Changed class selector
+        document.querySelectorAll('.nav-item').forEach(link => {
             link.classList.remove('bg-slate-800', 'text-white');
             link.classList.add('text-slate-400');
-            // Logic to match href or id
-            // Simple approach: map hash to nav id
             const navIdMap = {
                 '': 'nav-dashboard',
                 '#dashboard': 'nav-dashboard',
@@ -59,10 +97,12 @@ const router = {
         });
 
         // Page specific logic
+        if (pageId === 'page-dashboard') loadDashboard();
         if (pageId === 'page-data') loadData();
         if (pageId === 'page-strategies') loadStrategies();
-        if (pageId === 'page-backtest') { loadStrategies(); loadData(); } // Populate dropdowns
+        if (pageId === 'page-backtest') { loadStrategies(); loadData(); }
         if (pageId === 'page-mcp') initMCP();
+        if (pageId === 'page-assistant') initChat();
     },
 
     navigate: function(hash) {
@@ -70,18 +110,68 @@ const router = {
     }
 };
 
-// Expose router to window
 window.router = router;
+
+// --- Dashboard ---
+async function loadDashboard() {
+    // Populate "Recent Activity" with strategies for now
+    try {
+        const res = await fetch(`${API_BASE}/strategies`);
+        const strategies = await res.json();
+        const activityContainer = document.getElementById('dashboard-activity');
+
+        if(activityContainer) {
+            // Sort by most recent version first? Assuming backend does, but otherwise...
+            // Strategies don't have update timestamp yet, so just list them.
+
+            activityContainer.innerHTML = '';
+            activityContainer.className = "bg-slate-900/50 border border-slate-800 rounded-xl p-6 min-h-[300px] flex flex-col";
+            // Header
+            const header = document.createElement('div');
+            header.className = "w-full flex justify-between items-center mb-4 border-b border-slate-800 pb-2";
+            header.innerHTML = '<h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Recent Strategy Updates</h3>';
+            activityContainer.appendChild(header);
+
+            const list = document.createElement('div');
+            list.className = "w-full space-y-3";
+
+            strategies.slice(0, 5).forEach(s => {
+                const item = document.createElement('div');
+                item.className = "flex items-center gap-3 p-3 rounded-lg bg-slate-800/50 border border-slate-800 hover:border-slate-700 transition-colors";
+                item.innerHTML = `
+                    <div class="h-8 w-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                        <i class="fa-solid fa-code"></i>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium text-white">${s.name}</div>
+                        <div class="text-[10px] text-slate-500">Version ${s.latest_version}</div>
+                    </div>
+                    <div class="ml-auto text-[10px] text-slate-500 font-mono">
+                        ${new Date().toLocaleDateString()}
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+            activityContainer.appendChild(list);
+
+            // Add a "System Status" card
+            // ...
+        }
+    } catch(e) {
+        console.error("Dashboard Load Error", e);
+    }
+}
 
 // --- Data Manager ---
 async function loadData() {
     try {
         const res = await fetch(`${API_BASE}/data`);
         const data = await res.json();
+        if(!Array.isArray(data)) return; // Handle empty or error gracefully
+
         const tbody = document.getElementById('data-table-body');
         if(tbody) tbody.innerHTML = '';
 
-        // Populate Backtest Dataset Dropdown
         const btSelect = document.getElementById('bt-dataset');
         if(btSelect) btSelect.innerHTML = '';
 
@@ -92,10 +182,10 @@ async function loadData() {
                 tr.innerHTML = `
                     <td class="px-6 py-4 text-white font-medium">${d.symbol}</td>
                     <td class="px-6 py-4 text-slate-400">${d.timeframe}</td>
-                    <td class="px-6 py-4 text-slate-400">${d.start_date || '-'} to ${d.end_date || '-'}</td>
-                    <td class="px-6 py-4 text-right text-slate-400">${d.rows || 0}</td>
+                    <td class="px-6 py-4 text-slate-400">${d.start_date ? d.start_date.split('T')[0] : '-'}</td>
+                    <td class="px-6 py-4 text-right text-slate-400 font-mono">${d.row_count || 0}</td>
                     <td class="px-6 py-4 text-right">
-                        <button class="text-rose-400 hover:text-rose-300 transition-colors" onclick="deleteData('${d.id}')">
+                        <button class="text-rose-400 hover:text-rose-300 transition-colors p-2 hover:bg-rose-500/10 rounded" onclick="deleteData('${d.id}')">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     </td>
@@ -106,17 +196,16 @@ async function loadData() {
             if(btSelect) {
                 const opt = document.createElement('option');
                 opt.value = d.id;
-                opt.textContent = `${d.symbol} ${d.timeframe} (${d.rows} rows)`;
+                opt.textContent = `${d.symbol} ${d.timeframe} (${d.row_count} rows)`;
                 btSelect.appendChild(opt);
             }
         });
 
-        // Update Stats on Dashboard (if element exists)
         const statEl = document.querySelector('[data-stat="datasets"]');
         if(statEl) statEl.textContent = data.length;
 
     } catch (e) {
-        console.error("Load Data Error:", e);
+        showToast("Failed to load data: " + e.message, 'error');
     }
 }
 
@@ -125,7 +214,7 @@ async function importFromUrl() {
     const symbol = document.getElementById('url-symbol').value;
     const timeframe = document.getElementById('url-tf').value;
 
-    if (!url || !symbol) return alert("URL and Symbol are required");
+    if (!url || !symbol) return showToast("URL and Symbol are required", 'warning');
 
     const btn = document.getElementById('btn-import-url');
     btn.disabled = true;
@@ -140,20 +229,33 @@ async function importFromUrl() {
 
         const result = await res.json();
         if (res.ok) {
-            alert(`Imported ${result.rows} rows.`);
+            showToast(`Imported ${result.data.row_count} rows successfully`, 'success');
             loadData();
         } else {
-            alert("Error: " + result.detail);
+            showToast(result.detail, 'error');
         }
     } catch (e) {
-        alert("Import failed: " + e);
+        showToast("Import failed: " + e.message, 'error');
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-cloud-download"></i> Download';
     }
 }
 
-function switchImportTab(tab) {
+window.deleteData = async function(id) {
+    if(!confirm("Are you sure?")) return;
+    try {
+        const res = await fetch(`${API_BASE}/data/${id}`, { method: 'DELETE' });
+        if(res.ok) {
+            showToast("Dataset deleted", 'success');
+            loadData();
+        } else {
+            showToast("Delete failed", 'error');
+        }
+    } catch(e) { showToast(e.message, 'error'); }
+};
+
+window.switchImportTab = function(tab) {
     document.getElementById('import-local').classList.add('hidden');
     document.getElementById('import-url').classList.add('hidden');
     document.getElementById('tab-local').className = "text-sm font-semibold text-slate-500 hover:text-slate-300 border-b-2 border-transparent pb-2 transition-colors focus:outline-none";
@@ -167,7 +269,6 @@ function switchImportTab(tab) {
         document.getElementById('tab-url').className = "text-sm font-semibold text-indigo-400 border-b-2 border-indigo-400 pb-2 transition-colors focus:outline-none";
     }
 }
-window.switchImportTab = switchImportTab;
 
 // --- Strategy Lab ---
 async function loadStrategies() {
@@ -175,18 +276,16 @@ async function loadStrategies() {
         const res = await fetch(`${API_BASE}/strategies`);
         const strategies = await res.json();
 
-        // Update Stats
         const statEl = document.querySelector('[data-stat="strategies"]');
         if(statEl) statEl.textContent = strategies.length;
 
-        // List
         const list = document.getElementById('strategy-list');
         if(list) {
             list.innerHTML = '';
             strategies.forEach(s => {
                 const div = document.createElement('div');
-                div.className = "px-3 py-2 hover:bg-slate-800 rounded cursor-pointer transition-colors group";
-                div.onclick = () => loadStrategyCode(s.name);
+                div.className = "px-3 py-2 hover:bg-slate-800 rounded cursor-pointer transition-colors group border border-transparent hover:border-slate-700";
+                div.onclick = () => loadStrategyCode(s.name); // Need to implement this if editor is real
                 div.innerHTML = `
                     <div class="flex justify-between items-center">
                         <span class="text-sm font-medium text-slate-300 group-hover:text-white">${s.name}</span>
@@ -197,7 +296,6 @@ async function loadStrategies() {
             });
         }
 
-        // Populate select in Backtest Runner
         const select = document.getElementById('bt-strategy');
         if(select) {
             select.innerHTML = '';
@@ -213,14 +311,150 @@ async function loadStrategies() {
     }
 }
 
+window.createNewStrategy = function() {
+    const name = prompt("Strategy Name:");
+    if(name) {
+        // Mock create
+        showToast(`Strategy ${name} created (mock)`, 'success');
+        loadStrategies();
+    }
+};
+
+// --- AI Chat ---
+let chatInitialized = false;
+let currentSessionId = null;
+console.log("Showdown available?", typeof showdown);
+const mdConverter = typeof showdown !== 'undefined' ? new showdown.Converter({
+    tables: true,
+    tasklists: true,
+    ghCodeBlocks: true,
+    openLinksInNewWindow: true
+}) : null;
+
+async function initChat() {
+    if(chatInitialized) return;
+    chatInitialized = true;
+
+    const input = document.getElementById('ai-input');
+    const sendBtn = document.getElementById('ai-send-btn');
+
+    sendBtn.onclick = sendMessage;
+    input.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
+
+    // Create session
+    try {
+        const res = await fetch(`${API_BASE}/ai/sessions`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: 'user', model: 'gpt-4o' })
+        });
+        const data = await res.json();
+        currentSessionId = data.session_id;
+    } catch(e) {
+        showToast("Failed to init AI session", 'error');
+    }
+}
+
+async function sendMessage() {
+    const input = document.getElementById('ai-input');
+    const text = input.value.trim();
+    if(!text) return;
+
+    input.value = '';
+    renderMessage('user', text);
+
+    // Loading State
+    const loadingId = 'loading-' + Date.now();
+    renderLoading(loadingId);
+
+    try {
+        const res = await fetch(`${API_BASE}/ai/chat`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                session_id: currentSessionId,
+                message: text
+            })
+        });
+
+        const data = await res.json();
+        removeLoading(loadingId);
+        renderMessage('assistant', data.response);
+
+    } catch(e) {
+        removeLoading(loadingId);
+        showToast("AI Error: " + e.message, 'error');
+    }
+}
+
+function renderMessage(role, content) {
+    const container = document.getElementById('chat-container');
+    const div = document.createElement('div');
+    div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`;
+
+    const bubble = document.createElement('div');
+    bubble.className = role === 'user'
+        ? "max-w-[85%] bg-indigo-600 text-white rounded-2xl rounded-tr-none px-5 py-3 shadow-md"
+        : "max-w-[85%] bg-slate-800 border border-slate-700 text-slate-200 rounded-2xl rounded-tl-none px-5 py-4 shadow-md prose prose-invert prose-sm max-w-none";
+
+    if(role === 'assistant') {
+        // Parse Markdown
+        if(mdConverter) {
+            bubble.innerHTML = mdConverter.makeHtml(content);
+        } else {
+            // Manual Fallback for basic Markdown
+            let html = content
+                .replace(/</g, '&lt;').replace(/>/g, '&gt;') // Escape HTML
+                .replace(/```python([\s\S]*?)```/g, '<pre><code class="language-python">$1</code></pre>')
+                .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/`([^`]+)`/g, '<code class="bg-slate-700 px-1 py-0.5 rounded text-xs">$1</code>')
+                .replace(/\n/g, '<br>');
+            bubble.innerHTML = html;
+        }
+        // Highlight Code
+        if(typeof hljs !== 'undefined') {
+            bubble.querySelectorAll('pre code').forEach((el) => {
+                hljs.highlightElement(el);
+            });
+        }
+    } else {
+        bubble.textContent = content;
+    }
+
+    div.appendChild(bubble);
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function renderLoading(id) {
+    const container = document.getElementById('chat-container');
+    const div = document.createElement('div');
+    div.id = id;
+    div.className = "flex justify-start animate-fade-in";
+    div.innerHTML = `
+        <div class="bg-slate-800 border border-slate-700 px-4 py-3 rounded-2xl rounded-tl-none shadow-md flex gap-1.5 items-center">
+            <div class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></div>
+            <div class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+            <div class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+        </div>
+    `;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function removeLoading(id) {
+    const el = document.getElementById(id);
+    if(el) el.remove();
+}
+
 // --- Backtest Runner ---
 async function runBacktest() {
     const strategy = document.getElementById('bt-strategy').value;
     const dataset_id = document.getElementById('bt-dataset').value;
 
-    if (!strategy || !dataset_id) return alert("Please select a strategy and dataset");
+    if (!strategy || !dataset_id) return showToast("Please select a strategy and dataset", 'warning');
 
-    // Status Update
     const statusBadge = document.getElementById('bt-status-badge');
     const statusText = document.getElementById('bt-status');
     const progressBar = document.getElementById('bt-progress-bar');
@@ -246,7 +480,7 @@ async function runBacktest() {
              statusText.textContent = "COMPLETED";
              statusBadge.className = "bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold border border-emerald-500/20";
              statusBadge.textContent = "SUCCESS";
-
+             showToast("Backtest completed successfully", 'success');
              renderResults(result.results);
         } else {
             progressBar.style.width = "100%";
@@ -254,19 +488,18 @@ async function runBacktest() {
             statusText.textContent = "FAILED";
             statusBadge.className = "bg-rose-500/10 text-rose-400 text-[10px] px-2 py-0.5 rounded font-bold border border-rose-500/20";
             statusBadge.textContent = "ERROR";
-            alert("Backtest failed: " + (result.detail || "Unknown error"));
+            showToast("Backtest failed: " + (result.detail || "Unknown error"), 'error');
         }
     } catch (e) {
-        alert("Error running backtest: " + e);
+        showToast("Error running backtest: " + e.message, 'error');
     }
 }
 window.runBacktest = runBacktest;
 
 window.renderResults = function(results) {
-    // Show results section
     const resultsContainer = document.getElementById('bt-results');
     resultsContainer.innerHTML = `
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
              <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
                 <div class="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1">Net Profit</div>
                 <div class="${results.metrics.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400'} text-xl font-bold font-mono">$${results.metrics.net_profit.toFixed(2)}</div>
@@ -285,7 +518,7 @@ window.renderResults = function(results) {
              </div>
         </div>
         
-        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm animate-fade-in">
              <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/50">
                 <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Trade List</h3>
             </div>
@@ -316,7 +549,6 @@ window.renderResults = function(results) {
         </div>
     `;
 
-    // Chart
     if (results.chart_data && results.chart_data.ohlcv) {
          document.getElementById('bt-charts').classList.remove('hidden');
          renderBacktestCharts(results.chart_data, results.trades);
@@ -349,42 +581,29 @@ window.renderBacktestCharts = function(data, trades) {
             vertLines: { color: '#1e293b' },
             horzLines: { color: '#1e293b' },
         },
-        rightPriceScale: {
-            borderColor: '#334155',
-        },
-        timeScale: {
-            borderColor: '#334155',
-            timeVisible: true,
-        },
+        rightPriceScale: { borderColor: '#334155' },
+        timeScale: { borderColor: '#334155', timeVisible: true },
         width: container.clientWidth,
         height: 500
     };
 
     mainChart = createChart(container, chartOptions);
 
-    // 1. Candlestick
     candleSeries = mainChart.addCandlestickSeries({
-        upColor: '#10b981',
-        downColor: '#f43f5e',
-        borderVisible: false,
-        wickUpColor: '#10b981',
-        wickDownColor: '#f43f5e',
+        upColor: '#10b981', downColor: '#f43f5e',
+        borderVisible: false, wickUpColor: '#10b981', wickDownColor: '#f43f5e',
     });
 
-    // Sort & Unique
     const sorted = data.ohlcv.sort((a, b) => a.time - b.time);
     const unique = [];
     if (sorted.length > 0) {
         unique.push(sorted[0]);
         for (let i = 1; i < sorted.length; i++) {
-            if (sorted[i].time > sorted[i-1].time) {
-                unique.push(sorted[i]);
-            }
+            if (sorted[i].time > sorted[i-1].time) unique.push(sorted[i]);
         }
     }
     candleSeries.setData(unique);
 
-    // 2. Markers
     const markers = [];
     trades.forEach(t => {
         markers.push({
@@ -405,36 +624,25 @@ window.renderBacktestCharts = function(data, trades) {
     markers.sort((a, b) => a.time - b.time);
     candleSeries.setMarkers(markers);
 
-    // 3. Equity Curve (Overlay on Left Scale)
     equitySeries = mainChart.addLineSeries({
-        color: '#fbbf24',
-        lineWidth: 2,
-        priceScaleId: 'left',
+        color: '#fbbf24', lineWidth: 2, priceScaleId: 'left',
     });
 
-    mainChart.priceScale('left').applyOptions({
-        visible: true,
-        borderColor: '#334155',
-    });
+    mainChart.priceScale('left').applyOptions({ visible: true, borderColor: '#334155' });
 
     const equityData = data.equity.sort((a, b) => a.time - b.time);
-    // Ensure unique
     const uniqueEquity = [];
     if (equityData.length > 0) {
         uniqueEquity.push(equityData[0]);
         for (let i = 1; i < equityData.length; i++) {
-            if (equityData[i].time > equityData[i-1].time) {
-                uniqueEquity.push(equityData[i]);
-            }
+            if (equityData[i].time > equityData[i-1].time) uniqueEquity.push(equityData[i]);
         }
     }
     equitySeries.setData(uniqueEquity);
-
     mainChart.timeScale().fitContent();
 
-    // Resize Observer
     new ResizeObserver(entries => {
-        if (entries.length === 0 || entries[0].target !== container) { return; }
+        if (entries.length === 0 || entries[0].target !== container) return;
         const newRect = entries[0].contentRect;
         mainChart.applyOptions({ width: newRect.width, height: newRect.height });
     }).observe(container);
@@ -449,7 +657,6 @@ async function initMCP() {
 
     if(!statusEl) return;
 
-    // Update MCP Endpoint Display dynamically
     const endpointInput = document.getElementById('mcp-endpoint');
     if(endpointInput) {
         endpointInput.value = `${window.location.protocol}//${window.location.host}/api/mcp/sse`;
@@ -474,7 +681,6 @@ async function initMCP() {
                 statusText.className = "ml-3 text-sm font-medium text-slate-300";
             }
 
-            // Logs
             if(logsEl) {
                 logsEl.innerHTML = '';
                 if(data.logs.length === 0) {
@@ -493,7 +699,6 @@ async function initMCP() {
                     });
                 }
             }
-
         } catch (e) {
             console.error("MCP Status Error:", e);
         }
@@ -510,7 +715,6 @@ async function initMCP() {
     };
 
     updateStatus();
-    // Poll
     if(!window.mcpInterval) {
         window.mcpInterval = setInterval(updateStatus, 5000);
     }
