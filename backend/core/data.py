@@ -98,6 +98,22 @@ class DataManager:
         """
         return self._process_csv(file_path, symbol, timeframe)
 
+    def save_dataframe(self, df: pd.DataFrame, symbol: str, timeframe: str) -> Dict[str, Any]:
+        """
+        Process and save an existing DataFrame (from yfinance or other sources).
+        Assumes columns: [open, high, low, close, volume, datetime]
+        """
+        # Clean column names
+        df.columns = df.columns.str.strip().str.lower()
+
+        # Normalize datetime column
+        for col in ['utc', 'date', 'time', 'timestamp']:
+            if col in df.columns and 'datetime' not in df.columns:
+                df.rename(columns={col: 'datetime'}, inplace=True)
+                break
+
+        return self._clean_and_save(df, symbol, timeframe)
+
     def _process_csv(self, file_path: str, symbol: str, timeframe: str) -> Dict[str, Any]:
         """
         Internal: Validate, parse, sort, and convert CSV to Parquet.
@@ -120,6 +136,14 @@ class DataManager:
                     df.rename(columns={col: 'datetime'}, inplace=True)
                     break
 
+            return self._clean_and_save(df, symbol, timeframe)
+
+        except Exception as e:
+            logger.error(f"Error processing csv: {e}")
+            raise e
+
+    def _clean_and_save(self, df: pd.DataFrame, symbol: str, timeframe: str) -> Dict[str, Any]:
+        try:
             self._validate_columns(df)
             
             # 3. Parse Datetime
@@ -204,9 +228,8 @@ class DataManager:
             }
             
             return metadata
-
         except Exception as e:
-            logger.error(f"Error processing csv: {e}")
+            logger.error(f"Error clean and save: {e}")
             raise e
 
     def _validate_columns(self, df: pd.DataFrame):

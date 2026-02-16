@@ -1,10 +1,38 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import logging
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="QuantLogic Framework (QLM)", version="1.0.0")
+# Configure Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger("QLM.Main")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("QLM System Starting...")
+    yield
+    # Shutdown
+    logger.info("QLM System Shutting Down...")
+
+app = FastAPI(title="QuantLogic Framework (QLM)", version="2.0.0", lifespan=lifespan)
+
+# Global Exception Handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global Exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"message": "Internal Server Error", "detail": str(exc)},
+    )
 
 # CORS
 app.add_middleware(

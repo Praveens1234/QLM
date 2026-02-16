@@ -111,7 +111,7 @@ class Database:
         """
         Yields a SQLite connection. ensures clean closing.
         """
-        conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=30)
         conn.row_factory = sqlite3.Row # Return dict-like objects
         try:
             yield conn

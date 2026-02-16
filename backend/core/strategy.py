@@ -16,6 +16,21 @@ class Strategy(ABC):
     All user strategies must inherit from this class.
     """
     
+    def __init__(self):
+        self.parameters = {}
+
+    def set_parameters(self, params: Dict[str, Any]):
+        """
+        Update strategy parameters for optimization.
+        """
+        self.parameters.update(params)
+
+    def get_parameters(self) -> Dict[str, Any]:
+        """
+        Return the current parameters.
+        """
+        return self.parameters
+
     @abstractmethod
     def define_variables(self, df: pd.DataFrame) -> Dict[str, pd.Series]:
         """
@@ -38,19 +53,26 @@ class Strategy(ABC):
         """
         pass
 
-    @abstractmethod
     def exit(self, df: pd.DataFrame, vars: Dict[str, pd.Series], trade: Dict[str, Any]) -> bool:
         """
-        Return True to exit the specific trade, False to hold.
-        This is called per-trade per-candle during execution.
-        Wait, for vectorization support, passing full series might be better,
-        but the prompt says 'Execution is Candle-by-candle'.
-        However, the interface 'exit' in prompt returns 'boolean_series or condition'.
-        If it returns boolean series, it's vectorized.
-        If 'condition', it might be per-candle.
-        Let's support returning a Boolean Series for exits for now, as it's cleaner.
+        Custom exit logic for slow-mode execution.
+        Return True to exit the specific trade.
         """
-        pass
+        return False
+
+    def exit_long_signal(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series:
+        """
+        Vectorized signal to exit ALL long positions.
+        Returns boolean Series.
+        """
+        return pd.Series(False, index=df.index)
+
+    def exit_short_signal(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series:
+        """
+        Vectorized signal to exit ALL short positions.
+        Returns boolean Series.
+        """
+        return pd.Series(False, index=df.index)
 
     @abstractmethod
     def risk_model(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> Dict[str, pd.Series]:

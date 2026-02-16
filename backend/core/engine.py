@@ -6,6 +6,7 @@ from backend.core.data import DataManager
 from backend.core.strategy import StrategyLoader, Strategy
 from backend.core.metrics import PerformanceEngine
 from backend.core.store import MetadataStore
+from backend.core.fast_engine import fast_backtest_core
 from datetime import datetime
 
 logger = logging.getLogger("QLM.Engine")
@@ -20,7 +21,7 @@ class BacktestEngine:
         self.data_manager = DataManager()
         self.strategy_loader = StrategyLoader()
 
-    def run(self, dataset_id: str, strategy_name: str, version: int = None, callback=None) -> Dict[str, Any]:
+    def run(self, dataset_id: str, strategy_name: str, version: int = None, callback=None, parameters: Dict = None) -> Dict[str, Any]:
         """
         Run a backtest for a given dataset and strategy.
         Callback signature: func(progress_pct: float, message: str, data: Dict)
@@ -47,13 +48,24 @@ class BacktestEngine:
             
             strategy_instance = StrategyClass()
             
+            # Inject Parameters if provided
+            if parameters:
+                strategy_instance.set_parameters(parameters)
+
             # 3. Execution (Fail-Safe Wrapper)
             try:
-                results = self._execute(df, strategy_instance, callback)
+                # Use Fast Execution by default if optimization parameters are present, else Standard
+                # Or just try fast first? For now, keep standard as default for UI backtests.
+                # Actually, optimization calls explicitly need speed.
+                # Let's use a heuristic: if callback is None (batch mode), use fast.
+                use_fast = (callback is None)
+                results = self._execute(df, strategy_instance, callback, use_fast=use_fast)
                 status = "success"
                 error = None
             except Exception as exec_err:
                 logger.error(f"Execution Runtime Error: {exec_err}")
+                import traceback
+                traceback.print_exc()
                 status = "failed"
                 error = str(exec_err)
                 results = {
@@ -80,7 +92,7 @@ class BacktestEngine:
             # Let's re-raise to let API handle the HTTP response code, but ensure we logged it.
             raise e
 
-    def _execute(self, df: pd.DataFrame, strategy: Strategy, callback=None) -> Dict[str, Any]:
+    def _execute(self, df: pd.DataFrame, strategy: Strategy, callback=None, use_fast=False) -> Dict[str, Any]:
         """
         Event-driven execution loop.
         """
@@ -92,12 +104,12 @@ class BacktestEngine:
         vars_dict = strategy.define_variables(df)
         
         # 3.2 Generate Signals (Vectorized)
-        long_signals = strategy.entry_long(df, vars_dict)
-        short_signals = strategy.entry_short(df, vars_dict)
+        long_signals = strategy.entry_long(df, vars_dict).fillna(False).astype(bool)
+        short_signals = strategy.entry_short(df, vars_dict).fillna(False).astype(bool)
         
-        # Ensure signals are booleans and handle NaNs (from rolling)
-        long_signals = long_signals.fillna(False).astype(bool)
-        short_signals = short_signals.fillna(False).astype(bool)
+        # 3.3 Generate Exit Signals (Vectorized) - New Interface
+        long_exits = strategy.exit_long_signal(df, vars_dict).fillna(False).astype(bool)
+        short_exits = strategy.exit_short_signal(df, vars_dict).fillna(False).astype(bool)
         
         # Risk Model
         risk = strategy.risk_model(df, vars_dict)
@@ -113,143 +125,139 @@ class BacktestEngine:
         if tp_series is None:
             tp_series = default_nan_series
 
-        # Convert to numpy and fillna
-        sl_arr = sl_series.fillna(np.nan).values
-        tp_arr = tp_series.fillna(np.nan).values
-        
         # Position Sizing
         pos_sizes = strategy.position_size(df, vars_dict).fillna(1.0).values
-
-        trades = []
-        active_trade = None
         
-        # Convert necessary columns to numpy arrays for speed
-        opens = df['open'].values
-        highs = df['high'].values
-        lows = df['low'].values
-        closes = df['close'].values
-        times = df['dtv'].values # int64
+        # Convert necessary columns to numpy arrays
+        opens = df['open'].values.astype(np.float64)
+        highs = df['high'].values.astype(np.float64)
+        lows = df['low'].values.astype(np.float64)
+        closes = df['close'].values.astype(np.float64)
+        times = df['dtv'].values.astype(np.int64)
         
-        # Signals to numpy
-        sig_long = long_signals.values
-        sig_short = short_signals.values
-        
-        # Fail-Safe: Check for data integrity
-        if np.any(np.isnan(opens)) or np.any(np.isnan(closes)):
-             logger.warning("Dataset contains NaNs in OHLC data. Execution may be unreliable.")
+        sl_arr = sl_series.fillna(np.nan).values.astype(np.float64)
+        tp_arr = tp_series.fillna(np.nan).values.astype(np.float64)
+        pos_sizes = pos_sizes.astype(np.float64)
 
-        for i in range(n_rows):
-            # Current Candle - CAST TO PYTHON TYPES FOR JSON SERIALIZATION
-            try:
-                current_time = int(times[i])
-                open_p, high_p, low_p, close_p = float(opens[i]), float(highs[i]), float(lows[i]), float(closes[i])
-            except (ValueError, TypeError):
-                # Skip bad rows
-                continue
+        if use_fast:
+             # FAST PATH (Numba)
+             trades_arr = fast_backtest_core(
+                 times, opens, highs, lows, closes,
+                 long_signals.values, short_signals.values,
+                 long_exits.values, short_exits.values,
+                 sl_arr, tp_arr, pos_sizes
+             )
 
-            # Progress Update
-            if callback and i % (max(1, n_rows // 100)) == 0:
-                progress = (i / n_rows) * 100
-                display_time = pd.to_datetime(current_time, unit='ns', utc=True).strftime('%Y-%m-%d %H:%M:%S')
-                callback(progress, "Running", {"current_time": display_time, "active_trade_count": 1 if active_trade else 0})
+             # Convert Numba results to Dicts
+             trades = []
+             for row in trades_arr:
+                 # row: [entry_time, exit_time, entry_price, exit_price, pnl, direction, exit_reason, size]
+                 entry_ts = pd.to_datetime(row[0], unit='ns', utc=True)
+                 exit_ts = pd.to_datetime(row[1], unit='ns', utc=True)
+                 duration_min = (row[1] - row[0]) / (1e9 * 60)
+
+                 reason_map = {1: "SL Hit", 2: "TP Hit", 3: "Signal", 4: "End"}
+
+                 trades.append({
+                     "entry_time": entry_ts.strftime('%Y-%m-%d %H:%M:%S'),
+                     "exit_time": exit_ts.strftime('%Y-%m-%d %H:%M:%S'),
+                     "entry_price": row[2],
+                     "exit_price": row[3],
+                     "pnl": row[4],
+                     "direction": "long" if row[5] == 1 else "short",
+                     "exit_reason": reason_map.get(int(row[6]), "Unknown"),
+                     "size": row[7],
+                     "duration": round(duration_min, 2)
+                 })
+
+        else:
+            # SLOW PATH (Python Loop - Legacy & Custom Logic)
+            trades = []
+            active_trade = None
             
-            # Check Active Trade Exit
-            if active_trade:
-                trade_pnl = 0.0
-                exit_price = 0.0
-                exit_reason = ""
-                
-                # 1. Check SL/TP (Intrabar approximation)
-                curr_sl = active_trade.get('sl')
-                curr_tp = active_trade.get('tp')
-                
-                # Robust Logic: Ensure we compare float to float
-                if active_trade['direction'] == 'long':
-                    if curr_sl is not None and not np.isnan(curr_sl) and low_p <= curr_sl:
-                        exit_price = curr_sl
-                        exit_reason = "SL Hit"
-                    elif curr_tp is not None and not np.isnan(curr_tp) and high_p >= curr_tp:
-                        exit_price = curr_tp
-                        exit_reason = "TP Hit"
-                
-                elif active_trade['direction'] == 'short':
-                    if curr_sl is not None and not np.isnan(curr_sl) and high_p >= curr_sl:
-                        exit_price = curr_sl
-                        exit_reason = "SL Hit"
-                    elif curr_tp is not None and not np.isnan(curr_tp) and low_p <= curr_tp:
-                        exit_price = curr_tp
-                        exit_reason = "TP Hit"
+            sig_long = long_signals.values
+            sig_short = short_signals.values
 
-                # 2. Check Strategy Exit (Signal)
-                if not exit_reason:
-                    try:
-                        trade_info = active_trade.copy()
-                        trade_info['current_idx'] = i
-                        should_exit = strategy.exit(df, vars_dict, trade_info)
-
-                        if should_exit:
-                            exit_price = close_p
-                            exit_reason = "Signal"
-                    except Exception as e:
-                        # Log strategy error but don't crash
-                        logger.warning(f"Strategy exit logic failed at idx {i}: {e}")
-                
-                if exit_reason:
-                    trade_size = active_trade.get('size', 1.0)
-                    if active_trade['direction'] == 'long':
-                        trade_pnl = (exit_price - active_trade['entry_price']) * trade_size
-                    else:
-                        trade_pnl = (active_trade['entry_price'] - exit_price) * trade_size
-                        
-                    exit_dt = pd.to_datetime(current_time, unit='ns', utc=True)
-                    entry_dt = pd.to_datetime(active_trade['entry_time'], unit='ns', utc=True)
-                    
-                    active_trade['exit_time'] = exit_dt.strftime('%Y-%m-%d %H:%M:%S')
-                    active_trade['entry_time'] = entry_dt.strftime('%Y-%m-%d %H:%M:%S')
-
-                    duration_ns = current_time - int(entry_dt.value)
-                    duration_min = duration_ns / (1e9 * 60)
-                    active_trade['duration'] = round(duration_min, 2)
-
-                    active_trade['exit_price'] = exit_price
-                    active_trade['pnl'] = trade_pnl
-                    active_trade['exit_reason'] = exit_reason
-                    
-                    # Clean up numpy types
-                    if active_trade['sl'] is not None and np.isnan(active_trade['sl']): active_trade['sl'] = None
-                    if active_trade['tp'] is not None and np.isnan(active_trade['tp']): active_trade['tp'] = None
-                    
-                    trades.append(active_trade)
-                    active_trade = None
-                    continue 
-            
-            # Check Entry
-            if not active_trade:
-                # Use try-except for checking signals to handle potential index errors (though unlikely with range loop)
+            for i in range(n_rows):
                 try:
-                    is_long = sig_long[i]
-                    is_short = sig_short[i]
+                    current_time = int(times[i])
+                    open_p, high_p, low_p, close_p = float(opens[i]), float(highs[i]), float(lows[i]), float(closes[i])
+                except (ValueError, TypeError): continue
 
-                    if is_long:
+                if callback and i % (max(1, n_rows // 100)) == 0:
+                    progress = (i / n_rows) * 100
+                    display_time = pd.to_datetime(current_time, unit='ns', utc=True).strftime('%Y-%m-%d %H:%M:%S')
+                    callback(progress, "Running", {"current_time": display_time, "active_trade_count": 1 if active_trade else 0})
+
+                if active_trade:
+                    trade_pnl = 0.0
+                    exit_price = 0.0
+                    exit_reason = ""
+                    
+                    curr_sl = active_trade.get('sl')
+                    curr_tp = active_trade.get('tp')
+
+                    if active_trade['direction'] == 'long':
+                        if curr_sl is not None and not np.isnan(curr_sl) and low_p <= curr_sl:
+                            exit_price = curr_sl; exit_reason = "SL Hit"
+                        elif curr_tp is not None and not np.isnan(curr_tp) and high_p >= curr_tp:
+                            exit_price = curr_tp; exit_reason = "TP Hit"
+                    elif active_trade['direction'] == 'short':
+                        if curr_sl is not None and not np.isnan(curr_sl) and high_p >= curr_sl:
+                            exit_price = curr_sl; exit_reason = "SL Hit"
+                        elif curr_tp is not None and not np.isnan(curr_tp) and low_p <= curr_tp:
+                            exit_price = curr_tp; exit_reason = "TP Hit"
+
+                    if not exit_reason:
+                        # Custom Python Logic Check
+                        if strategy.exit(df, vars_dict, active_trade):
+                             exit_price = close_p; exit_reason = "Signal"
+                        # Or Vectorized Check (if strategy overrides standard loop)
+                        elif active_trade['direction'] == 'long' and long_exits[i]:
+                             exit_price = close_p; exit_reason = "Signal"
+                        elif active_trade['direction'] == 'short' and short_exits[i]:
+                             exit_price = close_p; exit_reason = "Signal"
+
+                    if exit_reason:
+                        trade_size = active_trade.get('size', 1.0)
+                        if active_trade['direction'] == 'long':
+                            trade_pnl = (exit_price - active_trade['entry_price']) * trade_size
+                        else:
+                            trade_pnl = (active_trade['entry_price'] - exit_price) * trade_size
+
+                        exit_dt = pd.to_datetime(current_time, unit='ns', utc=True)
+                        entry_dt = pd.to_datetime(active_trade['entry_time'], unit='ns', utc=True)
+
+                        active_trade.update({
+                            'exit_time': exit_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                            'entry_time': entry_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                            'duration': round((current_time - int(entry_dt.value)) / (1e9 * 60), 2),
+                            'exit_price': exit_price,
+                            'pnl': trade_pnl,
+                            'exit_reason': exit_reason
+                        })
+                        if active_trade['sl'] is not None and np.isnan(active_trade['sl']): active_trade['sl'] = None
+                        if active_trade['tp'] is not None and np.isnan(active_trade['tp']): active_trade['tp'] = None
+
+                        trades.append(active_trade)
+                        active_trade = None
+                        continue
+
+                if not active_trade:
+                    if sig_long[i]:
                         active_trade = {
-                            "entry_time": current_time,
-                            "entry_price": close_p,
-                            "direction": "long",
+                            "entry_time": current_time, "entry_price": close_p, "direction": "long",
                             "sl": float(sl_arr[i]) if not np.isnan(sl_arr[i]) else None,
                             "tp": float(tp_arr[i]) if not np.isnan(tp_arr[i]) else None,
-                            "size": float(pos_sizes[i]) if not np.isnan(pos_sizes[i]) else 1.0
+                            "size": float(pos_sizes[i])
                         }
-                    elif is_short:
+                    elif sig_short[i]:
                         active_trade = {
-                            "entry_time": current_time,
-                            "entry_price": close_p,
-                            "direction": "short",
+                            "entry_time": current_time, "entry_price": close_p, "direction": "short",
                             "sl": float(sl_arr[i]) if not np.isnan(sl_arr[i]) else None,
                             "tp": float(tp_arr[i]) if not np.isnan(tp_arr[i]) else None,
-                            "size": float(pos_sizes[i]) if not np.isnan(pos_sizes[i]) else 1.0
+                            "size": float(pos_sizes[i])
                         }
-                except Exception as e:
-                    logger.warning(f"Signal processing failed at idx {i}: {e}")
         
         # Calculate Metrics
         metrics = PerformanceEngine.calculate_metrics(trades)

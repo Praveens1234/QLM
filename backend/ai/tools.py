@@ -5,6 +5,7 @@ from backend.core.strategy import StrategyLoader
 from backend.core.store import MetadataStore
 from backend.core.engine import BacktestEngine
 from backend.core.data import DataManager
+from backend.core.data_feed import DataFeedManager
 from backend.ai.analytics import calculate_market_structure, optimize_strategy
 from backend.ai.config_manager import AIConfigManager
 import os
@@ -26,6 +27,7 @@ class AITools:
         self.metadata_store = MetadataStore()
         self.data_manager = DataManager()
         self.config_manager = AIConfigManager()
+        self.data_feed_manager = DataFeedManager()
         
     def get_definitions(self) -> List[Dict]:
         """
@@ -40,6 +42,23 @@ class AITools:
                     "parameters": {
                         "type": "object",
                         "properties": {},
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "download_market_data",
+                    "description": "Download market data from Yahoo Finance.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "symbol": {"type": "string", "description": "Ticker symbol (e.g. AAPL, BTC-USD)"},
+                            "timeframe": {"type": "string", "description": "Timeframe (e.g. 1d, 1h, 15m). Default '1d'."},
+                            "start_date": {"type": "string", "description": "Start date (YYYY-MM-DD). Optional."},
+                            "end_date": {"type": "string", "description": "End date (YYYY-MM-DD). Optional."}
+                        },
+                        "required": ["symbol"]
                     }
                 }
             },
@@ -393,6 +412,17 @@ class AITools:
                     return {"status": "success", "id": metadata['id'], "rows": metadata['row_count']}
 
                 return await self._run_sync(_import)
+
+            elif tool_name == "download_market_data":
+                symbol = args.get("symbol")
+                tf = args.get("timeframe", "1d")
+                start = args.get("start_date")
+                end = args.get("end_date")
+
+                def _download():
+                    return self.data_feed_manager.download_market_data(symbol, tf, start, end)
+
+                return await self._run_sync(_download)
 
             elif tool_name == "read_file":
                 path = args.get("path")

@@ -12,3 +12,5 @@ aiohttp>=3.8.0
 requests>=2.31.0
 mcp>=1.0.0
 psutil
+numba>=0.57.0
+yfinance>=0.2.0
