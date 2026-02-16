@@ -122,7 +122,7 @@ async def list_resources() -> list[Resource]:
     if not mcp_state.is_active: return []
 
     resources = []
-    strategies = strategy_loader.list_strategies()
+    strategies = await asyncio.to_thread(strategy_loader.list_strategies)
     for s in strategies:
         resources.append(Resource(
             uri=f"qlm://strategy/{s['name']}",
@@ -130,7 +130,7 @@ async def list_resources() -> list[Resource]:
             mimeType="text/x-python"
         ))
 
-    datasets = metadata_store.list_datasets()
+    datasets = await asyncio.to_thread(metadata_store.list_datasets)
     for d in datasets:
         resources.append(Resource(
             uri=f"qlm://data/{d['id']}",
