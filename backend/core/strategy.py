@@ -252,8 +252,12 @@ class StrategyLoader:
 
         # 3. Runtime Simulation
         import uuid
+        import tempfile
+
+        # Use system temp directory to avoid triggering file watchers in project root
+        temp_dir = tempfile.gettempdir()
         temp_name = f"temp_validate_{uuid.uuid4().hex}"
-        temp_path = os.path.join(self.strategy_dir, f"{temp_name}.py")
+        temp_path = os.path.join(temp_dir, f"{temp_name}.py")
         
         try:
             # Write to temp file
@@ -261,10 +265,16 @@ class StrategyLoader:
                 f.write(code)
                 
             # Load module dynamically
-            spec = importlib.util.spec_from_file_location(f"strategies.{temp_name}", temp_path)
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[f"strategies.{temp_name}"] = module
-            spec.loader.exec_module(module)
+            # Need to ensure unique name in sys.modules
+            module_name = f"temp_strategies.{temp_name}"
+
+            spec = importlib.util.spec_from_file_location(module_name, temp_path)
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                sys.modules[module_name] = module
+                spec.loader.exec_module(module)
+            else:
+                return {"valid": False, "error": "Failed to create module spec for validation."}
             
             # Find Strategy Class
             strategy_cls = None
@@ -331,9 +341,12 @@ class StrategyLoader:
         finally:
             # Cleanup
             if os.path.exists(temp_path):
-                os.remove(temp_path)
-            if f"strategies.{temp_name}" in sys.modules:
-                del sys.modules[f"strategies.{temp_name}"]
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+            if module_name in sys.modules:
+                del sys.modules[module_name]
 
     def delete_strategy(self, name: str):
         """

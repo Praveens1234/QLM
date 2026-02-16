@@ -77,6 +77,7 @@ async def import_from_url(request: UrlImportRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
 
+@router.get("")
 @router.get("/")
 async def list_datasets():
     return metadata_store.list_datasets()

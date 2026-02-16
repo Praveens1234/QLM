@@ -273,23 +273,41 @@ async def handle_mcp_messages(request):
 # But we need access to mcp_state.
 
 async def handle_mcp_sse_asgi(scope, receive, send):
-    if not mcp_state.is_active:
-        response = Response("MCP Service Disabled", status_code=503)
-        await response(scope, receive, send)
-        return
+    try:
+        if not mcp_state.is_active:
+            response = Response("MCP Service Disabled", status_code=503)
+            await response(scope, receive, send)
+            return
 
-    async with sse.connect_sse(scope, receive, send) as streams:
-        await mcp_server.run(streams[0], streams[1], mcp_server.create_initialization_options())
+        async with sse.connect_sse(scope, receive, send) as streams:
+            await mcp_server.run(streams[0], streams[1], mcp_server.create_initialization_options())
+
+    except Exception as e:
+        logger.error(f"MCP SSE Error: {e}")
+        # If headers not sent, send 500
+        # But connect_sse might have started response.
+        # We can't safely send response here if partial.
+        pass
 
 async def handle_mcp_messages_asgi(scope, receive, send):
-    logger.info(f"MCP Messages ASGI: Method={scope.get('method')}, Path={scope.get('path')}")
+    try:
+        logger.info(f"MCP Messages ASGI: Method={scope.get('method')}, Path={scope.get('path')}")
 
-    if not mcp_state.is_active:
-        response = Response("MCP Service Disabled", status_code=503)
-        await response(scope, receive, send)
-        return
+        if not mcp_state.is_active:
+            response = Response("MCP Service Disabled", status_code=503)
+            await response(scope, receive, send)
+            return
 
-    await sse.handle_post_message(scope, receive, send)
+        await sse.handle_post_message(scope, receive, send)
+
+    except Exception as e:
+        logger.error(f"MCP Messages Error: {e}")
+        # Try to send 500 if possible
+        try:
+            response = Response(json.dumps({"error": str(e)}), status_code=500, media_type="application/json")
+            await response(scope, receive, send)
+        except:
+            pass # Response likely already started
 
 # API Endpoints for Dashboard
 async def get_mcp_status():

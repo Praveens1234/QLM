@@ -15,6 +15,7 @@ class StrategyResponse(BaseModel):
     versions: List[int]
     latest_version: int
 
+@router.get("", response_model=List[StrategyResponse])
 @router.get("/", response_model=List[StrategyResponse])
 async def list_strategies():
     strategies = loader.list_strategies()
