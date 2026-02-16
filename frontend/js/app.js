@@ -270,7 +270,79 @@ window.switchImportTab = function(tab) {
     }
 }
 
+window.uploadDataset = async function() {
+    const fileInput = document.getElementById('upload-file');
+    const symbolInput = document.getElementById('upload-symbol');
+    const tfInput = document.getElementById('upload-tf');
+
+    if (!fileInput.files.length || !symbolInput.value || !tfInput.value) {
+        return showToast("Please fill all fields", 'warning');
+    }
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('symbol', symbolInput.value);
+    formData.append('timeframe', tfInput.value);
+
+    // Disable Button
+    const btn = document.querySelector('button[onclick="uploadDataset()"]');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+    btn.disabled = true;
+
+    try {
+        const res = await fetch(`${API_BASE}/data/upload`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await res.json();
+
+        if (res.ok) {
+            showToast("Dataset imported successfully", 'success');
+            loadData();
+            // Reset
+            fileInput.value = '';
+            symbolInput.value = '';
+            tfInput.value = '';
+        } else {
+            showToast("Upload failed: " + result.detail, 'error');
+        }
+    } catch (e) {
+        showToast("Error: " + e.message, 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+};
+
 // --- Strategy Lab ---
+let strategyEditor = null;
+
+function initEditor() {
+    if (strategyEditor) return;
+
+    if (typeof monaco !== 'undefined') {
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }});
+        require(['vs/editor/editor.main'], function() {
+            strategyEditor = monaco.editor.create(document.getElementById('editor-container'), {
+                value: "# Select a strategy to view code",
+                language: 'python',
+                theme: 'vs-dark',
+                automaticLayout: true,
+                minimap: { enabled: false },
+                fontSize: 12,
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace"
+            });
+        });
+    } else {
+        console.warn("Monaco not loaded yet.");
+    }
+}
+
+// Call initEditor when page loads or on navigation to strategies
+window.addEventListener('load', initEditor);
+
 async function loadStrategies() {
     try {
         const res = await fetch(`${API_BASE}/strategies`);
@@ -285,7 +357,7 @@ async function loadStrategies() {
             strategies.forEach(s => {
                 const div = document.createElement('div');
                 div.className = "px-3 py-2 hover:bg-slate-800 rounded cursor-pointer transition-colors group border border-transparent hover:border-slate-700";
-                div.onclick = () => loadStrategyCode(s.name); // Need to implement this if editor is real
+                div.onclick = () => loadStrategyCode(s.name, s.latest_version);
                 div.innerHTML = `
                     <div class="flex justify-between items-center">
                         <span class="text-sm font-medium text-slate-300 group-hover:text-white">${s.name}</span>
@@ -311,12 +383,102 @@ async function loadStrategies() {
     }
 }
 
+window.loadStrategyCode = async function(name, version) {
+    // Determine version if not passed
+    // But listing passes it.
+    if (!version) return;
+
+    // Update active state in list
+    // (Optional UI polish)
+
+    try {
+        const res = await fetch(`${API_BASE}/strategies/${name}/${version}`);
+        if (!res.ok) throw new Error("Failed to fetch code");
+        const data = await res.json();
+
+        if (strategyEditor) {
+            strategyEditor.setValue(data.code);
+        } else {
+            // Fallback
+            const fallback = document.getElementById('strategy-editor-fallback');
+            if(fallback) {
+                fallback.value = data.code;
+                fallback.classList.remove('hidden');
+                document.getElementById('editor-container').classList.add('hidden');
+            }
+        }
+
+        // Set name input
+        const nameInput = document.getElementById('strategy-name-input');
+        if(nameInput) nameInput.value = name;
+
+    } catch(e) {
+        showToast("Error loading strategy: " + e.message, 'error');
+    }
+}
+
+window.saveStrategy = async function() {
+    const name = document.getElementById('strategy-name-input').value;
+    if (!name) return showToast("Strategy Name is required", 'warning');
+
+    let code = "";
+    if (strategyEditor) {
+        code = strategyEditor.getValue();
+    } else {
+        code = document.getElementById('strategy-editor-fallback').value;
+    }
+
+    if (!code) return showToast("Strategy code cannot be empty", 'warning');
+
+    try {
+        const res = await fetch(`${API_BASE}/strategies`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ name, code })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            showToast(`Strategy ${name} v${data.version} saved`, 'success');
+            loadStrategies();
+        } else {
+            showToast("Save Failed: " + data.detail, 'error');
+        }
+    } catch (e) {
+        showToast("Save Error: " + e.message, 'error');
+    }
+};
+
+window.validateStrategy = async function() {
+    let code = strategyEditor ? strategyEditor.getValue() : "";
+    if (!code) return showToast("No code to validate", 'warning');
+
+    try {
+        const res = await fetch(`${API_BASE}/strategies/validate`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ name: "temp", code })
+        });
+        const data = await res.json();
+
+        if (data.valid) {
+            showToast("Strategy is valid!", 'success');
+        } else {
+            showToast("Validation Failed: " + data.error, 'error');
+        }
+    } catch(e) {
+        showToast("Validation Error: " + e.message, 'error');
+    }
+};
+
 window.createNewStrategy = function() {
     const name = prompt("Strategy Name:");
     if(name) {
-        // Mock create
-        showToast(`Strategy ${name} created (mock)`, 'success');
-        loadStrategies();
+        document.getElementById('strategy-name-input').value = name;
+        if(strategyEditor) {
+            strategyEditor.setValue(`from backend.core.strategy import Strategy\nimport pandas as pd\n\nclass ${name}(Strategy):\n    def define_variables(self, df: pd.DataFrame) -> dict:\n        return {}\n\n    def entry_long(self, df: pd.DataFrame, vars: dict) -> pd.Series:\n        return pd.Series(False, index=df.index)\n\n    def entry_short(self, df: pd.DataFrame, vars: dict) -> pd.Series:\n        return pd.Series(False, index=df.index)\n\n    def exit(self, df: pd.DataFrame, vars: dict, trade: dict) -> bool:\n        return False\n\n    def risk_model(self, df: pd.DataFrame, vars: dict) -> dict:\n        return {'sl': None, 'tp': None}\n`);
+        }
+        showToast(`Started new strategy: ${name}`, 'success');
     }
 };
 
