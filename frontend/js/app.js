@@ -328,7 +328,7 @@ function renderDatasets() {
             </td>
             <td class="px-6 py-4 text-right text-xs text-slate-400 font-mono">${d.row_count.toLocaleString()}</td>
             <td class="px-6 py-4 text-right">
-                <button onclick="deleteDataset('${d.id}')" class="text-slate-500 hover:text-rose-500 transition-colors p-1.5 rounded hover:bg-slate-800 opacity-0 group-hover:opacity-100">
+                <button onclick="deleteDataset('${d.id}')" aria-label="Delete dataset" class="text-slate-500 hover:text-rose-500 transition-colors p-1.5 rounded hover:bg-slate-800 opacity-0 group-hover:opacity-100">
                     <i class="fa-solid fa-trash-can"></i>
                 </button>
             </td>
@@ -443,7 +443,7 @@ async function loadStrategies() {
                     <p class="text-[10px] text-slate-500">v${s.latest_version}</p>
                 </div>
             </div>
-            <button onclick="deleteStrategy('${s.name}'); event.stopPropagation();" class="text-slate-600 hover:text-rose-500 p-1.5 rounded transition-colors opacity-0 group-hover:opacity-100">
+            <button onclick="deleteStrategy('${s.name}'); event.stopPropagation();" aria-label="Delete strategy ${s.name}" class="text-slate-600 hover:text-rose-500 p-1.5 rounded transition-colors opacity-0 group-hover:opacity-100">
                 <i class="fa-solid fa-trash-can text-xs"></i>
             </button>
         </div>
@@ -739,7 +739,7 @@ function renderSessions() {
     list.innerHTML = sessions.map(s => `
         <li class="flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors text-sm ${s.id === currentSessionId ? 'bg-indigo-600/10 text-indigo-400 font-medium' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}" onclick="loadSession('${s.id}')">
             <span class="truncate pr-2">${s.title}</span>
-            <button onclick="deleteSession('${s.id}'); event.stopPropagation()" class="text-slate-600 hover:text-rose-500 p-1 rounded opacity-60 hover:opacity-100">
+            <button onclick="deleteSession('${s.id}'); event.stopPropagation()" aria-label="Delete session" class="text-slate-600 hover:text-rose-500 p-1 rounded opacity-60 hover:opacity-100">
                 <i class="fa-solid fa-times text-xs"></i>
             </button>
         </li>
