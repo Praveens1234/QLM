@@ -20,13 +20,24 @@ from backend.api import router as api_router
 app.include_router(api_router, prefix="/api")
 
 # MCP Transport & Management
-from backend.api.mcp import handle_mcp_sse, handle_mcp_messages, get_mcp_status, toggle_mcp
+from backend.api.mcp import handle_mcp_sse_asgi, handle_mcp_messages_asgi, get_mcp_status, toggle_mcp
 
 class ToggleRequest(BaseModel):
     active: bool
 
-app.add_route("/api/mcp/sse", handle_mcp_sse)
-app.add_route("/api/mcp/messages", handle_mcp_messages, methods=["POST"])
+# We use the raw ASGI handlers to avoid Starlette Response wrapping issues with SSE
+# To ensure Starlette detects these as ASGI apps and allows method filtering,
+# we wrap them in a class instance. This bypasses the isfunction() check that might
+# incorrectly trigger request-response wrapping.
+
+class ASGIWrapper:
+    def __init__(self, handler):
+        self.handler = handler
+    async def __call__(self, scope, receive, send):
+        await self.handler(scope, receive, send)
+
+app.add_route("/api/mcp/sse", ASGIWrapper(handle_mcp_sse_asgi), methods=["GET"])
+app.add_route("/api/mcp/messages", ASGIWrapper(handle_mcp_messages_asgi), methods=["POST"])
 app.add_api_route("/api/mcp/status", get_mcp_status, methods=["GET"])
 app.add_api_route("/api/mcp/toggle", toggle_mcp, methods=["POST"])
 
