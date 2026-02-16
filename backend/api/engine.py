@@ -2,9 +2,12 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from backend.core.engine import BacktestEngine
 from backend.api.ws import manager
-from typing import Optional
+from typing import Optional, Dict, Any
 import asyncio
 from starlette.concurrency import run_in_threadpool
+import logging
+
+logger = logging.getLogger("QLM.API.Engine")
 
 router = APIRouter()
 engine = BacktestEngine()
@@ -18,9 +21,8 @@ class BacktestRequest(BaseModel):
 async def run_backtest(request: BacktestRequest):
     loop = asyncio.get_running_loop()
     
-    def sync_callback(pct, msg, data):
-        # We need a sync callback that calls the async broadcast
-        # Using run_coroutine_threadsafe to schedule on the main loop
+    def sync_callback(pct: float, msg: str, data: Dict[str, Any]):
+        # Schedule the async broadcast on the main event loop
         payload = {
             "type": "progress",
             "dataset_id": request.dataset_id,
@@ -31,7 +33,7 @@ async def run_backtest(request: BacktestRequest):
         asyncio.run_coroutine_threadsafe(manager.broadcast(payload), loop)
 
     try:
-        # Run the CPU-bound backtest in a threadpool to avoid blocking the async loop
+        # Run CPU-bound backtest in threadpool
         results = await run_in_threadpool(
             engine.run,
             dataset_id=request.dataset_id,
@@ -40,18 +42,37 @@ async def run_backtest(request: BacktestRequest):
             callback=sync_callback
         )
         
-        # Broadcast completion
-        await manager.broadcast({
-            "type": "finished",
-            "dataset_id": request.dataset_id,
-            "results": results
-        })
+        status = results.get("status", "success")
+
+        if status == "failed":
+            error_msg = results.get("error", "Unknown execution error")
+            logger.error(f"Backtest failed gracefully: {error_msg}")
+
+            # Broadcast failure
+            await manager.broadcast({
+                "type": "error",
+                "dataset_id": request.dataset_id,
+                "message": "Backtest Execution Failed",
+                "details": error_msg
+            })
+
+            # Still return partial results? Or error?
+            # Let's return the results (which contain empty trades) but with status
+            return {"status": "failed", "error": error_msg, "results": results}
         
-        return {"status": "success", "results": results}
+        else:
+            # Broadcast completion
+            await manager.broadcast({
+                "type": "finished",
+                "dataset_id": request.dataset_id,
+                "results": results
+            })
+            return {"status": "success", "results": results}
         
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.error(f"Backtest API Error: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal Server Error during Backtest")

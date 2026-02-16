@@ -8,7 +8,7 @@ import requests
 import tempfile
 import shutil
 from datetime import datetime, timezone
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, List
 
 # Logger
 logger = logging.getLogger("QLM.Data")
@@ -19,7 +19,6 @@ class DataManager:
     Supports local upload and remote URL download (CSV/ZIP).
     """
     
-    # We allow 'datetime' or 'utc' for timestamp
     REQUIRED_COLUMNS = ['open', 'high', 'low', 'close', 'volume']
     
     def __init__(self, data_dir: str = "data"):
@@ -39,12 +38,11 @@ class DataManager:
                 local_filename = "downloaded_file"
 
             download_path = os.path.join(temp_dir, local_filename)
-
             logger.info(f"Downloading from {url} to {download_path}...")
 
-            # Use requests with a user agent to avoid basic blocks
             headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-            with requests.get(url, headers=headers, stream=True) as r:
+
+            with requests.get(url, headers=headers, stream=True, timeout=30) as r:
                 r.raise_for_status()
                 with open(download_path, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=8192):
@@ -54,14 +52,25 @@ class DataManager:
             target_csv = download_path
 
             if download_path.lower().endswith('.zip'):
-                logger.info("Detected ZIP file. Extracting...")
+                logger.info("Detected ZIP file. Extracting safely...")
+
                 with zipfile.ZipFile(download_path, 'r') as zip_ref:
-                    zip_ref.extractall(temp_dir)
+                    # Zip Slip Protection
+                    members = zip_ref.namelist()
+                    safe_members = []
+                    abs_target = os.path.abspath(temp_dir)
+
+                    for member in members:
+                        # Normalize path to prevent traversal
+                        abs_dest = os.path.abspath(os.path.join(temp_dir, member))
+                        if not abs_dest.startswith(abs_target):
+                            raise ValueError(f"Zip Slip attempt detected: {member}")
+                        safe_members.append(member)
+
+                    zip_ref.extractall(temp_dir, members=safe_members)
 
                 # Find CSV
                 csv_files = [f for f in os.listdir(temp_dir) if f.lower().endswith('.csv')]
-
-                # Filter out __MACOSX garbage if present
                 csv_files = [f for f in csv_files if not f.startswith('__')]
 
                 if len(csv_files) == 0:
@@ -95,15 +104,17 @@ class DataManager:
         Returns metadata for the dataset.
         """
         try:
-            # 1. Load CSV
-            # Format: dd.mm.yyyy hh:mm:ss
-            df = pd.read_csv(file_path, skipinitialspace=True)
+            # 1. Load CSV (Try to infer separator)
+            try:
+                df = pd.read_csv(file_path, skipinitialspace=True)
+            except Exception:
+                 # Fallback to python engine with auto detection
+                df = pd.read_csv(file_path, skipinitialspace=True, sep=None, engine='python')
             
             # Clean column names
             df.columns = df.columns.str.strip().str.lower()
             
             # 2. Validate Structure & Normalization
-            # Rename 'utc' or 'date' or 'time' to 'datetime' if present
             for col in ['utc', 'date', 'time', 'timestamp']:
                 if col in df.columns:
                     df.rename(columns={col: 'datetime'}, inplace=True)
@@ -111,56 +122,50 @@ class DataManager:
 
             self._validate_columns(df)
             
-            # 3. Parse Datetime to UTC Epoch
-            # Ensure strings are stripped of whitespace
-            df['datetime'] = df['datetime'].astype(str).str.strip()
+            # 3. Parse Datetime
+            # Convert column to string first to handle mixed types
+            dt_col = df['datetime'].astype(str).str.strip()
 
-            # Clean common garbage like " UTC" suffix in values
-            df['datetime'] = df['datetime'].str.replace(' UTC', '', regex=False).str.replace(' GMT', '', regex=False)
-                
-            try:
-                # Try ISO first (common)
-                df['datetime'] = pd.to_datetime(df['datetime'], errors='raise', utc=True)
-            except (ValueError, TypeError):
-                # Fallback to specific format d.m.y h:m:s
-                try:
-                    df['datetime'] = pd.to_datetime(df['datetime'], format='%d.%m.%Y %H:%M:%S', errors='raise')
-                    df['datetime'] = df['datetime'].dt.tz_localize('UTC', ambiguous='raise', nonexistent='raise')
-                except Exception:
-                    # Fallback to d.m.y h:m:s.f
-                    try:
-                        df['datetime'] = pd.to_datetime(df['datetime'], format='%d.%m.%Y %H:%M:%S.%f', errors='raise')
-                        df['datetime'] = df['datetime'].dt.tz_localize('UTC', ambiguous='raise', nonexistent='raise')
-                    except Exception:
-                        # Final attempt: mixed format
-                        df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce', utc=True)
-                        if df['datetime'].isna().any():
-                            # Try parsing with dayfirst=True for DD.MM.YYYY
-                            try:
-                                 df['datetime'] = pd.to_datetime(df['datetime'], dayfirst=True, errors='coerce', utc=True)
-                            except:
-                                 pass
+            # Remove common suffixes
+            dt_col = dt_col.str.replace(' UTC', '', regex=False).str.replace(' GMT', '', regex=False).str.replace('Z', '', regex=False)
 
-                        if df['datetime'].isna().any():
-                             raise ValueError("Could not parse datetime column. Ensure standard ISO or 'dd.mm.yyyy HH:MM:SS' format.")
-            
-            # Convert to int64 nanoseconds (Unix epoch)
-            # stored as int64 in parquet for efficiency
+            # Try to infer format using pandas to_datetime (which is usually good)
+            # We enforce UTC
             try:
-                df['datetime'] = df['datetime'].dt.as_unit('ns')
+                # First attempt: standard ISO or mixed
+                df['datetime'] = pd.to_datetime(dt_col, utc=True, errors='raise')
             except Exception:
-                # Fallback for older pandas or if as_unit fails
-                df['datetime'] = df['datetime'].astype('datetime64[ns, UTC]')
-                
+                # Second attempt: Day first (European)
+                try:
+                    df['datetime'] = pd.to_datetime(dt_col, utc=True, dayfirst=True, errors='raise')
+                except Exception:
+                    # Third attempt: manual format string for some common crypto data
+                    try:
+                        df['datetime'] = pd.to_datetime(dt_col, format='%d.%m.%Y %H:%M:%S', utc=True)
+                    except Exception as e:
+                         raise ValueError(f"Could not parse datetime column. Ensure standard ISO 8601 or 'dd.mm.yyyy HH:MM:SS' format. Error: {e}")
+
+            # Drop rows with NaT
+            if df['datetime'].isna().any():
+                logger.warning(f"Dropping {df['datetime'].isna().sum()} rows with invalid dates.")
+                df = df.dropna(subset=['datetime'])
+
+            # Convert to int64 nanoseconds (Unix epoch)
+            # Ensure we have datetime64[ns, UTC]
+            if df['datetime'].dtype != 'datetime64[ns, UTC]':
+                df['datetime'] = df['datetime'].dt.tz_convert('UTC')
+
             df['dtv'] = df['datetime'].astype('int64') # nanoseconds since epoch
             
             # 4. Sort and Validate Continuity
             df = df.sort_values(by='dtv').reset_index(drop=True)
             
-            if df['dtv'].is_unique is False:
-                raise ValueError("Duplicate timestamps found in dataset.")
+            # Check duplicates
+            if not df['dtv'].is_unique:
+                logger.warning("Duplicate timestamps found. Dropping duplicates (keeping first).")
+                df = df.drop_duplicates(subset=['dtv'], keep='first').reset_index(drop=True)
             
-            # 5. Detect Timeframe (Simple Check)
+            # 5. Detect Timeframe
             detected_tf_sec = self._detect_timeframe(df)
             
             # 6. Save as Parquet
@@ -168,10 +173,20 @@ class DataManager:
             parquet_filename = f"{dataset_id}.parquet"
             parquet_path = os.path.join(self.data_dir, parquet_filename)
             
-            # Standardize logic: datetime, dtv, open, high, low, close, volume (all float64 except dtv/datetime)
-            final_df = df[['datetime', 'dtv', 'open', 'high', 'low', 'close', 'volume']].copy()
+            # Select and cast columns
+            final_df = pd.DataFrame()
+            final_df['datetime'] = df['datetime']
+            final_df['dtv'] = df['dtv']
+
             for col in ['open', 'high', 'low', 'close', 'volume']:
-                final_df[col] = final_df[col].astype('float64')
+                # Coerce to numeric, clean bad chars
+                final_df[col] = pd.to_numeric(df[col], errors='coerce')
+
+            # Drop rows with NaNs in OHLC
+            if final_df[['open', 'high', 'low', 'close']].isna().any().any():
+                dropped = final_df[final_df[['open', 'high', 'low', 'close']].isna().any(axis=1)].shape[0]
+                logger.warning(f"Dropping {dropped} rows with NaN OHLC data.")
+                final_df = final_df.dropna(subset=['open', 'high', 'low', 'close'])
                 
             final_df.to_parquet(parquet_path, engine='pyarrow', index=False)
             
@@ -180,9 +195,9 @@ class DataManager:
                 "id": dataset_id,
                 "symbol": symbol,
                 "timeframe": timeframe,
-                "detected_tf_sec": detected_tf_sec,
-                "start_date": df['datetime'].iloc[0].isoformat(),
-                "end_date": df['datetime'].iloc[-1].isoformat(),
+                "detected_tf_sec": int(detected_tf_sec),
+                "start_date": final_df['datetime'].iloc[0].isoformat(),
+                "end_date": final_df['datetime'].iloc[-1].isoformat(),
                 "row_count": len(final_df),
                 "file_path": parquet_path,
                 "created_at": datetime.now(timezone.utc).isoformat()
@@ -195,7 +210,6 @@ class DataManager:
             raise e
 
     def _validate_columns(self, df: pd.DataFrame):
-        # We need datetime (or alias) plus OHLCV
         if 'datetime' not in df.columns:
              raise ValueError("Missing required column: datetime (or date/time/utc/timestamp)")
 
@@ -208,12 +222,14 @@ class DataManager:
             return 0
         
         # Calculate diff in seconds
-        # dtv is in nanoseconds, so / 1e9
         diffs = df['dtv'].diff().dropna() / 1e9
+        # Get mode (most frequent interval)
         mode_val = diffs.mode()
         if not mode_val.empty:
             return int(mode_val.iloc[0])
         return 0
 
     def load_dataset(self, file_path: str) -> pd.DataFrame:
+        if not os.path.exists(file_path):
+             raise FileNotFoundError(f"Dataset file not found: {file_path}")
         return pd.read_parquet(file_path)
