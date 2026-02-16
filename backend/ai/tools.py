@@ -348,6 +348,12 @@ class AITools:
                         # Run backtest
                         result = engine.run(dataset['id'], strat_name)
 
+                        if result.get("status") == "failed":
+                             return {
+                                 "status": "failed",
+                                 "error": result.get("error", "Unknown Backtest Failure")
+                             }
+
                         # Return Summary Metrics
                         return {
                             "status": "success",

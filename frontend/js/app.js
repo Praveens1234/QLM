@@ -50,7 +50,6 @@ const router = {
 
         // Close mobile sidebar if open
         const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('sidebar-overlay');
         if (sidebar && !sidebar.classList.contains('-translate-x-full') && window.innerWidth < 768) {
             toggleSidebar();
         }
@@ -124,10 +123,8 @@ async function loadProviders() {
         const confRes = await fetch(`${API_URL}/ai/config/active`);
         activeConfig = await confRes.json();
 
-        if (activeConfig.base_url) { // infer provider by url matching or just select if active set
-             // Simple matching logic if provider_name is returned
+        if (activeConfig.base_url) {
              if(activeConfig.provider_name) {
-                 // find id
                  const p = providers.find(x => x.name === activeConfig.provider_name);
                  if(p) {
                      activeSelect.value = p.id;
@@ -144,7 +141,7 @@ async function addProvider() {
     const key = document.getElementById('new-prov-key').value;
 
     if(!name || !url || !key) {
-        alert("Fill all fields");
+        Toast.error("Please fill all fields");
         return;
     }
 
@@ -155,22 +152,18 @@ async function addProvider() {
             body: JSON.stringify({name, base_url: url, api_key: key})
         });
 
-        // Auto-fetch models
         const provId = name.toLowerCase().replace(/ /g, "_");
-        // Reload list
         await loadProviders();
-        // Trigger model fetch
-        alert("Provider added. Fetching models...");
+        Toast.success("Provider added. Fetching models...");
         await fetchModelsForProvider(provId);
-        await loadProviders(); // Reload with models
+        await loadProviders();
 
-        // Clear inputs
         document.getElementById('new-prov-name').value = "";
         document.getElementById('new-prov-url').value = "";
         document.getElementById('new-prov-key').value = "";
 
     } catch(e) {
-        alert("Error adding provider: " + e);
+        Toast.error("Error adding provider: " + e);
     }
 }
 
@@ -202,7 +195,7 @@ async function saveActiveConfig() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({provider_id: pid, model_id: mid})
     });
-    alert("Active Configuration Updated!");
+    Toast.success("Active Configuration Updated!");
 }
 
 // MCP Service Functions
@@ -211,7 +204,6 @@ async function loadMCPStatus() {
         const res = await fetch(`${API_URL}/mcp/status`);
         const data = await res.json();
 
-        // Update Toggle
         const toggle = document.getElementById('mcp-toggle');
         const statusText = document.getElementById('mcp-status-text');
         const statusDetail = document.getElementById('mcp-status-detail');
@@ -227,7 +219,6 @@ async function loadMCPStatus() {
             statusDetail.className = "text-xs text-slate-400";
         }
 
-        // Update Logs
         const logContainer = document.getElementById('mcp-logs');
         if (data.logs.length === 0) {
             logContainer.innerHTML = '<div class="text-slate-500 italic">No activity recorded.</div>';
@@ -266,8 +257,8 @@ async function toggleMCPService() {
         });
         loadMCPStatus();
     } catch(e) {
-        alert("Failed to toggle service");
-        toggle.checked = !isActive; // revert
+        Toast.error("Failed to toggle service");
+        toggle.checked = !isActive;
     }
 }
 
@@ -288,18 +279,58 @@ async function updateDashboardStats() {
 
 // WebSocket
 function initWS() {
+    // Prevent multiple connections
+    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+
     socket = new WebSocket(WS_URL);
+
     socket.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'progress') {
-            updateProgress(msg);
-        } else if (msg.type === 'finished') {
-            updateProgress(msg);
-            renderResults(msg.results);
+        try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'progress') {
+                updateProgress(msg);
+            } else if (msg.type === 'finished') {
+                updateProgress(msg);
+                renderResults(msg.results);
+            } else if (msg.type === 'error') {
+                handleWSError(msg);
+            } else if (msg.type === 'ai_status') {
+                renderAIStatus(msg);
+            }
+        } catch(e) {
+            console.error("WS Parse Error", e);
         }
     };
-    socket.onopen = () => console.log("WS Connected");
-    socket.onclose = () => setTimeout(initWS, 1000);
+
+    socket.onopen = () => {
+        console.log("WS Connected");
+        // Optional: Send handshake or ID
+    };
+
+    socket.onclose = (e) => {
+        console.log("WS Disconnected. Reconnecting...", e.reason);
+        setTimeout(initWS, 2000);
+    };
+
+    socket.onerror = (err) => {
+        console.error("WS Error", err);
+        socket.close();
+    };
+}
+
+function handleWSError(msg) {
+    Toast.error(msg.message);
+    const badge = document.getElementById('bt-status-badge');
+    const status = document.getElementById('bt-status');
+    const bar = document.getElementById('bt-progress-bar');
+
+    if (badge) {
+        badge.innerText = "FAILED";
+        badge.className = "bg-rose-500/10 text-rose-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
+    }
+    if (status) status.innerText = msg.details || msg.message;
+    if (bar) bar.style.width = '100%';
+    if (bar) bar.classList.add('bg-rose-500');
 }
 
 // Data Functions
@@ -349,14 +380,14 @@ async function uploadDataset() {
     try {
         const res = await fetch(`${API_URL}/data/upload`, { method: 'POST', body: formData });
         if (res.ok) {
-            alert("Uploaded successfully");
+            Toast.success("Uploaded successfully");
             loadDatasets();
         } else {
             const err = await res.json();
-            alert("Error: " + err.detail);
+            Toast.error("Error: " + err.detail);
         }
     } catch (e) {
-        alert("Upload failed: " + e);
+        Toast.error("Upload failed: " + e);
     }
 }
 
@@ -393,7 +424,7 @@ async function importFromUrl() {
     const btn = document.getElementById('btn-import-url');
 
     if (!url || !symbol || !timeframe) {
-        alert("Please fill all fields.");
+        Toast.error("Please fill all fields.");
         return;
     }
 
@@ -408,15 +439,15 @@ async function importFromUrl() {
         });
 
         if (res.ok) {
-            alert("Dataset imported successfully!");
+            Toast.success("Dataset imported successfully!");
             document.getElementById('url-input').value = "";
             loadDatasets();
         } else {
             const err = await res.json();
-            alert("Error: " + err.detail);
+            Toast.error("Error: " + err.detail);
         }
     } catch (e) {
-        alert("Import failed: " + e);
+        Toast.error("Import failed: " + e);
     } finally {
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-cloud-download"></i> Download`;
@@ -468,10 +499,10 @@ async function deleteStrategy(name) {
             }
         } else {
             const err = await res.json();
-            alert("Error: " + err.detail);
+            Toast.error("Error: " + err.detail);
         }
     } catch (e) {
-        alert("Delete failed: " + e);
+        Toast.error("Delete failed: " + e);
     }
 }
 
@@ -494,10 +525,10 @@ async function saveStrategy() {
     });
 
     if (res.ok) {
-        alert("Strategy Saved");
+        Toast.success("Strategy Saved");
         loadStrategies();
     } else {
-        alert("Error saving strategy");
+        Toast.error("Error saving strategy");
     }
 }
 
@@ -514,12 +545,12 @@ async function validateStrategy() {
         const result = await res.json();
 
         if (result.valid) {
-            alert(`✅ Valid! \n${result.message}`);
+            Toast.success(`✅ Valid! \n${result.message}`);
         } else {
-            alert(`❌ Invalid! \n${result.error}`);
+            Toast.error(`❌ Invalid! \n${result.error}`);
         }
     } catch (e) {
-        alert("Validation request failed: " + e);
+        Toast.error("Validation request failed: " + e);
     }
 }
 
@@ -536,26 +567,37 @@ async function runBacktest() {
     const datasetId = document.getElementById('bt-dataset').value;
     const strategyName = document.getElementById('bt-strategy').value;
 
-    document.getElementById('bt-progress-bar').style.width = '0%';
+    const bar = document.getElementById('bt-progress-bar');
+    bar.style.width = '0%';
+    bar.classList.remove('bg-rose-500'); // Reset color if failed previously
+
     document.getElementById('bt-status').innerText = "Starting...";
 
-    // Show badge
     const badge = document.getElementById('bt-status-badge');
     badge.classList.remove('hidden');
     badge.innerText = "STARTING";
     badge.className = "bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
 
-    const res = await fetch(`${API_URL}/backtest/run`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataset_id: datasetId, strategy_name: strategyName })
-    });
+    try {
+        const res = await fetch(`${API_URL}/backtest/run`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dataset_id: datasetId, strategy_name: strategyName })
+        });
 
-    if (!res.ok) {
-        alert("Backtest failed to start");
-        document.getElementById('bt-status').innerText = "Failed";
-        badge.innerText = "FAILED";
-        badge.className = "bg-rose-500/10 text-rose-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
+        const data = await res.json();
+
+        if (!res.ok || data.status === "failed") {
+            const msg = data.error || data.detail || "Backtest failed to start";
+            Toast.error(msg);
+            document.getElementById('bt-status').innerText = "Failed";
+            badge.innerText = "FAILED";
+            badge.className = "bg-rose-500/10 text-rose-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
+            bar.classList.add('bg-rose-500');
+            bar.style.width = '100%';
+        }
+    } catch(e) {
+        Toast.error("Request Error: " + e);
     }
 }
 
@@ -585,7 +627,6 @@ function renderAIStatus(msg) {
     if (msg.session_id !== currentSessionId) return;
 
     const container = document.getElementById('chat-container');
-    // Check if last element is a status indicator
     let statusEl = document.getElementById('ai-status-indicator');
 
     if (!statusEl) {
@@ -763,7 +804,7 @@ async function newSession() {
         document.getElementById('chat-container').innerHTML = '';
         appendMessage('system', "Started new session. How can I help?");
     } catch (e) {
-        alert("Failed to create session");
+        Toast.error("Failed to create session");
     }
 }
 
@@ -887,7 +928,7 @@ function applyCodeToEditor(btn) {
     if(editor) {
         editor.setValue(code);
         router.navigate('strategies');
-        alert("Code applied to editor!");
+        Toast.success("Code applied to editor!");
     }
 }
 
@@ -899,6 +940,9 @@ document.getElementById('ai-input').addEventListener('keypress', (e) => {
 
 // Init
 window.onload = () => {
+    // Init Toast
+    if(window.Toast) Toast.init();
+
     initWS();
     router.init();
     loadTemplates();
