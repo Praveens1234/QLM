@@ -800,7 +800,168 @@ async function initMCP() {
     }
 }
 
+// --- Settings ---
+async function loadSettings() {
+    try {
+        const [activeRes, providersRes] = await Promise.all([
+            fetch(`${API_BASE}/ai/config/active`),
+            fetch(`${API_BASE}/ai/config/providers`)
+        ]);
+
+        const activeConfig = await activeRes.json();
+        const providers = await providersRes.json();
+
+        // Populate Providers List
+        const list = document.getElementById('provider-list');
+        if (list) {
+            list.innerHTML = '';
+            providers.forEach(p => {
+                const div = document.createElement('div');
+                div.className = "px-6 py-4 flex justify-between items-center";
+                div.innerHTML = `
+                    <div>
+                        <div class="font-medium text-white text-sm">${p.name}</div>
+                        <div class="text-[10px] text-slate-500 font-mono mt-0.5">${p.base_url}</div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-[10px] px-2 py-0.5 rounded ${p.has_key ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'} border ${p.has_key ? 'border-emerald-500/20' : 'border-rose-500/20'} font-bold uppercase">
+                            ${p.has_key ? 'Configured' : 'No Key'}
+                        </span>
+                        <div class="text-[10px] text-slate-500">${p.models.length} Models</div>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        // Populate Active Provider Select
+        const providerSelect = document.getElementById('active-provider');
+        if (providerSelect) {
+            providerSelect.innerHTML = '<option value="">Select Provider...</option>';
+            providers.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                if (p.name === activeConfig.provider_name || p.id === activeConfig.provider_id) { // Backend needs to send ID ideally
+                     // Since activeConfig returns provider_name, we match name or id logic if needed.
+                     // The backend get_active_config() returns provider_name.
+                     // We should ideally return provider_id too.
+                     // But for now, we can match logic or update backend.
+                     // Assuming 'id' matches logic if available.
+                }
+                providerSelect.appendChild(opt);
+            });
+
+            // Hack to select active based on name comparison if ID missing
+            // But let's rely on finding it.
+            for (let i=0; i<providerSelect.options.length; i++) {
+                if (providerSelect.options[i].text === activeConfig.provider_name) {
+                    providerSelect.selectedIndex = i;
+                    break;
+                }
+            }
+
+            if (providerSelect.value) {
+                await loadProviderModels(providerSelect.value, activeConfig.model);
+            }
+        }
+
+    } catch (e) {
+        console.error("Settings Load Error", e);
+    }
+}
+
+window.loadProviderModels = async function(providerId, activeModelId = null) {
+    const modelSelect = document.getElementById('active-model');
+    if (!modelSelect || !providerId) return;
+
+    modelSelect.innerHTML = '<option>Loading...</option>';
+    modelSelect.disabled = true;
+
+    try {
+        const res = await fetch(`${API_BASE}/ai/config/models/${providerId}`);
+        const data = await res.json();
+
+        modelSelect.innerHTML = '';
+        data.models.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            modelSelect.appendChild(opt);
+        });
+
+        if (activeModelId) {
+            modelSelect.value = activeModelId;
+        }
+
+    } catch (e) {
+        showToast("Failed to load models: " + e.message, 'error');
+        modelSelect.innerHTML = '<option value="">Error loading models</option>';
+    } finally {
+        modelSelect.disabled = false;
+    }
+};
+
+window.saveActiveConfig = async function() {
+    const providerId = document.getElementById('active-provider').value;
+    const modelId = document.getElementById('active-model').value;
+
+    if (!providerId || !modelId) return showToast("Select a provider and model", 'warning');
+
+    try {
+        const res = await fetch(`${API_BASE}/ai/config/active`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ provider_id: providerId, model_id: modelId })
+        });
+
+        if (res.ok) {
+            showToast("AI Configuration Updated", 'success');
+        } else {
+            showToast("Failed to update config", 'error');
+        }
+    } catch (e) {
+        showToast("Error: " + e.message, 'error');
+    }
+};
+
+window.addProvider = async function() {
+    const name = document.getElementById('new-prov-name').value;
+    const url = document.getElementById('new-prov-url').value;
+    const key = document.getElementById('new-prov-key').value;
+
+    if (!name || !url || !key) return showToast("All fields required", 'warning');
+
+    try {
+        const res = await fetch(`${API_BASE}/ai/config/providers`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ name, base_url: url, api_key: key })
+        });
+
+        if (res.ok) {
+            showToast("Provider Added", 'success');
+            document.getElementById('new-prov-name').value = '';
+            document.getElementById('new-prov-url').value = '';
+            document.getElementById('new-prov-key').value = '';
+            loadSettings();
+        } else {
+            showToast("Failed to add provider", 'error');
+        }
+    } catch (e) {
+        showToast("Error: " + e.message, 'error');
+    }
+};
+
 // --- Init ---
 router.init();
 loadStrategies();
 loadData();
+// Hook loadSettings into router or call if on settings page
+if (window.location.hash === '#settings') loadSettings();
+// Also hook router handleRoute to call it when navigating
+const originalHandle = router.handleRoute;
+router.handleRoute = function() {
+    originalHandle.apply(this);
+    if (window.location.hash === '#settings') loadSettings();
+};

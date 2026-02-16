@@ -122,7 +122,8 @@ class AIConfigManager:
                     "base_url": p["base_url"],
                     "api_key": p["api_key"],
                     "model": mid,
-                    "provider_name": p["name"]
+                    "provider_name": p["name"],
+                    "provider_id": p["id"]
                 }
         return {}
 
