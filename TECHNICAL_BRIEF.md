@@ -31,11 +31,11 @@ This document details the successful transition of the QuantLogic Framework (QLM
     *   **Features**: In-memory order management, position tracking, and simulated fills based on tick data.
 *   **Verification**: `tests/test_execution.py` confirms correct order lifecycle (Open -> Filled) and position updates.
 
-### D. Data Feed Management (Automation)
-*   **Action**: Created `backend/core/data_feed.py`.
-*   **Details**: Implemented `DataFeedManager` and `YahooFinanceFeed`.
-    *   **Features**: Automated download of OHLCV data from Yahoo Finance, standardization of columns, and integration with the Parquet data store.
-*   **Verification**: `tests/test_data_feed.py` verifies successful data ingestion and metadata registration.
+### D. Data Feed Management (Manual)
+*   **Action**: Ensured robust manual upload pipelines.
+*   **Details**: The system relies on manual CSV/ZIP uploads via the `DataManager` (`backend/core/data.py`).
+    *   **Features**: Secure Zip-Slip prevention, automatic column detection, and Parquet optimization for uploaded files.
+*   **Verification**: `tests/test_full_system.py` verifies successful CSV ingestion and metadata registration.
 
 ### E. System Hardening (Resilience)
 *   **Action**: Implemented Global Exception Handling and Concurrency Fixes.
@@ -58,7 +58,7 @@ graph LR
 ### Live Execution Flow
 ```mermaid
 graph LR
-    A[Data Feed] -->|Tick| B(Strategy Runner)
+    A[Manual Upload] -->|Tick Simulation| B(Strategy Runner)
     B -->|Signal| C[Execution Handler]
     C -->|Order| D[Broker / Paper]
 ```
