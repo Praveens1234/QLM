@@ -8,85 +8,42 @@ import sys
 import logging
 import ast
 from filelock import FileLock
+from backend.core.events import event_bus
 
 logger = logging.getLogger("QLM.Strategy")
 
 class Strategy(ABC):
     """
     Abstract Base Class for QLM Strategies.
-    All user strategies must inherit from this class.
-
-    Update: Now supports vectorized exit signals and Parameter Optimization.
     """
-    
     def __init__(self, parameters: Dict[str, Any] = None):
-        """
-        Initialize strategy with optional parameters.
-        """
         self.parameters = parameters or {}
 
     def set_parameters(self, params: Dict[str, Any]):
-        """
-        Update strategy parameters for optimization.
-        """
         self.parameters.update(params)
 
     @abstractmethod
-    def define_variables(self, df: pd.DataFrame) -> Dict[str, pd.Series]:
-        """
-        Define any mathematical transformations (indicators).
-        Returns a dictionary of Series aligned with the dataframe.
-        """
-        pass
+    def define_variables(self, df: pd.DataFrame) -> Dict[str, pd.Series]: pass
 
     @abstractmethod
-    def entry_long(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series:
-        """
-        Return a boolean Series for long entry signals.
-        """
-        pass
+    def entry_long(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series: pass
 
     @abstractmethod
-    def entry_short(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series:
-        """
-        Return a boolean Series for short entry signals.
-        """
-        pass
+    def entry_short(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series: pass
 
     def exit_long_signal(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series:
-        """
-        Return a boolean Series for long exit signals (vectorized).
-        Defaults to all False. Override this for fast backtesting.
-        """
         return pd.Series(False, index=df.index)
 
     def exit_short_signal(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series:
-        """
-        Return a boolean Series for short exit signals (vectorized).
-        Defaults to all False. Override this for fast backtesting.
-        """
         return pd.Series(False, index=df.index)
 
     @abstractmethod
-    def exit(self, df: pd.DataFrame, vars: Dict[str, pd.Series], trade: Dict[str, Any]) -> bool:
-        """
-        Return True to exit the specific trade, False to hold.
-        This is called per-trade per-candle during execution (Legacy Mode).
-        """
-        pass
+    def exit(self, df: pd.DataFrame, vars: Dict[str, pd.Series], trade: Dict[str, Any]) -> bool: pass
 
     @abstractmethod
-    def risk_model(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> Dict[str, pd.Series]:
-        """
-        Return dictionary with 'sl', 'tp', 'valid' (boolean) Series.
-        """
-        pass
+    def risk_model(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> Dict[str, pd.Series]: pass
 
     def position_size(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series:
-        """
-        Return a Series of position sizes.
-        Default is 1.0 for all candles.
-        """
         return pd.Series(1.0, index=df.index, dtype=float)
 
 class StrategyLoader:
@@ -135,6 +92,7 @@ class StrategyLoader:
         """
         Save a new version of the strategy. Returns the new version number.
         Uses FileLock to ensure atomic writes.
+        Notifies EventBus.
         """
         # Security Check: Validate imports
         self._validate_code(code)
@@ -152,9 +110,18 @@ class StrategyLoader:
 
             filename = f"v{new_version}.py"
             filepath = os.path.join(path, filename)
-            
+
             with open(filepath, "w") as f:
                 f.write(code)
+
+            # Notify
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+                uri = f"qlm://strategy/{name}"
+                loop.create_task(event_bus.notify_resource_update(uri))
+            except:
+                pass
 
             return new_version
 

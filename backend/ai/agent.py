@@ -8,69 +8,12 @@ from backend.ai.store import ChatStore
 from backend.ai.brain import Brain
 from backend.ai.memory import JobManager
 from backend.ai.config_manager import AIConfigManager
+from backend.ai.prompt_manager import prompt_manager
+from backend.ai.skills.registry import skill_registry
+from backend.ai.context import ContextManager
 import os
 
 logger = logging.getLogger("QLM.AI.Agent")
-
-# Enhanced Base Prompt
-BASE_PROMPT = """
-You are a **Senior Quantitative Researcher** for the QLM (QuantLogic Framework).
-Your mission is to autonomously develop, validate, and optimize institutional-grade trading strategies.
-
-### 🧠 Operational Protocol (ReAct)
-You must function in a loop of **Reasoning** and **Acting**:
-1.  **Analyze**: Understand the user's intent. If vague, ask clarifying questions.
-2.  **Plan**: Decide which tools are needed. Explain your reasoning briefly.
-3.  **Execute**: Use the provided tools (e.g., `create_strategy`, `run_backtest`).
-4.  **Observe**: Analyze the tool output. If it fails, **self-heal** by fixing the inputs or code.
-5.  **Conclude**: Present the final result clearly to the user.
-
-### 📜 Critical Rules
-*   **Persona**: Professional, rigorous, data-driven. Do not be overly chatty.
-*   **Validation**: **ALWAYS** run `validate_strategy` before `run_backtest`.
-*   **Data Integrity**: Never hallucinate Dataset IDs. Use `list_datasets` to find them.
-*   **Code Quality**: Write robust, vectorized Python code using `pandas`. Handle `NaN`s and edge cases.
-*   **Safety**: Do not access files outside `strategies/` or `logs/`.
-
-### 🛠️ Tool Usage Guidelines
-*   `import_dataset_from_url`: Use this if the user provides a link (Zip/CSV).
-*   `create_strategy`: Needs full python code. Inherit from `Strategy`.
-*   `optimize_parameters`: Use this to refine a losing strategy.
-
-Output Python code in markdown blocks:
-```python
-...
-```
-"""
-
-def load_skill(name: str) -> str:
-    path = os.path.join(os.path.dirname(__file__), "skills", f"{name}.md")
-    if os.path.exists(path):
-        with open(path, "r") as f:
-            return f.read()
-    return ""
-
-def get_relevant_skills(user_message: str) -> str:
-    """
-    Dynamically injects skills based on context.
-    """
-    skills = [load_skill("general")] # Always include general rules
-    msg = user_message.lower()
-
-    # Context Mapping
-    if any(x in msg for x in ["analyze", "market", "trend", "structure"]):
-        skills.append(load_skill("market_analysis"))
-
-    if any(x in msg for x in ["strategy", "code", "create", "write", "python"]):
-        skills.append(load_skill("coding"))
-
-    if any(x in msg for x in ["fix", "error", "debug", "fail", "broken"]):
-        skills.append(load_skill("debugging"))
-
-    if any(x in msg for x in ["regime", "volatility"]):
-        skills.append(load_skill("regime"))
-
-    return "\n\n".join(filter(None, skills))
 
 class AIAgent:
     def __init__(self):
@@ -90,6 +33,26 @@ class AIAgent:
     async def get_available_models(self) -> List[str]:
         return await self.client.list_models()
 
+    def _inject_skills(self, user_message: str) -> str:
+        """
+        Dynamically selects relevant skills based on user query.
+        """
+        relevant_skills = skill_registry.search_skills(user_message)
+
+        # Always include 'general' if it exists
+        general = skill_registry.get_skill("general")
+        if general and general not in relevant_skills:
+            relevant_skills.insert(0, general)
+
+        if not relevant_skills:
+            return ""
+
+        skill_text = "## 📚 RELEVANT SKILLS\n"
+        for skill in relevant_skills:
+            skill_text += f"### {skill.name}\n{skill.content}\n\n"
+
+        return skill_text
+
     async def chat(self, user_message: str, session_id: str = None, on_status: Callable[[str, str], Awaitable[None]] = None) -> str:
         """
         Main chat loop using the Brain.
@@ -102,17 +65,27 @@ class AIAgent:
         history = self.store.get_history(session_id)
         job_context = self.job_manager.get_job_context(session_id)
 
-        # Dynamic Skill Injection
-        relevant_skills = get_relevant_skills(user_message)
-        system_prompt = f"{BASE_PROMPT}\n\n## 📚 RELEVANT SKILLS\n{relevant_skills}\n\n{job_context}"
+        # 1. Load Base Prompt
+        prompt_data = prompt_manager.get_prompt("senior_quant")
+        base_system_msg = prompt_data.messages[0].content.text # Assuming single system message
 
-        # Construct Context
-        # Keep system prompt + last 20 messages for context window efficiency
-        context = [{"role": "system", "content": system_prompt}] + history[-20:]
+        # 2. Inject Dynamic Skills
+        skills_section = self._inject_skills(user_message)
 
-        new_user_msg = {"role": "user", "content": user_message}
-        context.append(new_user_msg)
-        self.store.add_message(session_id, new_user_msg)
+        # 3. Assemble System Prompt
+        system_prompt = f"{base_system_msg}\n\n{skills_section}\n\n{job_context}"
+
+        # 4. Construct Context with Smart Pruning
+        # Get config for max tokens
+        config = self.config_manager.get_config()
+
+        # Keep system prompt separate
+        raw_history = history + [{"role": "user", "content": user_message}]
+        pruned_history = ContextManager.prune_history(raw_history, max_tokens=config.max_tokens)
+
+        context = [{"role": "system", "content": system_prompt}] + pruned_history
+
+        self.store.add_message(session_id, {"role": "user", "content": user_message})
         
         # Define Callbacks
         async def on_message(msg: Dict[str, Any]):

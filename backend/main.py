@@ -44,21 +44,26 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # API Router
 from backend.api import router as api_router
+from backend.api import dashboard
+from backend.api import ai_settings # New Settings API
+
 app.include_router(api_router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
+app.include_router(ai_settings.router, prefix="/api")
 
 # MCP Transport & Management
 from backend.api.mcp import handle_mcp_sse, handle_mcp_messages, get_mcp_status, toggle_mcp
 
 class ASGIWrapper:
+    """Helper to expose a raw ASGI handler as a Starlette endpoint."""
     def __init__(self, app):
         self.app = app
     async def __call__(self, scope, receive, send):
         await self.app(scope, receive, send)
 
-# Add MCP Routes (Raw ASGI for SSE) using Mount to bypass Request/Response wrapping
-# Mount matches prefix, but for specific files it acts like an endpoint if path matches exactly
-app.router.routes.append(Mount("/api/mcp/sse", app=ASGIWrapper(handle_mcp_sse)))
-app.router.routes.append(Mount("/api/mcp/messages", app=ASGIWrapper(handle_mcp_messages)))
+# Add MCP Routes
+app.add_route("/api/mcp/sse", ASGIWrapper(handle_mcp_sse), methods=["GET"])
+app.add_route("/api/mcp/messages", ASGIWrapper(handle_mcp_messages), methods=["POST"])
 
 # Standard API routes for MCP Status
 app.add_api_route("/api/mcp/status", get_mcp_status, methods=["GET"])
@@ -69,7 +74,6 @@ async def health_check():
     return {"status": "ok", "system": "QLM"}
 
 # Serve Frontend
-# Ensure frontend directory exists
 if not os.path.exists("frontend"):
     os.makedirs("frontend")
 
@@ -77,5 +81,4 @@ app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
 
 if __name__ == "__main__":
     import uvicorn
-    # Updated to 0.0.0.0 and port 8010 as requested
     uvicorn.run("backend.main:app", host="0.0.0.0", port=8010, reload=True)

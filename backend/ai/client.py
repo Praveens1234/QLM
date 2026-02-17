@@ -1,92 +1,58 @@
-import os
-import aiohttp
 import logging
 from typing import List, Dict, Any, Optional
 from backend.ai.config_manager import AIConfigManager
+from backend.ai.factory import ProviderFactory
+from backend.core.exceptions import SystemError
+from backend.ai.resilience import ai_retry
 
 logger = logging.getLogger("QLM.AI.Client")
 
 class AIClient:
     """
-    A generic OpenAI-compatible API client.
-    Supports dynamic configuration via AIConfigManager.
+    Unified AI Client acting as a gateway to multiple providers.
+    Handles dynamic routing based on active configuration.
+    Includes Resilience Layer.
     """
     def __init__(self):
         self.config_manager = AIConfigManager()
-        self._reload_config()
 
-    def _reload_config(self):
-        conf = self.config_manager.get_active_config()
-        self.api_key = conf.get("api_key")
-        self.base_url = conf.get("base_url", "https://api.openai.com/v1").rstrip("/")
-        self.model = conf.get("model", "gpt-4-turbo")
-        
-    def configure(self, api_key: str, base_url: str, model: str):
-        """
-        Legacy/Direct override.
-        Note: This doesn't persist to the new manager structure directly unless we update the manager.
-        """
-        self.api_key = api_key
-        self.base_url = base_url.rstrip("/")
-        self.model = model
-
+    @ai_retry
     async def chat_completion(self, messages: List[Dict[str, str]], tools: Optional[List[Dict]] = None) -> Dict[str, Any]:
-        self._reload_config() # Ensure latest
+        """
+        Route request to the active provider with automatic retries.
+        """
+        config = self.config_manager.get_config()
 
-        if not self.api_key:
-             raise ValueError("AI API Key not configured. Please check Settings.")
+        if not config.active_provider_id:
+            raise SystemError("No active AI provider configured.")
 
-        url = f"{self.base_url}/chat/completions"
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}"
-        }
-        
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "stream": False # Streaming handled via other means if needed, keeping simple here
-        }
-        
-        if tools:
-            payload["tools"] = tools
-            payload["tool_choice"] = "auto"
+        provider_conf = next((p for p in config.providers if p.id == config.active_provider_id), None)
+        if not provider_conf:
+            raise SystemError(f"Active provider {config.active_provider_id} not found in configuration.")
+
+        model = config.active_model_id
+        if not model and provider_conf.models:
+            model = provider_conf.models[0].id
+
+        if not model:
+             raise SystemError(f"No model selected for provider {provider_conf.name}.")
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, headers=headers, json=payload) as response:
-                    if response.status != 200:
-                        error_text = await response.text()
-                        logger.error(f"AI Request failed: {response.status} - {error_text}")
-                        raise Exception(f"AI API Error: {response.status} - {error_text}")
-                    
-                    return await response.json()
-                        
+            provider = ProviderFactory.get_provider(provider_conf)
+            logger.info(f"Sending request to {provider_conf.name} ({model})...")
+            response = await provider.chat_completion(messages, model, tools)
+            return response
+
         except Exception as e:
-            logger.error(f"AI Client Exception: {e}")
-            raise e
+            logger.warning(f"Unified Client Request Failed: {e}")
+            raise e # Trigger retry
 
     async def list_models(self) -> List[str]:
-        self._reload_config()
-        if not self.api_key:
-             return []
-
-        url = f"{self.base_url}/models"
-        headers = {
-            "Authorization": f"Bearer {self.api_key}"
-        }
+        """
+        List models for the *active* provider (Legacy compatibility).
+        """
+        config = self.config_manager.get_config()
+        provider_conf = next((p for p in config.providers if p.id == config.active_provider_id), None)
+        if not provider_conf: return []
         
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        if "data" in data:
-                            return [m["id"] for m in data["data"]]
-                        return []
-                    else:
-                        logger.warning(f"Failed to list models: {response.status}")
-                        return []
-        except Exception as e:
-            logger.error(f"Error fetching models: {e}")
-            return []
+        return [m.id for m in provider_conf.models]

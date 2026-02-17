@@ -16,3 +16,5 @@ filelock
 structlog
 deap
 numba
+tenacity
+pyyaml

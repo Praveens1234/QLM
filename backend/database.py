@@ -3,6 +3,7 @@ import os
 import logging
 from typing import Optional, List, Dict, Any, Tuple
 from contextlib import contextmanager
+from backend.core.retry import db_retry
 
 logger = logging.getLogger("QLM.Database")
 
@@ -11,6 +12,7 @@ class Database:
     Centralized SQLite Database Manager.
     Handles connection pooling (basic), schema migration, and safe execution.
     Implements WAL mode for better concurrency and ACID compliance.
+    Includes Automatic Retry for Locking Errors.
     """
 
     def __init__(self, db_path: str = "data/qlm.db"):
@@ -19,9 +21,11 @@ class Database:
         self._init_pragmas()
         self._init_schema()
 
+    @db_retry
     def _init_pragmas(self):
         """
         Enable Write-Ahead Logging (WAL) and other performance settings.
+        Wrapped in retry to handle initial lock contention.
         """
         try:
             with self.get_connection() as conn:
@@ -31,18 +35,20 @@ class Database:
                 conn.execute("PRAGMA busy_timeout=5000;") # 5 seconds
         except Exception as e:
             logger.error(f"Failed to set database pragmas: {e}")
-            # Continue, as basic mode might still work
+            raise e
 
+    @db_retry
     def _init_schema(self):
         """
         Initialize the database schema.
         Idempotent: Only creates tables if they don't exist.
+        Includes Migrations for AI Architecture Overhaul.
         """
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
 
-                # --- Config Table ---
+                # --- Config Table (Global Settings) ---
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS config (
                         key TEXT PRIMARY KEY,
@@ -51,17 +57,26 @@ class Database:
                     )
                 ''')
 
-                # --- Providers Table ---
+                # --- Providers Table (Enhanced) ---
+                # Check if we need to migrate (add 'type' column if missing)
+                # For simplicity in this environment, we use IF NOT EXISTS and ALTER in try/except block
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS providers (
                         id TEXT PRIMARY KEY,
                         name TEXT,
+                        type TEXT DEFAULT 'openai',
                         base_url TEXT,
                         api_key TEXT,
                         models TEXT, -- JSON list of models
                         is_active BOOLEAN DEFAULT 0
                     )
                 ''')
+
+                # Simple Migration: Add 'type' column if it doesn't exist
+                try:
+                    cursor.execute("ALTER TABLE providers ADD COLUMN type TEXT DEFAULT 'openai'")
+                except sqlite3.OperationalError:
+                    pass # Column likely exists
 
                 # --- Jobs/Memory Table ---
                 cursor.execute('''
@@ -113,6 +128,17 @@ class Database:
                         row_count INTEGER,
                         file_path TEXT NOT NULL,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+
+                # --- Audit Logs ---
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS audit_logs (
+                        id TEXT PRIMARY KEY,
+                        session_id TEXT,
+                        action TEXT,
+                        details TEXT,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 ''')
 
