@@ -10,12 +10,28 @@ class Database:
     """
     Centralized SQLite Database Manager.
     Handles connection pooling (basic), schema migration, and safe execution.
+    Implements WAL mode for better concurrency and ACID compliance.
     """
 
     def __init__(self, db_path: str = "data/qlm.db"):
         self.db_path = db_path
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        self._init_pragmas()
         self._init_schema()
+
+    def _init_pragmas(self):
+        """
+        Enable Write-Ahead Logging (WAL) and other performance settings.
+        """
+        try:
+            with self.get_connection() as conn:
+                conn.execute("PRAGMA journal_mode=WAL;")
+                conn.execute("PRAGMA synchronous=NORMAL;")
+                conn.execute("PRAGMA foreign_keys=ON;")
+                conn.execute("PRAGMA busy_timeout=5000;") # 5 seconds
+        except Exception as e:
+            logger.error(f"Failed to set database pragmas: {e}")
+            # Continue, as basic mode might still work
 
     def _init_schema(self):
         """
@@ -101,7 +117,7 @@ class Database:
                 ''')
 
                 conn.commit()
-                logger.info(f"Database initialized at {self.db_path}")
+                logger.info(f"Database initialized at {self.db_path} (WAL Mode)")
         except Exception as e:
             logger.error(f"Database initialization failed: {e}")
             raise e
@@ -109,9 +125,11 @@ class Database:
     @contextmanager
     def get_connection(self):
         """
-        Yields a SQLite connection. ensures clean closing.
+        Yields a SQLite connection with a 10s timeout to handle concurrency.
+        Ensures clean closing.
         """
-        conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        # Increased timeout to 10s to prevent 'database is locked' during heavy writes
+        conn = sqlite3.connect(self.db_path, timeout=10.0, check_same_thread=False)
         conn.row_factory = sqlite3.Row # Return dict-like objects
         try:
             yield conn

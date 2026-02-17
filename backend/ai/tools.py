@@ -5,7 +5,7 @@ from backend.core.strategy import StrategyLoader
 from backend.core.store import MetadataStore
 from backend.core.engine import BacktestEngine
 from backend.core.data import DataManager
-from backend.ai.analytics import calculate_market_structure, optimize_strategy
+from backend.ai.analytics import calculate_market_structure, optimize_strategy, optimize_strategy_genetic
 from backend.ai.config_manager import AIConfigManager
 import os
 import shutil
@@ -14,6 +14,7 @@ import asyncio
 import functools
 import platform
 import psutil
+import uuid
 
 logger = logging.getLogger("QLM.AI.Tools")
 
@@ -26,6 +27,9 @@ class AITools:
         self.metadata_store = MetadataStore()
         self.data_manager = DataManager()
         self.config_manager = AIConfigManager()
+        self.logs_dir = "logs"
+        if not os.path.exists(self.logs_dir):
+            os.makedirs(self.logs_dir)
         
     def get_definitions(self) -> List[Dict]:
         """
@@ -214,7 +218,8 @@ class AITools:
                             "strategy_name": {"type": "string", "description": "Name of the strategy"},
                             "symbol": {"type": "string", "description": "Symbol"},
                             "timeframe": {"type": "string", "description": "Timeframe"},
-                            "param_grid": {"type": "object", "description": "Dict of parameters to optimize (e.g., {'window': [10, 20]})"}
+                            "param_grid": {"type": "object", "description": "Dict of parameters to optimize (e.g., {'window': [10, 20]})"},
+                            "method": {"type": "string", "enum": ["grid", "genetic"], "description": "Optimization method (default: grid)"}
                         },
                         "required": ["strategy_name", "symbol", "timeframe", "param_grid"]
                     }
@@ -354,14 +359,22 @@ class AITools:
                                  "error": result.get("error", "Unknown Backtest Failure")
                              }
 
+                        # Save trades to log file
+                        trade_file = f"trades_{strat_name}_{symbol}_{uuid.uuid4().hex[:8]}.csv"
+                        trade_path = os.path.join(self.logs_dir, trade_file)
+                        if result['trades']:
+                            pd.DataFrame(result['trades']).to_csv(trade_path, index=False)
+
                         # Return Summary Metrics
                         return {
                             "status": "success",
                             "metrics": result['metrics'],
-                            "trade_count": len(result['trades'])
+                            "trade_count": len(result['trades']),
+                            "trade_log": trade_path
                         }
                     except Exception as e:
-                        return {"error": f"Backtest runtime error: {str(e)}"}
+                        import traceback
+                        return {"error": f"Backtest runtime error: {str(e)}\n{traceback.format_exc()}"}
 
                 return await self._run_sync(_run_bt)
 
@@ -464,13 +477,18 @@ class AITools:
                 symbol = args.get("symbol")
                 tf = args.get("timeframe")
                 param_grid = args.get("param_grid")
+                method = args.get("method", "grid")
 
                 def _optimize():
                     datasets = self.metadata_store.list_datasets()
                     dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
                     if not dataset:
                         return {"error": "Dataset not found"}
-                    return optimize_strategy(strat_name, dataset['id'], param_grid)
+
+                    if method == "genetic":
+                        return optimize_strategy_genetic(strat_name, dataset['id'], param_grid)
+                    else:
+                        return optimize_strategy(strat_name, dataset['id'], param_grid)
 
                 return await self._run_sync(_optimize)
 

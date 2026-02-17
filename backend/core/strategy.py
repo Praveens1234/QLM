@@ -7,6 +7,7 @@ import importlib.util
 import sys
 import logging
 import ast
+from filelock import FileLock
 
 logger = logging.getLogger("QLM.Strategy")
 
@@ -14,8 +15,22 @@ class Strategy(ABC):
     """
     Abstract Base Class for QLM Strategies.
     All user strategies must inherit from this class.
+
+    Update: Now supports vectorized exit signals and Parameter Optimization.
     """
     
+    def __init__(self, parameters: Dict[str, Any] = None):
+        """
+        Initialize strategy with optional parameters.
+        """
+        self.parameters = parameters or {}
+
+    def set_parameters(self, params: Dict[str, Any]):
+        """
+        Update strategy parameters for optimization.
+        """
+        self.parameters.update(params)
+
     @abstractmethod
     def define_variables(self, df: pd.DataFrame) -> Dict[str, pd.Series]:
         """
@@ -38,17 +53,25 @@ class Strategy(ABC):
         """
         pass
 
+    def exit_long_signal(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series:
+        """
+        Return a boolean Series for long exit signals (vectorized).
+        Defaults to all False. Override this for fast backtesting.
+        """
+        return pd.Series(False, index=df.index)
+
+    def exit_short_signal(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series:
+        """
+        Return a boolean Series for short exit signals (vectorized).
+        Defaults to all False. Override this for fast backtesting.
+        """
+        return pd.Series(False, index=df.index)
+
     @abstractmethod
     def exit(self, df: pd.DataFrame, vars: Dict[str, pd.Series], trade: Dict[str, Any]) -> bool:
         """
         Return True to exit the specific trade, False to hold.
-        This is called per-trade per-candle during execution.
-        Wait, for vectorization support, passing full series might be better,
-        but the prompt says 'Execution is Candle-by-candle'.
-        However, the interface 'exit' in prompt returns 'boolean_series or condition'.
-        If it returns boolean series, it's vectorized.
-        If 'condition', it might be per-candle.
-        Let's support returning a Boolean Series for exits for now, as it's cleaner.
+        This is called per-trade per-candle during execution (Legacy Mode).
         """
         pass
 
@@ -111,6 +134,7 @@ class StrategyLoader:
     def save_strategy(self, name: str, code: str) -> int:
         """
         Save a new version of the strategy. Returns the new version number.
+        Uses FileLock to ensure atomic writes.
         """
         # Security Check: Validate imports
         self._validate_code(code)
@@ -118,17 +142,21 @@ class StrategyLoader:
         path = os.path.join(self.strategy_dir, name)
         if not os.path.exists(path):
             os.makedirs(path)
-            
-        versions = self._get_versions(name)
-        new_version = (max(versions) if versions else 0) + 1
         
-        filename = f"v{new_version}.py"
-        filepath = os.path.join(path, filename)
-        
-        with open(filepath, "w") as f:
-            f.write(code)
+        lock_path = os.path.join(path, ".lock")
+        lock = FileLock(lock_path, timeout=10)
+
+        with lock:
+            versions = self._get_versions(name)
+            new_version = (max(versions) if versions else 0) + 1
+
+            filename = f"v{new_version}.py"
+            filepath = os.path.join(path, filename)
             
-        return new_version
+            with open(filepath, "w") as f:
+                f.write(code)
+
+            return new_version
 
     def get_strategy_code(self, name: str, version: int = None) -> Optional[str]:
         if version is None:
@@ -243,9 +271,6 @@ class StrategyLoader:
             missing = required_methods - implemented_methods
             if missing:
                 return {"valid": False, "error": f"Missing required methods: {', '.join(missing)}"}
-                
-            # return {"valid": True, "message": "Strategy is valid."} # Removed to allow Runtime Simulation
-            pass
             
         except Exception as e:
              return {"valid": False, "error": f"Analysis Error: {e}"}

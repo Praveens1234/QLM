@@ -1,7 +1,9 @@
 from typing import Dict, Any, Optional
 import json
 import logging
+import asyncio
 from backend.database import db
+from backend.core.events import event_bus
 
 logger = logging.getLogger("QLM.AI.JobManager")
 
@@ -9,9 +11,21 @@ class JobManager:
     """
     Manages long-running 'Jobs' or 'Goals' for the AI Agent.
     Persists state to SQLite to survive restarts.
+    Broadcasts updates via EventBus.
     """
     def __init__(self):
-        pass # Database connection handled per method via db.get_connection()
+        pass
+
+    def _publish_update(self, event_type: str, data: Dict[str, Any]):
+        """
+        Fire-and-forget async publish.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(event_bus.publish(event_type, data))
+        except RuntimeError:
+            # Loop might not be running in tests or scripts
+            pass
 
     def start_job(self, session_id: str, goal: str):
         with db.get_connection() as conn:
@@ -29,6 +43,12 @@ class JobManager:
             conn.commit()
 
         logger.info(f"Job started for session {session_id}: {goal}")
+        self._publish_update("job_update", {
+            "session_id": session_id,
+            "status": "in_progress",
+            "goal": goal,
+            "step": "Started"
+        })
 
     def update_job(self, session_id: str, step_desc: str, artifacts: Optional[Dict] = None):
         with db.get_connection() as conn:
@@ -58,6 +78,13 @@ class JobManager:
 
             conn.commit()
 
+        self._publish_update("job_update", {
+            "session_id": session_id,
+            "status": "in_progress",
+            "step": step_desc,
+            "artifacts": artifacts
+        })
+
     def get_job_context(self, session_id: str) -> str:
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -83,3 +110,8 @@ class JobManager:
             cursor = conn.cursor()
             cursor.execute("UPDATE jobs SET status='completed', updated_at=CURRENT_TIMESTAMP WHERE session_id=?", (session_id,))
             conn.commit()
+
+        self._publish_update("job_update", {
+            "session_id": session_id,
+            "status": "completed"
+        })

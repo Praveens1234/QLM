@@ -1,8 +1,18 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.routing import Route, Mount
 import os
+import traceback
 from pydantic import BaseModel
+
+from backend.core.exceptions import QLMError, StrategyError, DataError, SystemError, OptimizationError
+from backend.utils.logging import configure_logging, get_logger
+
+# Configure Logging
+configure_logging()
+logger = get_logger("QLM.Main")
 
 app = FastAPI(title="QuantLogic Framework (QLM)", version="1.0.0")
 
@@ -15,6 +25,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Global Exception Handler
+@app.exception_handler(QLMError)
+async def qlm_exception_handler(request: Request, exc: QLMError):
+    logger.error("QLM Error", error=str(exc), type=exc.__class__.__name__, details=exc.details)
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"error": str(exc), "type": exc.__class__.__name__, "details": exc.details},
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error("Global Unhandled Exception", error=str(exc), traceback=traceback.format_exc())
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"error": "Internal Server Error", "message": str(exc)},
+    )
+
 # API Router
 from backend.api import router as api_router
 app.include_router(api_router, prefix="/api")
@@ -22,11 +49,18 @@ app.include_router(api_router, prefix="/api")
 # MCP Transport & Management
 from backend.api.mcp import handle_mcp_sse, handle_mcp_messages, get_mcp_status, toggle_mcp
 
-class ToggleRequest(BaseModel):
-    active: bool
+class ASGIWrapper:
+    def __init__(self, app):
+        self.app = app
+    async def __call__(self, scope, receive, send):
+        await self.app(scope, receive, send)
 
-app.add_route("/api/mcp/sse", handle_mcp_sse)
-app.add_route("/api/mcp/messages", handle_mcp_messages, methods=["POST"])
+# Add MCP Routes (Raw ASGI for SSE) using Mount to bypass Request/Response wrapping
+# Mount matches prefix, but for specific files it acts like an endpoint if path matches exactly
+app.router.routes.append(Mount("/api/mcp/sse", app=ASGIWrapper(handle_mcp_sse)))
+app.router.routes.append(Mount("/api/mcp/messages", app=ASGIWrapper(handle_mcp_messages)))
+
+# Standard API routes for MCP Status
 app.add_api_route("/api/mcp/status", get_mcp_status, methods=["GET"])
 app.add_api_route("/api/mcp/toggle", toggle_mcp, methods=["POST"])
 

@@ -1,7 +1,6 @@
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
-from mcp.types import Tool, TextContent, Resource
-from starlette.responses import JSONResponse, Response
+from mcp.types import Tool, TextContent, Resource, Prompt, GetPromptResult, PromptMessage
 import asyncio
 import logging
 from backend.ai.tools import AITools
@@ -11,6 +10,7 @@ import os
 import json
 from datetime import datetime, timezone
 from typing import List, Dict, Any
+from starlette.responses import JSONResponse
 
 logger = logging.getLogger("QLM.MCP")
 
@@ -50,29 +50,33 @@ def _convert_schema(openai_schema: dict) -> dict:
 # 3. List Tools
 @mcp_server.list_tools()
 async def list_tools() -> list[Tool]:
-    definitions = ai_tools.get_definitions()
-    mcp_tools = []
+    try:
+        definitions = ai_tools.get_definitions()
+        mcp_tools = []
 
-    for d in definitions:
-        func_def = d.get("function", {})
+        for d in definitions:
+            func_def = d.get("function", {})
+            mcp_tools.append(Tool(
+                name=func_def.get("name"),
+                description=func_def.get("description"),
+                inputSchema=_convert_schema(d)
+            ))
+
         mcp_tools.append(Tool(
-            name=func_def.get("name"),
-            description=func_def.get("description"),
-            inputSchema=_convert_schema(d)
+            name="consult_skill",
+            description="Retrieve expert knowledge/skill documentation.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "topic": {"type": "string", "enum": ["coding", "market_analysis", "debugging", "general", "regime"]}
+                },
+                "required": ["topic"]
+            }
         ))
-
-    mcp_tools.append(Tool(
-        name="consult_skill",
-        description="Retrieve expert knowledge/skill documentation.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "topic": {"type": "string", "enum": ["coding", "market_analysis", "debugging", "general", "regime"]}
-            },
-            "required": ["topic"]
-        }
-    ))
-    return mcp_tools
+        return mcp_tools
+    except Exception as e:
+        logger.error(f"Error listing tools: {e}")
+        return []
 
 # 4. Call Tool
 @mcp_server.call_tool()
@@ -121,54 +125,61 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 async def list_resources() -> list[Resource]:
     if not mcp_state.is_active: return []
 
-    resources = []
-    strategies = await asyncio.to_thread(strategy_loader.list_strategies)
-    for s in strategies:
-        resources.append(Resource(
-            uri=f"qlm://strategy/{s['name']}",
-            name=f"Strategy: {s['name']} (v{s['latest_version']})",
-            mimeType="text/x-python"
-        ))
+    try:
+        resources = []
+        strategies = await asyncio.to_thread(strategy_loader.list_strategies)
+        for s in strategies:
+            resources.append(Resource(
+                uri=f"qlm://strategy/{s['name']}",
+                name=f"Strategy: {s['name']} (v{s['latest_version']})",
+                mimeType="text/x-python"
+            ))
 
-    datasets = await asyncio.to_thread(metadata_store.list_datasets)
-    for d in datasets:
-        resources.append(Resource(
-            uri=f"qlm://data/{d['id']}",
-            name=f"Dataset: {d['symbol']} {d['timeframe']}",
-            mimeType="application/octet-stream"
-        ))
-    return resources
+        datasets = await asyncio.to_thread(metadata_store.list_datasets)
+        for d in datasets:
+            resources.append(Resource(
+                uri=f"qlm://data/{d['id']}",
+                name=f"Dataset: {d['symbol']} {d['timeframe']}",
+                mimeType="application/octet-stream"
+            ))
+        return resources
+    except Exception as e:
+        logger.error(f"Error listing resources: {e}")
+        return []
 
 # 6. Read Resource
 @mcp_server.read_resource()
 async def read_resource(uri: str) -> str:
     if not mcp_state.is_active: raise ValueError("MCP Disabled")
 
-    scheme, path = uri.split("://")
-    parts = path.split("/")
+    try:
+        scheme, path = uri.split("://")
+        parts = path.split("/")
 
-    if parts[0] == "strategy":
-        name = parts[1]
-        code = strategy_loader.get_strategy_code(name)
-        if code:
-            mcp_state.add_log("read_resource", uri)
-            return code
-        raise ValueError("Strategy not found")
+        if parts[0] == "strategy":
+            name = parts[1]
+            code = strategy_loader.get_strategy_code(name)
+            if code:
+                mcp_state.add_log("read_resource", uri)
+                return code
+            raise ValueError("Strategy not found")
 
-    elif parts[0] == "data":
-        ds_id = parts[1]
-        meta = metadata_store.get_dataset(ds_id)
-        if meta:
-            mcp_state.add_log("read_resource", uri)
-            return json.dumps(meta, indent=2, default=str)
-        raise ValueError("Dataset not found")
+        elif parts[0] == "data":
+            ds_id = parts[1]
+            meta = metadata_store.get_dataset(ds_id)
+            if meta:
+                mcp_state.add_log("read_resource", uri)
+                return json.dumps(meta, indent=2, default=str)
+            raise ValueError("Dataset not found")
 
-    raise ValueError("Invalid Resource URI")
+        raise ValueError("Invalid Resource URI")
+    except Exception as e:
+         logger.error(f"Error reading resource {uri}: {e}")
+         raise e
 
 # 7. Prompt
 @mcp_server.list_prompts()
-async def list_prompts():
-    from mcp.types import Prompt
+async def list_prompts() -> list[Prompt]:
     return [
         Prompt(
             name="senior_quant",
@@ -178,9 +189,8 @@ async def list_prompts():
     ]
 
 @mcp_server.get_prompt()
-async def get_prompt(name: str, arguments: dict):
-    from mcp.types import GetPromptResult, PromptMessage, TextContent
-    from backend.ai.agent import BASE_PROMPT
+async def get_prompt(name: str, arguments: dict) -> GetPromptResult:
+    from backend.ai.agent import BASE_PROMPT # Avoid circular import
 
     if name == "senior_quant":
         return GetPromptResult(
@@ -196,26 +206,41 @@ async def get_prompt(name: str, arguments: dict):
 # 8. Transport & Management
 sse = SseServerTransport("/api/mcp/messages")
 
-async def handle_mcp_sse(request):
+async def handle_mcp_sse(scope, receive, send):
+    """
+    ASGI Handler for SSE Endpoint.
+    """
     if not mcp_state.is_active:
-        return Response("MCP Service Disabled", status_code=503)
+        # Return 503 if disabled
+        response = JSONResponse({"error": "MCP Service Disabled"}, status_code=503)
+        await response(scope, receive, send)
+        return
 
-    async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
+    async with sse.connect_sse(scope, receive, send) as streams:
         await mcp_server.run(streams[0], streams[1], mcp_server.create_initialization_options())
 
-async def handle_mcp_messages(request):
+async def handle_mcp_messages(scope, receive, send):
+    """
+    ASGI Handler for Messages Endpoint.
+    """
     if not mcp_state.is_active:
-        return Response("MCP Service Disabled", status_code=503)
+        response = JSONResponse({"error": "MCP Service Disabled"}, status_code=503)
+        await response(scope, receive, send)
+        return
 
-    await sse.handle_post_message(request.scope, request.receive, request._send)
+    await sse.handle_post_message(scope, receive, send)
 
 # API Endpoints for Dashboard
-async def get_mcp_status():
-    return {
+async def get_mcp_status(request):
+    return JSONResponse({
         "is_active": mcp_state.is_active,
         "logs": mcp_state.activity_log
-    }
+    })
 
-async def toggle_mcp(payload: Dict[str, bool]):
-    mcp_state.is_active = payload.get("active", True)
-    return {"status": "updated", "is_active": mcp_state.is_active}
+async def toggle_mcp(request):
+    try:
+        payload = await request.json()
+        mcp_state.is_active = payload.get("active", True)
+        return JSONResponse({"status": "updated", "is_active": mcp_state.is_active})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
