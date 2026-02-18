@@ -20,7 +20,7 @@ class AIClient:
         self.api_key = conf.get("api_key")
         self.base_url = conf.get("base_url", "https://api.openai.com/v1").rstrip("/")
         self.model = conf.get("model", "gpt-4-turbo")
-        
+
     def configure(self, api_key: str, base_url: str, model: str):
         """
         Legacy/Direct override.
@@ -41,13 +41,13 @@ class AIClient:
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}"
         }
-        
+
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": False # Streaming handled via other means if needed, keeping simple here
         }
-        
+
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
@@ -59,9 +59,9 @@ class AIClient:
                         error_text = await response.text()
                         logger.error(f"AI Request failed: {response.status} - {error_text}")
                         raise Exception(f"AI API Error: {response.status} - {error_text}")
-                    
+
                     return await response.json()
-                        
+
         except Exception as e:
             logger.error(f"AI Client Exception: {e}")
             raise e

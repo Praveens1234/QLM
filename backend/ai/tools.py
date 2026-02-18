@@ -5,8 +5,10 @@ from backend.core.strategy import StrategyLoader
 from backend.core.store import MetadataStore
 from backend.core.engine import BacktestEngine
 from backend.core.data import DataManager
-from backend.ai.analytics import calculate_market_structure, optimize_strategy
+from backend.ai.analytics import calculate_market_structure, optimize_strategy, optimize_strategy_genetic
 from backend.ai.config_manager import AIConfigManager
+from backend.core.limiter import request_limiter
+from backend.core.interceptor import mcp_safe
 import os
 import shutil
 import pandas as pd
@@ -14,18 +16,23 @@ import asyncio
 import functools
 import platform
 import psutil
+import uuid
 
 logger = logging.getLogger("QLM.AI.Tools")
 
 class AITools:
     """
     Registry of tools available to the AI Agent and MCP.
+    Includes concurrency limits and smart error handling.
     """
     def __init__(self):
         self.strategy_loader = StrategyLoader()
         self.metadata_store = MetadataStore()
         self.data_manager = DataManager()
         self.config_manager = AIConfigManager()
+        self.logs_dir = "logs"
+        if not os.path.exists(self.logs_dir):
+            os.makedirs(self.logs_dir)
         
     def get_definitions(self) -> List[Dict]:
         """
@@ -214,7 +221,8 @@ class AITools:
                             "strategy_name": {"type": "string", "description": "Name of the strategy"},
                             "symbol": {"type": "string", "description": "Symbol"},
                             "timeframe": {"type": "string", "description": "Timeframe"},
-                            "param_grid": {"type": "object", "description": "Dict of parameters to optimize (e.g., {'window': [10, 20]})"}
+                            "param_grid": {"type": "object", "description": "Dict of parameters to optimize (e.g., {'window': [10, 20]})"},
+                            "method": {"type": "string", "enum": ["grid", "genetic"], "description": "Optimization method (default: grid)"}
                         },
                         "required": ["strategy_name", "symbol", "timeframe", "param_grid"]
                     }
@@ -286,49 +294,52 @@ class AITools:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, functools.partial(func, *args, **kwargs))
 
+    @mcp_safe
     async def execute(self, tool_name: str, args: Dict) -> Any:
         """
         Execute a tool by name with arguments.
         """
         logger.info(f"Executing tool: {tool_name} with args: {list(args.keys())}")
         
-        try:
-            if tool_name == "list_datasets":
-                return await self._run_sync(self.metadata_store.list_datasets)
-                
-            elif tool_name == "list_strategies":
-                return await self._run_sync(self.strategy_loader.list_strategies)
-                
-            elif tool_name == "get_strategy_code":
-                name = args.get("name")
-                def _get():
-                    code = self.strategy_loader.get_strategy_code(name)
-                    if code:
-                        return {"found": True, "code": code}
-                    return {"found": False, "error": "Strategy not found"}
-                return await self._run_sync(_get)
-                
-            elif tool_name == "create_strategy":
-                name = args.get("name")
-                code = args.get("code")
-                
-                def _create():
-                    # First validate
-                    validation = self.strategy_loader.validate_strategy_code(code)
-                    if not validation.get("valid"):
-                        return {"status": "failed", "validation": validation}
+        # NOTE: Exceptions are now caught by @mcp_safe
+        if tool_name == "list_datasets":
+            return await self._run_sync(self.metadata_store.list_datasets)
 
-                    # If valid, save
-                    version = self.strategy_loader.save_strategy(name, code)
-                    return {"status": "success", "version": version, "message": f"Strategy {name} saved (v{version})."}
-                
-                return await self._run_sync(_create)
+        elif tool_name == "list_strategies":
+            return await self._run_sync(self.strategy_loader.list_strategies)
+
+        elif tool_name == "get_strategy_code":
+            name = args.get("name")
+            def _get():
+                code = self.strategy_loader.get_strategy_code(name)
+                if code:
+                    return {"found": True, "code": code}
+                return {"found": False, "error": "Strategy not found"}
+            return await self._run_sync(_get)
+
+        elif tool_name == "create_strategy":
+            name = args.get("name")
+            code = args.get("code")
+
+            def _create():
+                # First validate
+                validation = self.strategy_loader.validate_strategy_code(code)
+                if not validation.get("valid"):
+                    return {"status": "failed", "validation": validation}
+
+                # If valid, save
+                version = self.strategy_loader.save_strategy(name, code)
+                return {"status": "success", "version": version, "message": f"Strategy {name} saved (v{version})."}
             
-            elif tool_name == "validate_strategy":
-                code = args.get("code")
-                return await self._run_sync(self.strategy_loader.validate_strategy_code, code)
-                
-            elif tool_name == "run_backtest":
+            return await self._run_sync(_create)
+
+        elif tool_name == "validate_strategy":
+            code = args.get("code")
+            return await self._run_sync(self.strategy_loader.validate_strategy_code, code)
+
+        elif tool_name == "run_backtest":
+            await request_limiter.acquire()
+            try:
                 strat_name = args.get("strategy_name")
                 symbol = args.get("symbol")
                 tf = args.get("timeframe")
@@ -344,180 +355,189 @@ class AITools:
 
                     engine = BacktestEngine()
 
-                    try:
-                        # Run backtest
-                        result = engine.run(dataset['id'], strat_name)
+                    # Run backtest (Engine now handles basic exceptions, but mcp_safe catches crashes)
+                    result = engine.run(dataset['id'], strat_name)
 
-                        if result.get("status") == "failed":
-                             return {
-                                 "status": "failed",
-                                 "error": result.get("error", "Unknown Backtest Failure")
-                             }
-
-                        # Return Summary Metrics
+                    if result.get("status") == "failed":
                         return {
-                            "status": "success",
-                            "metrics": result['metrics'],
-                            "trade_count": len(result['trades'])
+                            "status": "failed",
+                            "error": result.get("error", "Unknown Backtest Failure")
                         }
-                    except Exception as e:
-                        return {"error": f"Backtest runtime error: {str(e)}"}
+
+                    # Save trades to log file
+                    trade_file = f"trades_{strat_name}_{symbol}_{uuid.uuid4().hex[:8]}.csv"
+                    trade_path = os.path.join(self.logs_dir, trade_file)
+                    if result['trades']:
+                        pd.DataFrame(result['trades']).to_csv(trade_path, index=False)
+
+                    # Return Summary Metrics
+                    return {
+                        "status": "success",
+                        "metrics": result['metrics'],
+                        "trade_count": len(result['trades']),
+                        "trade_log": trade_path
+                    }
 
                 return await self._run_sync(_run_bt)
+            finally:
+                request_limiter.release()
 
-            elif tool_name == "get_market_data":
-                symbol = args.get("symbol")
-                tf = args.get("timeframe")
+        elif tool_name == "get_market_data":
+            symbol = args.get("symbol")
+            tf = args.get("timeframe")
 
-                def _get_data():
-                    datasets = self.metadata_store.list_datasets()
-                    dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
+            def _get_data():
+                datasets = self.metadata_store.list_datasets()
+                dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
 
-                    if not dataset:
-                        return {"error": "Dataset not found"}
+                if not dataset:
+                    return {"error": "Dataset not found"}
 
-                    df = pd.read_parquet(dataset['file_path'])
-                    head = df.head(10).to_dict(orient='records')
-                    return {"data": head}
+                df = pd.read_parquet(dataset['file_path'])
+                head = df.head(10).to_dict(orient='records')
+                return {"data": head}
 
-                return await self._run_sync(_get_data)
+            return await self._run_sync(_get_data)
 
-            elif tool_name == "import_dataset_from_url":
-                url = args.get("url")
-                symbol = args.get("symbol")
-                timeframe = args.get("timeframe")
+        elif tool_name == "import_dataset_from_url":
+            url = args.get("url")
+            symbol = args.get("symbol")
+            timeframe = args.get("timeframe")
 
-                def _import():
-                    metadata = self.data_manager.process_url(url, symbol, timeframe)
-                    self.metadata_store.add_dataset(metadata)
-                    return {"status": "success", "id": metadata['id'], "rows": metadata['row_count']}
+            def _import():
+                metadata = self.data_manager.process_url(url, symbol, timeframe)
+                self.metadata_store.add_dataset(metadata)
+                return {"status": "success", "id": metadata['id'], "rows": metadata['row_count']}
 
-                return await self._run_sync(_import)
+            return await self._run_sync(_import)
 
-            elif tool_name == "read_file":
-                path = args.get("path")
+        elif tool_name == "read_file":
+            path = args.get("path")
 
-                def _read():
+            def _read():
+                try:
+                    abs_path = self._validate_path(path)
+                    if not os.path.exists(abs_path):
+                        return {"error": "File not found"}
+                    with open(abs_path, "r") as f:
+                        return {"content": f.read()}
+                except ValueError as ve:
+                     return {"error": str(ve)}
+
+            return await self._run_sync(_read)
+
+        elif tool_name == "write_file":
+            path = args.get("path")
+            content = args.get("content")
+
+            def _write():
+                try:
+                    abs_path = self._validate_path(path)
+                    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+                    with open(abs_path, "w") as f:
+                        f.write(content)
+                    return {"status": "success", "message": f"File {path} written."}
+                except ValueError as ve:
+                     return {"error": str(ve)}
+
+            return await self._run_sync(_write)
+
+        elif tool_name == "delete_entity":
+            type_ = args.get("type")
+            id_ = args.get("id")
+
+            def _delete():
+                if type_ == "strategy":
                     try:
-                        abs_path = self._validate_path(path)
-                        if not os.path.exists(abs_path):
-                            return {"error": "File not found"}
-                        with open(abs_path, "r") as f:
-                            return {"content": f.read()}
-                    except ValueError as ve:
-                         return {"error": str(ve)}
-
-                return await self._run_sync(_read)
-
-            elif tool_name == "write_file":
-                path = args.get("path")
-                content = args.get("content")
-
-                def _write():
+                        self.strategy_loader.delete_strategy(id_)
+                        return {"status": "success", "message": f"Strategy {id_} deleted."}
+                    except Exception as e:
+                         return {"error": str(e)}
+                elif type_ == "dataset":
                     try:
-                        abs_path = self._validate_path(path)
-                        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-                        with open(abs_path, "w") as f:
-                            f.write(content)
-                        return {"status": "success", "message": f"File {path} written."}
-                    except ValueError as ve:
-                         return {"error": str(ve)}
+                        self.metadata_store.delete_dataset(id_)
+                        return {"status": "success", "message": f"Dataset {id_} deleted."}
+                    except Exception as e:
+                         return {"error": str(e)}
 
-                return await self._run_sync(_write)
+            return await self._run_sync(_delete)
 
-            elif tool_name == "delete_entity":
-                type_ = args.get("type")
-                id_ = args.get("id")
+        elif tool_name == "analyze_market_structure":
+            symbol = args.get("symbol")
+            tf = args.get("timeframe")
 
-                def _delete():
-                    if type_ == "strategy":
-                        try:
-                            self.strategy_loader.delete_strategy(id_)
-                            return {"status": "success", "message": f"Strategy {id_} deleted."}
-                        except Exception as e:
-                             return {"error": str(e)}
-                    elif type_ == "dataset":
-                        try:
-                            self.metadata_store.delete_dataset(id_)
-                            return {"status": "success", "message": f"Dataset {id_} deleted."}
-                        except Exception as e:
-                             return {"error": str(e)}
+            def _analyze():
+                datasets = self.metadata_store.list_datasets()
+                dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
+                if not dataset:
+                    return {"error": "Dataset not found"}
+                df = pd.read_parquet(dataset['file_path'])
+                return calculate_market_structure(df)
 
-                return await self._run_sync(_delete)
+            return await self._run_sync(_analyze)
 
-            elif tool_name == "analyze_market_structure":
-                symbol = args.get("symbol")
-                tf = args.get("timeframe")
-
-                def _analyze():
-                    datasets = self.metadata_store.list_datasets()
-                    dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
-                    if not dataset:
-                        return {"error": "Dataset not found"}
-                    df = pd.read_parquet(dataset['file_path'])
-                    return calculate_market_structure(df)
-
-                return await self._run_sync(_analyze)
-
-            elif tool_name == "optimize_parameters":
+        elif tool_name == "optimize_parameters":
+            await request_limiter.acquire()
+            try:
                 strat_name = args.get("strategy_name")
                 symbol = args.get("symbol")
                 tf = args.get("timeframe")
                 param_grid = args.get("param_grid")
+                method = args.get("method", "grid")
 
                 def _optimize():
                     datasets = self.metadata_store.list_datasets()
                     dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
                     if not dataset:
                         return {"error": "Dataset not found"}
-                    return optimize_strategy(strat_name, dataset['id'], param_grid)
+
+                    if method == "genetic":
+                        return optimize_strategy_genetic(strat_name, dataset['id'], param_grid)
+                    else:
+                        return optimize_strategy(strat_name, dataset['id'], param_grid)
 
                 return await self._run_sync(_optimize)
+            finally:
+                request_limiter.release()
 
-            elif tool_name == "get_system_status":
-                def _status():
-                    return {
-                        "status": "online",
-                        "system": "QLM",
-                        "version": "2.0.0",
-                        "os": platform.system(),
-                        "cpu_percent": psutil.cpu_percent(),
-                        "memory_percent": psutil.virtual_memory().percent,
-                    }
-                return await self._run_sync(_status)
+        elif tool_name == "get_system_status":
+            def _status():
+                return {
+                    "status": "online",
+                    "system": "QLM",
+                    "version": "2.0.0",
+                    "os": platform.system(),
+                    "cpu_percent": psutil.cpu_percent(),
+                    "memory_percent": psutil.virtual_memory().percent,
+                }
+            return await self._run_sync(_status)
 
-            elif tool_name == "update_ai_config":
-                pid = args.get("provider_id")
-                mid = args.get("model_id")
-                def _update():
-                    self.config_manager.set_active(pid, mid)
-                    return {"status": "success", "message": f"Active AI set to {mid} via {pid}"}
-                return await self._run_sync(_update)
+        elif tool_name == "update_ai_config":
+            pid = args.get("provider_id")
+            mid = args.get("model_id")
+            def _update():
+                self.config_manager.set_active(pid, mid)
+                return {"status": "success", "message": f"Active AI set to {mid} via {pid}"}
+            return await self._run_sync(_update)
 
-            elif tool_name == "get_tools_manifest":
-                def _manifest():
-                    intro = """# QLM (QuantLogic Framework)
+        elif tool_name == "get_tools_manifest":
+            def _manifest():
+                intro = """# QLM (QuantLogic Framework)
 QLM is an institutional-grade algorithmic trading platform designed for quantitative researchers. It provides a robust event-driven backtester, market data management, and an AI agent for strategy development.
 
 ## Available Tools
 """
-                    tools_doc = ""
-                    for d in self.get_definitions():
-                        fn = d['function']
-                        name = fn['name']
-                        desc = fn['description']
-                        params = json.dumps(fn['parameters'], indent=2)
-                        tools_doc += f"\n### `{name}`\n{desc}\n**Parameters**:\n```json\n{params}\n```\n"
+                tools_doc = ""
+                for d in self.get_definitions():
+                    fn = d['function']
+                    name = fn['name']
+                    desc = fn['description']
+                    params = json.dumps(fn['parameters'], indent=2)
+                    tools_doc += f"\n### `{name}`\n{desc}\n**Parameters**:\n```json\n{params}\n```\n"
 
-                    return intro + tools_doc
+                return intro + tools_doc
 
-                return await self._run_sync(_manifest)
-            
-            else:
-                return {"error": f"Tool '{tool_name}' not found."}
-                
-        except Exception as e:
-            logger.error(f"Tool execution failed: {e}")
-            import traceback
-            traceback.print_exc()
-            return {"error": f"Execution failed: {str(e)}"}
+            return await self._run_sync(_manifest)
+
+        else:
+            return {"error": f"Tool '{tool_name}' not found."}
