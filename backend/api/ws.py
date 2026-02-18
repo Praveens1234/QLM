@@ -3,6 +3,7 @@ from typing import List, Dict, Any
 import logging
 import asyncio
 import json
+from backend.core.events import event_bus
 
 logger = logging.getLogger("QLM.API.WS")
 
@@ -14,6 +15,8 @@ class ConnectionManager:
     """
     def __init__(self):
         self.active_connections: List[WebSocket] = []
+        # Subscribe to EventBus
+        event_bus.subscribe(self.broadcast_event)
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -25,28 +28,34 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
             logger.info(f"WS Client disconnected. Total: {len(self.active_connections)}")
 
+    async def broadcast_event(self, message: Dict[str, Any]):
+        """
+        Callback for EventBus.
+        """
+        await self.broadcast(message)
+
     async def broadcast(self, message: Dict[str, Any]):
         """
         Broadcast a message to all connected clients.
-        Removes dead connections.
+        Optimized with asyncio.gather.
         """
-        dead_connections = []
-        for connection in self.active_connections:
+        if not self.active_connections:
+            return
+
+        async def send_safe(connection):
             try:
                 await connection.send_json(message)
+                return True
             except Exception as e:
-                logger.warning(f"WS Broadcast failed for client: {e}")
-                dead_connections.append(connection)
+                return connection
 
-        for dead in dead_connections:
-            self.disconnect(dead)
+        # Run all sends concurrently
+        results = await asyncio.gather(*(send_safe(conn) for conn in self.active_connections))
 
-    async def send_error(self, message: str, details: str = ""):
-        await self.broadcast({
-            "type": "error",
-            "message": message,
-            "details": details
-        })
+        # Cleanup dead connections
+        for res in results:
+            if res is not True: # It's a dead connection object
+                self.disconnect(res)
 
 manager = ConnectionManager()
 
@@ -55,9 +64,7 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            # Keep connection alive.
-            # We can implement a ping/pong here if needed, but Starlette handles standard Pings.
-            # Just wait for messages (which we ignore or use for heartbeat)
+            # Keep connection alive / Handle incoming
             data = await websocket.receive_text()
             if data == "ping":
                 await websocket.send_text("pong")

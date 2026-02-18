@@ -3,6 +3,7 @@ import os
 import logging
 from typing import List, Dict, Any, Optional
 from backend.database import db
+from backend.core.encryption import encryption
 
 logger = logging.getLogger("QLM.AI.Config")
 
@@ -69,6 +70,7 @@ class AIConfigManager:
 
     def add_provider(self, name: str, base_url: str, api_key: str) -> str:
         provider_id = name.lower().replace(" ", "_")
+        encrypted_key = encryption.encrypt(api_key)
 
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -80,7 +82,7 @@ class AIConfigManager:
                 ON CONFLICT(id) DO UPDATE SET
                     base_url=excluded.base_url,
                     api_key=excluded.api_key
-            ''', (provider_id, name, base_url, api_key, json.dumps([])))
+            ''', (provider_id, name, base_url, encrypted_key, json.dumps([])))
 
             # If no active provider, set this one
             cursor.execute("SELECT value FROM config WHERE key='active_provider_id'")
@@ -153,11 +155,29 @@ class AIConfigManager:
             if not p_row:
                 return {}
 
+            # Decrypt key for internal use
+            raw_key = p_row["api_key"]
+            decrypted_key = encryption.decrypt(raw_key)
+
             return {
                 "base_url": p_row["base_url"],
-                "api_key": p_row["api_key"],
+                "api_key": decrypted_key,
                 "model": mid,
                 "provider_name": p_row["name"]
+            }
+
+    def get_provider_details(self, provider_id: str) -> Optional[Dict]:
+        """Get full details including decrypted key for internal use."""
+        with db.get_connection() as conn:
+            row = conn.execute("SELECT * FROM providers WHERE id=?", (provider_id,)).fetchone()
+            if not row: return None
+
+            return {
+                "id": row["id"],
+                "name": row["name"],
+                "base_url": row["base_url"],
+                "api_key": encryption.decrypt(row["api_key"]),
+                "models": json.loads(row["models"]) if row["models"] else []
             }
 
     def get_all_providers(self) -> List[Dict]:

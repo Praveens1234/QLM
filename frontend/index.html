@@ -44,7 +44,11 @@
     <!-- Monaco -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.js"></script>
 
+    <!-- Lightweight Charts -->
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+
     <!-- Custom CSS -->
+    <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/tailwind_custom.css">
 </head>
 
@@ -54,9 +58,9 @@
     <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 hidden md:hidden transition-opacity opacity-0 pointer-events-none" style="transition: opacity 0.3s;"></div>
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="w-64 bg-slate-900/95 border-r border-slate-800 flex flex-col justify-between transition-transform duration-300 fixed md:relative z-50 h-full md:translate-x-0 -translate-x-full shadow-2xl md:shadow-none">
+    <aside id="sidebar" class="w-64 glass-panel border-r-0 border-slate-800 flex flex-col justify-between transition-transform duration-300 fixed md:relative z-50 h-full md:translate-x-0 -translate-x-full shadow-2xl md:shadow-none">
         <!-- Header -->
-        <div class="h-16 px-6 border-b border-slate-800 flex items-center gap-3 bg-slate-900">
+        <div class="h-16 px-6 border-b border-white/5 flex items-center gap-3 bg-transparent">
             <div class="h-8 w-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20 ring-1 ring-white/10">
                 <i class="fa-solid fa-layer-group text-white text-xs"></i>
             </div>
@@ -68,22 +72,27 @@
 
         <!-- Navigation -->
         <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
-            <button onclick="router.navigate('dashboard')" id="nav-dashboard" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+            <button onclick="router.navigate('dashboard')" id="nav-dashboard" aria-label="Dashboard" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
                 <i class="fa-solid fa-chart-pie w-5 text-center text-slate-500 group-hover:text-indigo-400 transition-colors"></i>
                 <span class="font-medium">Dashboard</span>
             </button>
 
-            <button onclick="router.navigate('data')" id="nav-data" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+            <button onclick="router.navigate('live')" id="nav-live" aria-label="Live Trading" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+                <i class="fa-solid fa-bolt w-5 text-center text-slate-500 group-hover:text-emerald-400 transition-colors"></i>
+                <span class="font-medium">Live Trading</span>
+            </button>
+
+            <button onclick="router.navigate('data')" id="nav-data" aria-label="Data Manager" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
                 <i class="fa-solid fa-database w-5 text-center text-slate-500 group-hover:text-emerald-400 transition-colors"></i>
                 <span class="font-medium">Data Manager</span>
             </button>
 
-            <button onclick="router.navigate('strategies')" id="nav-strategies" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+            <button onclick="router.navigate('strategies')" id="nav-strategies" aria-label="Strategy Lab" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
                 <i class="fa-solid fa-code w-5 text-center text-slate-500 group-hover:text-amber-400 transition-colors"></i>
                 <span class="font-medium">Strategy Lab</span>
             </button>
 
-            <button onclick="router.navigate('backtest')" id="nav-backtest" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+            <button onclick="router.navigate('backtest')" id="nav-backtest" aria-label="Backtest Runner" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
                 <i class="fa-solid fa-play w-5 text-center text-slate-500 group-hover:text-rose-400 transition-colors"></i>
                 <span class="font-medium">Backtest Runner</span>
             </button>
@@ -92,14 +101,14 @@
                 <div class="h-px bg-slate-800 mx-3"></div>
             </div>
 
-            <button onclick="router.navigate('assistant')" id="nav-assistant" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all relative overflow-hidden">
+            <button onclick="router.navigate('assistant')" id="nav-assistant" aria-label="AI Architect" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all relative overflow-hidden">
                 <div class="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <i class="fa-solid fa-robot w-5 text-center text-indigo-400 group-hover:text-indigo-300 transition-colors relative z-10"></i>
                 <span class="font-medium relative z-10">AI Architect</span>
                 <span class="ml-auto bg-indigo-500/20 text-indigo-300 text-[9px] font-bold px-1.5 py-0.5 rounded border border-indigo-500/20">BETA</span>
             </button>
 
-            <button onclick="router.navigate('mcp')" id="nav-mcp" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+            <button onclick="router.navigate('mcp')" id="nav-mcp" aria-label="MCP Service" class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
                 <i class="fa-solid fa-network-wired w-5 text-center text-slate-500 group-hover:text-orange-400 transition-colors"></i>
                 <span class="font-medium">MCP Service</span>
             </button>
@@ -107,7 +116,7 @@
 
         <!-- Footer -->
         <div class="p-4 border-t border-slate-800 bg-slate-900">
-            <button onclick="router.navigate('settings')" id="nav-settings" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all text-xs font-medium">
+            <button onclick="router.navigate('settings')" id="nav-settings" aria-label="Settings" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all text-xs font-medium">
                 <i class="fa-solid fa-sliders w-5 text-center"></i>
                 <span>Settings</span>
             </button>
@@ -129,7 +138,7 @@
                 </div>
                 <span class="font-bold text-white tracking-tight">QLM</span>
             </div>
-            <button onclick="toggleSidebar()" class="text-slate-400 hover:text-white p-2 focus:outline-none">
+            <button onclick="toggleSidebar()" aria-label="Toggle Sidebar" class="text-slate-400 hover:text-white p-2 focus:outline-none">
                 <i class="fa-solid fa-bars text-lg"></i>
             </button>
         </header>
@@ -154,12 +163,13 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <!-- Stat Card 1 -->
-                    <div class="bg-slate-900/50 backdrop-blur border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-all hover:shadow-lg hover:shadow-indigo-500/5 group">
-                        <div class="flex justify-between items-start mb-4">
-                            <div class="h-10 w-10 bg-indigo-500/10 rounded-lg flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                    <div class="glass-panel rounded-xl p-5 hover:border-indigo-500/30 transition-all hover:shadow-lg hover:shadow-indigo-500/10 group relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-20 h-20 bg-indigo-500/5 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                        <div class="flex justify-between items-start mb-4 relative z-10">
+                            <div class="h-10 w-10 bg-indigo-500/10 rounded-lg flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-colors border border-indigo-500/20">
                                 <i class="fa-solid fa-code"></i>
                             </div>
-                            <span class="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                            <span class="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1 border border-emerald-500/20">
                                 <i class="fa-solid fa-arrow-trend-up"></i> ACTIVE
                             </span>
                         </div>
@@ -168,9 +178,10 @@
                     </div>
 
                     <!-- Stat Card 2 -->
-                    <div class="bg-slate-900/50 backdrop-blur border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-all hover:shadow-lg hover:shadow-emerald-500/5 group">
-                        <div class="flex justify-between items-start mb-4">
-                            <div class="h-10 w-10 bg-emerald-500/10 rounded-lg flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                    <div class="glass-panel rounded-xl p-5 hover:border-emerald-500/30 transition-all hover:shadow-lg hover:shadow-emerald-500/10 group relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-20 h-20 bg-emerald-500/5 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                        <div class="flex justify-between items-start mb-4 relative z-10">
+                            <div class="h-10 w-10 bg-emerald-500/10 rounded-lg flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors border border-emerald-500/20">
                                 <i class="fa-solid fa-database"></i>
                             </div>
                         </div>
@@ -179,9 +190,10 @@
                     </div>
 
                     <!-- Stat Card 3 -->
-                     <div class="bg-slate-900/50 backdrop-blur border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-all hover:shadow-lg hover:shadow-amber-500/5 group">
-                        <div class="flex justify-between items-start mb-4">
-                            <div class="h-10 w-10 bg-amber-500/10 rounded-lg flex items-center justify-center text-amber-400 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+                     <div class="glass-panel rounded-xl p-5 hover:border-amber-500/30 transition-all hover:shadow-lg hover:shadow-amber-500/10 group relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-20 h-20 bg-amber-500/5 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                        <div class="flex justify-between items-start mb-4 relative z-10">
+                            <div class="h-10 w-10 bg-amber-500/10 rounded-lg flex items-center justify-center text-amber-400 group-hover:bg-amber-500 group-hover:text-white transition-colors border border-amber-500/20">
                                 <i class="fa-solid fa-server"></i>
                             </div>
                         </div>
@@ -207,6 +219,56 @@
                 </div>
             </section>
 
+            <!-- Live Trading -->
+            <section id="page-live" class="page hidden animate-fade-in space-y-6 max-w-7xl mx-auto">
+                 <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white tracking-tight">Live Trading</h2>
+                        <p class="text-slate-400 text-sm mt-1">Real-time Execution & Monitoring</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                         <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-400 font-mono">
+                            <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            MARKET: OPEN
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Control Panel (Injected by JS) -->
+                <div id="live-controls"></div>
+
+                <!-- Active Positions & Orders -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass-panel rounded-xl overflow-hidden shadow-sm h-[400px] flex flex-col">
+                        <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Active Positions</h3>
+                        </div>
+                        <div id="live-positions-list" class="flex-1 overflow-auto p-0 scroll-smooth">
+                            <div class="flex h-full items-center justify-center text-slate-600">
+                                <div class="text-center">
+                                    <i class="fa-solid fa-layer-group text-3xl mb-3 opacity-20"></i>
+                                    <p class="text-xs">No active positions</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel rounded-xl overflow-hidden shadow-sm h-[400px] flex flex-col">
+                         <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Open Orders</h3>
+                        </div>
+                         <div id="live-orders-list" class="flex-1 overflow-auto p-0 scroll-smooth">
+                            <div class="flex h-full items-center justify-center text-slate-600">
+                                <div class="text-center">
+                                    <i class="fa-solid fa-list-check text-3xl mb-3 opacity-20"></i>
+                                    <p class="text-xs">No open orders</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Data Manager -->
             <section id="page-data" class="page hidden animate-fade-in space-y-6 max-w-7xl mx-auto">
                  <div class="flex items-center justify-between">
@@ -219,10 +281,10 @@
                 <!-- Import Card -->
                 <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
                     <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/50 flex gap-6">
-                         <button id="tab-local" onclick="switchImportTab('local')" class="text-sm font-semibold text-indigo-400 border-b-2 border-indigo-400 pb-2 transition-colors focus:outline-none">
+                         <button id="tab-local" class="text-sm font-semibold text-indigo-400 border-b-2 border-indigo-400 pb-2 transition-colors focus:outline-none">
                             <i class="fa-solid fa-upload mr-1.5"></i> Local Upload
                          </button>
-                         <button id="tab-url" onclick="switchImportTab('url')" class="text-sm font-semibold text-slate-500 hover:text-slate-300 border-b-2 border-transparent pb-2 transition-colors focus:outline-none">
+                         <button id="tab-url" class="text-sm font-semibold text-slate-500 hover:text-slate-300 border-b-2 border-transparent pb-2 transition-colors focus:outline-none">
                             <i class="fa-solid fa-globe mr-1.5"></i> Import URL
                          </button>
                     </div>
@@ -242,7 +304,7 @@
                                 <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Timeframe</label>
                                 <input type="text" id="upload-tf" placeholder="1H" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono uppercase">
                             </div>
-                            <button onclick="uploadDataset()" class="w-full lg:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-6 py-2.5 rounded-lg transition-all shadow-lg shadow-indigo-500/20 text-sm flex items-center justify-center gap-2 h-[42px]">
+                            <button class="w-full lg:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-6 py-2.5 rounded-lg transition-all shadow-lg shadow-indigo-500/20 text-sm flex items-center justify-center gap-2 h-[42px]">
                                 <i class="fa-solid fa-plus"></i> Import
                             </button>
                         </div>
@@ -264,7 +326,7 @@
                                 <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Timeframe</label>
                                 <input type="text" id="url-tf" placeholder="1H" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-mono uppercase">
                             </div>
-                            <button onclick="importFromUrl()" id="btn-import-url" class="w-full lg:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-6 py-2.5 rounded-lg transition-all shadow-lg shadow-emerald-500/20 text-sm flex items-center justify-center gap-2 whitespace-nowrap h-[42px]">
+                            <button id="btn-import-url" class="w-full lg:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-6 py-2.5 rounded-lg transition-all shadow-lg shadow-emerald-500/20 text-sm flex items-center justify-center gap-2 whitespace-nowrap h-[42px]">
                                 <i class="fa-solid fa-cloud-download"></i> Download
                             </button>
                         </div>
@@ -272,10 +334,10 @@
                 </div>
 
                 <!-- Table -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+                <div class="glass-panel rounded-xl overflow-hidden shadow-sm">
                     <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                         <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Available Datasets</h3>
-                        <button onclick="loadDatasets()" class="text-slate-500 hover:text-white transition-colors text-xs p-1 rounded hover:bg-slate-800"><i class="fa-solid fa-refresh"></i></button>
+                        <button aria-label="Refresh Datasets" class="text-slate-500 hover:text-white transition-colors text-xs p-1 rounded hover:bg-slate-800"><i class="fa-solid fa-refresh"></i></button>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm text-slate-400">
@@ -303,10 +365,10 @@
                         <h2 class="text-2xl font-bold text-white tracking-tight">Strategy Lab</h2>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="validateStrategy()" class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-colors flex items-center gap-2">
+                        <button class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-colors flex items-center gap-2">
                             <i class="fa-solid fa-check-double"></i> Validate
                         </button>
-                        <button onclick="saveStrategy()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-colors shadow-lg shadow-indigo-900/20 flex items-center gap-2">
+                        <button class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-colors shadow-lg shadow-indigo-900/20 flex items-center gap-2">
                             <i class="fa-solid fa-save"></i> Save
                         </button>
                     </div>
@@ -314,10 +376,10 @@
 
                 <div class="flex-1 flex flex-col lg:flex-row gap-4 overflow-hidden min-h-0">
                     <!-- Sidebar List -->
-                    <div class="w-full lg:w-64 flex-shrink-0 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm h-48 lg:h-auto">
+                    <div class="w-full lg:w-64 flex-shrink-0 flex flex-col glass-panel rounded-xl overflow-hidden shadow-sm h-48 lg:h-auto">
                         <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                             <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Strategy Files</span>
-                            <button onclick="createNewStrategy()" class="text-slate-400 hover:text-white p-1.5 rounded hover:bg-slate-800 transition-colors" title="New Strategy">
+                            <button aria-label="New Strategy" class="text-slate-400 hover:text-white p-1.5 rounded hover:bg-slate-800 transition-colors" title="New Strategy">
                                 <i class="fa-solid fa-plus text-xs"></i>
                             </button>
                         </div>
@@ -334,7 +396,7 @@
                                 <i class="fa-solid fa-file-code absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
                                 <input type="text" id="strategy-name-input" placeholder="StrategyName" class="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none font-mono">
                              </div>
-                             <select id="template-select" onchange="applyTemplate()" class="bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2">
+                             <select id="template-select" class="bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2">
                                 <option value="">Load Template...</option>
                             </select>
                         </div>
@@ -379,7 +441,33 @@
                                 </div>
                             </div>
 
-                            <button onclick="runBacktest()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 mt-2 uppercase tracking-wide text-xs">
+                            <div class="pt-4 border-t border-slate-800">
+                                <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Mode</label>
+                                <div class="flex gap-2">
+                                    <button id="btn-mode-bt" class="flex-1 bg-indigo-600 text-white text-xs font-bold py-2 rounded border border-indigo-500 shadow-md transition-all">Backtest</button>
+                                    <button id="btn-mode-opt" class="flex-1 bg-slate-800 text-slate-400 hover:text-white text-xs font-bold py-2 rounded border border-slate-700 hover:bg-slate-700 transition-all">Optimize</button>
+                                </div>
+                            </div>
+
+                            <div id="opt-config" class="hidden space-y-4 pt-2 animate-fade-in">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Method</label>
+                                    <select id="opt-method" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono">
+                                        <option value="grid">Grid Search</option>
+                                        <option value="genetic">Genetic Algorithm</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Target Metric</label>
+                                    <select id="opt-target" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono">
+                                        <option value="net_profit">Net Profit</option>
+                                        <option value="sharpe_ratio">Sharpe Ratio</option>
+                                        <option value="sqn">SQN</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button id="btn-run-action" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 mt-2 uppercase tracking-wide text-xs">
                                 <i class="fa-solid fa-rocket"></i> Run Simulation
                             </button>
                          </div>
@@ -414,9 +502,9 @@
             <!-- AI Assistant -->
             <section id="page-assistant" class="page hidden animate-fade-in h-[calc(100vh-8rem)] flex gap-6 max-w-[1920px] mx-auto">
                  <!-- Sessions Sidebar -->
-                 <div class="w-64 flex-shrink-0 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hidden lg:flex shadow-sm">
+                 <div class="w-64 flex-shrink-0 flex flex-col glass-panel rounded-xl overflow-hidden hidden lg:flex shadow-sm">
                     <div class="p-4 border-b border-slate-800">
-                        <button onclick="newSession()" class="w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 rounded-lg py-2.5 text-xs font-bold uppercase tracking-wide transition-colors flex items-center justify-center gap-2">
+                        <button class="w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 rounded-lg py-2.5 text-xs font-bold uppercase tracking-wide transition-colors flex items-center justify-center gap-2">
                             <i class="fa-solid fa-plus"></i> New Chat
                         </button>
                     </div>
@@ -424,14 +512,14 @@
                  </div>
 
                  <!-- Chat Area -->
-                 <div class="flex-1 flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl relative">
+                 <div class="flex-1 flex flex-col glass-panel rounded-xl overflow-hidden shadow-2xl relative">
                     <!-- Chat Header -->
                     <div class="h-14 border-b border-slate-800 flex items-center px-6 justify-between bg-slate-900/50 backdrop-blur z-10">
                         <div class="flex items-center gap-3">
                              <div class="h-2 w-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
                              <span class="text-sm font-bold text-white tracking-tight">QLM Assistant</span>
                         </div>
-                        <button class="lg:hidden text-slate-400 hover:text-white" onclick="alert('Session list on mobile coming soon')"><i class="fa-solid fa-history"></i></button>
+                        <button aria-label="Chat History" class="lg:hidden text-slate-400 hover:text-white" id="mobile-history-btn"><i class="fa-solid fa-history"></i></button>
                     </div>
 
                     <!-- Messages -->
@@ -453,7 +541,7 @@
                     <div class="p-4 border-t border-slate-800 bg-slate-900/80 backdrop-blur">
                         <div class="flex gap-3 relative max-w-4xl mx-auto">
                              <input type="text" id="ai-input" placeholder="Ask me to create a strategy..." autocomplete="off" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-5 py-3.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all pr-14 shadow-inner">
-                             <button id="ai-send-btn" class="absolute right-2 top-2 bottom-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg w-10 transition-colors flex items-center justify-center shadow-md">
+                             <button aria-label="Send Message" id="ai-send-btn" class="absolute right-2 top-2 bottom-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg w-10 transition-colors flex items-center justify-center shadow-md">
                                 <i class="fa-solid fa-paper-plane text-xs"></i>
                              </button>
                         </div>
@@ -469,21 +557,21 @@
                         <p class="text-slate-400 text-sm mt-1">External AI Connection & Control</p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="mcp-toggle" class="sr-only peer" onchange="toggleMCPService()">
+                        <input type="checkbox" id="mcp-toggle" class="sr-only peer">
                         <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
                         <span class="ml-3 text-sm font-medium text-slate-300" id="mcp-status-text">OFF</span>
                     </label>
                 </div>
 
                 <!-- Connection Info -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm">
+                <div class="glass-panel rounded-xl p-6 shadow-sm">
                     <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide border-b border-slate-800 pb-2 mb-4">Connection Details</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">SSE Endpoint</label>
                             <div class="flex gap-2">
                                 <input type="text" id="mcp-endpoint" readonly value="http://localhost:8010/api/mcp/sse" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-indigo-300 font-mono focus:outline-none">
-                                <button onclick="navigator.clipboard.writeText(document.getElementById('mcp-endpoint').value)" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-3 py-2 rounded-lg transition-colors"><i class="fa-solid fa-copy"></i></button>
+                                <button aria-label="Copy Endpoint" onclick="navigator.clipboard.writeText(document.getElementById('mcp-endpoint').value)" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-3 py-2 rounded-lg transition-colors"><i class="fa-solid fa-copy"></i></button>
                             </div>
                             <p class="text-[10px] text-slate-500 mt-2">Use this URL in Claude Desktop or other MCP clients.</p>
                         </div>
@@ -500,10 +588,10 @@
                 </div>
 
                 <!-- Activity Log -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col h-[500px]">
+                <div class="glass-panel rounded-xl overflow-hidden shadow-sm flex flex-col h-[500px]">
                     <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
                         <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Activity Log</h3>
-                        <button onclick="loadMCPStatus()" class="text-slate-500 hover:text-white text-xs"><i class="fa-solid fa-refresh"></i> Refresh</button>
+                        <button aria-label="Refresh MCP Logs" class="text-slate-500 hover:text-white text-xs"><i class="fa-solid fa-refresh"></i> Refresh</button>
                     </div>
                     <div class="flex-1 overflow-auto bg-[#020617] p-4 font-mono text-xs space-y-2" id="mcp-logs">
                         <!-- Logs -->
@@ -517,12 +605,12 @@
                  <h2 class="text-2xl font-bold text-white tracking-tight mb-6">Settings</h2>
 
                  <!-- Active Selection -->
-                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm">
+                 <div class="glass-panel rounded-xl p-6 shadow-sm">
                     <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide border-b border-slate-800 pb-2 mb-4">AI Configuration</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Provider</label>
-                            <select id="active-provider" onchange="loadProviderModels(this.value)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"></select>
+                            <select id="active-provider" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"></select>
                         </div>
                         <div>
                             <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Model</label>
@@ -530,12 +618,12 @@
                         </div>
                     </div>
                     <div class="flex justify-end pt-4">
-                        <button onclick="saveActiveConfig()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase px-4 py-2.5 rounded-lg transition-colors">Apply Configuration</button>
+                        <button class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase px-4 py-2.5 rounded-lg transition-colors">Apply Configuration</button>
                     </div>
                  </div>
 
                  <!-- Add Provider -->
-                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm">
+                 <div class="glass-panel rounded-xl p-6 shadow-sm">
                     <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide border-b border-slate-800 pb-2 mb-4">Add Provider</h3>
                     <div class="grid grid-cols-1 gap-4">
                         <div class="grid grid-cols-2 gap-4">
@@ -545,12 +633,12 @@
                         <input type="password" id="new-prov-key" placeholder="API Key" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white">
                     </div>
                     <div class="flex justify-end pt-4 gap-2">
-                        <button onclick="addProvider()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase px-4 py-2.5 rounded-lg transition-colors">Add Provider</button>
+                        <button class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase px-4 py-2.5 rounded-lg transition-colors">Add Provider</button>
                     </div>
                  </div>
 
                  <!-- List Providers -->
-                 <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+                 <div class="glass-panel rounded-xl overflow-hidden shadow-sm">
                     <div class="px-6 py-4 bg-slate-800/30 border-b border-slate-800">
                         <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Registered Providers</h3>
                     </div>
@@ -561,7 +649,6 @@
         </div>
     </main>
 
-    <script src="/js/notifications.js"></script>
-    <script src="/js/app.js"></script>
+    <script type="module" src="/js/app.js"></script>
 </body>
 </html>

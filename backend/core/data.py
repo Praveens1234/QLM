@@ -7,8 +7,11 @@ import zipfile
 import requests
 import tempfile
 import shutil
+import pyarrow as pa
+import pyarrow.parquet as pq
 from datetime import datetime, timezone
-from typing import Dict, Any, Tuple, List
+from typing import Dict, Any, Tuple, List, Optional
+from backend.core.exceptions import DataError
 
 # Logger
 logger = logging.getLogger("QLM.Data")
@@ -17,6 +20,7 @@ class DataManager:
     """
     Handles CSV ingestion, validation, and Parquet conversion.
     Supports local upload and remote URL download (CSV/ZIP).
+    Enforces strict schema validation using PyArrow.
     """
     
     REQUIRED_COLUMNS = ['open', 'high', 'low', 'close', 'volume']
@@ -35,14 +39,14 @@ class DataManager:
             # 1. Download
             local_filename = url.split('/')[-1]
             if not local_filename:
-                local_filename = "downloaded_file"
+                local_filename = f"download_{uuid.uuid4()}.tmp"
 
             download_path = os.path.join(temp_dir, local_filename)
             logger.info(f"Downloading from {url} to {download_path}...")
 
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
-            with requests.get(url, headers=headers, stream=True, timeout=30) as r:
+            with requests.get(url, headers=headers, stream=True, timeout=60) as r:
                 r.raise_for_status()
                 with open(download_path, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=8192):
@@ -53,7 +57,6 @@ class DataManager:
 
             if download_path.lower().endswith('.zip'):
                 logger.info("Detected ZIP file. Extracting safely...")
-
                 with zipfile.ZipFile(download_path, 'r') as zip_ref:
                     # Zip Slip Protection
                     members = zip_ref.namelist()
@@ -61,22 +64,20 @@ class DataManager:
                     abs_target = os.path.abspath(temp_dir)
 
                     for member in members:
-                        # Normalize path to prevent traversal
                         abs_dest = os.path.abspath(os.path.join(temp_dir, member))
                         if not abs_dest.startswith(abs_target):
-                            raise ValueError(f"Zip Slip attempt detected: {member}")
+                            raise DataError(f"Zip Slip attempt detected: {member}")
                         safe_members.append(member)
 
                     zip_ref.extractall(temp_dir, members=safe_members)
 
                 # Find CSV
-                csv_files = [f for f in os.listdir(temp_dir) if f.lower().endswith('.csv')]
-                csv_files = [f for f in csv_files if not f.startswith('__')]
+                csv_files = [f for f in os.listdir(temp_dir) if f.lower().endswith('.csv') and not f.startswith('__')]
 
                 if len(csv_files) == 0:
-                    raise ValueError("No CSV file found in the ZIP archive.")
+                    raise DataError("No CSV file found in the ZIP archive.")
                 if len(csv_files) > 1:
-                    raise ValueError(f"Multiple CSV files found in ZIP ({len(csv_files)}). Please provide a ZIP with exactly one CSV.")
+                    raise DataError(f"Multiple CSV files found in ZIP ({len(csv_files)}). Please provide a ZIP with exactly one CSV.")
 
                 target_csv = os.path.join(temp_dir, csv_files[0])
                 logger.info(f"Found CSV: {csv_files[0]}")
@@ -86,9 +87,8 @@ class DataManager:
 
         except Exception as e:
             logger.error(f"Error processing URL import: {e}")
-            raise e
+            raise DataError(f"Failed to process URL: {str(e)}")
         finally:
-            # Cleanup
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
 
@@ -96,7 +96,11 @@ class DataManager:
         """
         Process a local CSV upload.
         """
-        return self._process_csv(file_path, symbol, timeframe)
+        try:
+             return self._process_csv(file_path, symbol, timeframe)
+        except Exception as e:
+            logger.error(f"Error processing upload: {e}")
+            raise DataError(f"Failed to process upload: {str(e)}")
 
     def _process_csv(self, file_path: str, symbol: str, timeframe: str) -> Dict[str, Any]:
         """
@@ -104,132 +108,119 @@ class DataManager:
         Returns metadata for the dataset.
         """
         try:
-            # 1. Load CSV (Try to infer separator)
+            # 1. Load CSV (Robust Separation Detection)
             try:
-                df = pd.read_csv(file_path, skipinitialspace=True)
+                df = pd.read_csv(file_path, skipinitialspace=True, engine='c')
             except Exception:
-                 # Fallback to python engine with auto detection
+                # Fallback to python engine with auto separator detection
                 df = pd.read_csv(file_path, skipinitialspace=True, sep=None, engine='python')
             
             # Clean column names
             df.columns = df.columns.str.strip().str.lower()
             
-            # 2. Validate Structure & Normalization
-            for col in ['utc', 'date', 'time', 'timestamp']:
+            # Normalize Date Column
+            date_col_candidates = ['date', 'time', 'timestamp', 'datetime', 'dt', 'ts', 'utc']
+            found_date = False
+            for col in date_col_candidates:
                 if col in df.columns:
                     df.rename(columns={col: 'datetime'}, inplace=True)
+                    found_date = True
                     break
-
-            self._validate_columns(df)
             
-            # 3. Parse Datetime
-            # Convert column to string first to handle mixed types
-            dt_col = df['datetime'].astype(str).str.strip()
+            if not found_date:
+                raise DataError(f"Missing datetime column. Expected one of: {date_col_candidates}")
 
-            # Remove common suffixes
-            dt_col = dt_col.str.replace(' UTC', '', regex=False).str.replace(' GMT', '', regex=False).str.replace('Z', '', regex=False)
+            # Check Required Columns
+            missing = [col for col in self.REQUIRED_COLUMNS if col not in df.columns]
+            if missing:
+                raise DataError(f"Missing required columns: {missing}")
 
-            # Try to infer format using pandas to_datetime (which is usually good)
-            # We enforce UTC
+            # 2. Parse Datetime (Strict UTC)
+            # Handle various formats
             try:
-                # First attempt: standard ISO or mixed
-                df['datetime'] = pd.to_datetime(dt_col, utc=True, errors='raise')
+                # Try fast path (ISO8601)
+                df['datetime'] = pd.to_datetime(df['datetime'], utc=True, errors='coerce')
             except Exception:
-                # Second attempt: Day first (European)
-                try:
-                    df['datetime'] = pd.to_datetime(dt_col, utc=True, dayfirst=True, errors='raise')
-                except Exception:
-                    # Third attempt: manual format string for some common crypto data
-                    try:
-                        df['datetime'] = pd.to_datetime(dt_col, format='%d.%m.%Y %H:%M:%S', utc=True)
-                    except Exception as e:
-                         raise ValueError(f"Could not parse datetime column. Ensure standard ISO 8601 or 'dd.mm.yyyy HH:MM:SS' format. Error: {e}")
+                pass
 
-            # Drop rows with NaT
+            # Drop NaT
             if df['datetime'].isna().any():
-                logger.warning(f"Dropping {df['datetime'].isna().sum()} rows with invalid dates.")
+                n_dropped = df['datetime'].isna().sum()
+                logger.warning(f"Dropping {n_dropped} rows with invalid datetime.")
                 df = df.dropna(subset=['datetime'])
+            
+            if df.empty:
+                raise DataError("Dataset is empty after date parsing.")
 
-            # Convert to int64 nanoseconds (Unix epoch)
-            # Ensure we have datetime64[ns, UTC]
-            if df['datetime'].dtype != 'datetime64[ns, UTC]':
-                df['datetime'] = df['datetime'].dt.tz_convert('UTC')
+            # 3. Numeric Conversion & Cleaning
+            cols_to_numeric = ['open', 'high', 'low', 'close', 'volume']
+            for col in cols_to_numeric:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+            # Drop rows with NaN in OHLC
+            df.dropna(subset=['open', 'high', 'low', 'close'], inplace=True)
+            
+            if df.empty:
+                raise DataError("Dataset is empty after removing NaNs.")
 
-            df['dtv'] = df['datetime'].astype('int64') # nanoseconds since epoch
+            # 4. Sort & Deduplicate
+            df.sort_values('datetime', inplace=True)
+            df.drop_duplicates(subset=['datetime'], keep='first', inplace=True)
             
-            # 4. Sort and Validate Continuity
-            df = df.sort_values(by='dtv').reset_index(drop=True)
-            
-            # Check duplicates
-            if not df['dtv'].is_unique:
-                logger.warning("Duplicate timestamps found. Dropping duplicates (keeping first).")
-                df = df.drop_duplicates(subset=['dtv'], keep='first').reset_index(drop=True)
-            
-            # 5. Detect Timeframe
-            detected_tf_sec = self._detect_timeframe(df)
-            
-            # 6. Save as Parquet
+            # 5. Create 'dtv' (int64 nanoseconds)
+            df['dtv'] = df['datetime'].astype('int64')
+
+            # 6. Detect Timeframe (in seconds)
+            diffs = df['dtv'].diff().dropna() / 1e9 # seconds
+            mode_diff = diffs.mode()
+            detected_tf = int(mode_diff.iloc[0]) if not mode_diff.empty else 0
+
+            # 7. Convert to PyArrow Table (Enforce Schema)
+            schema = pa.schema([
+                ('datetime', pa.timestamp('ns', tz='UTC')),
+                ('open', pa.float64()),
+                ('high', pa.float64()),
+                ('low', pa.float64()),
+                ('close', pa.float64()),
+                ('volume', pa.float64()),
+                ('dtv', pa.int64())
+            ])
+
+            table = pa.Table.from_pandas(df, schema=schema, preserve_index=False)
+
+            # 8. Save Parquet
             dataset_id = str(uuid.uuid4())
             parquet_filename = f"{dataset_id}.parquet"
             parquet_path = os.path.join(self.data_dir, parquet_filename)
             
-            # Select and cast columns
-            final_df = pd.DataFrame()
-            final_df['datetime'] = df['datetime']
-            final_df['dtv'] = df['dtv']
-
-            for col in ['open', 'high', 'low', 'close', 'volume']:
-                # Coerce to numeric, clean bad chars
-                final_df[col] = pd.to_numeric(df[col], errors='coerce')
-
-            # Drop rows with NaNs in OHLC
-            if final_df[['open', 'high', 'low', 'close']].isna().any().any():
-                dropped = final_df[final_df[['open', 'high', 'low', 'close']].isna().any(axis=1)].shape[0]
-                logger.warning(f"Dropping {dropped} rows with NaN OHLC data.")
-                final_df = final_df.dropna(subset=['open', 'high', 'low', 'close'])
-                
-            final_df.to_parquet(parquet_path, engine='pyarrow', index=False)
+            pq.write_table(table, parquet_path)
             
-            # 7. Generate Metadata
-            metadata = {
+            # 9. Return Metadata
+            return {
                 "id": dataset_id,
                 "symbol": symbol,
                 "timeframe": timeframe,
-                "detected_tf_sec": int(detected_tf_sec),
-                "start_date": final_df['datetime'].iloc[0].isoformat(),
-                "end_date": final_df['datetime'].iloc[-1].isoformat(),
-                "row_count": len(final_df),
+                "detected_tf_sec": detected_tf,
+                "start_date": df['datetime'].iloc[0].isoformat(),
+                "end_date": df['datetime'].iloc[-1].isoformat(),
+                "row_count": len(df),
                 "file_path": parquet_path,
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
-            
-            return metadata
 
         except Exception as e:
-            logger.error(f"Error processing csv: {e}")
-            raise e
-
-    def _validate_columns(self, df: pd.DataFrame):
-        if 'datetime' not in df.columns:
-             raise ValueError("Missing required column: datetime (or date/time/utc/timestamp)")
-
-        missing = [col for col in self.REQUIRED_COLUMNS if col not in df.columns]
-        if missing:
-            raise ValueError(f"Missing required columns: {missing}")
-
-    def _detect_timeframe(self, df: pd.DataFrame) -> int:
-        if len(df) < 2:
-            return 0
-        
-        # Calculate diff in seconds
-        diffs = df['dtv'].diff().dropna() / 1e9
-        # Get mode (most frequent interval)
-        mode_val = diffs.mode()
-        if not mode_val.empty:
-            return int(mode_val.iloc[0])
-        return 0
+            if isinstance(e, DataError):
+                raise e
+            raise DataError(f"Processing failed: {str(e)}")
 
     def load_dataset(self, file_path: str) -> pd.DataFrame:
+        """
+        Load dataset efficiently using PyArrow.
+        """
         if not os.path.exists(file_path):
-             raise FileNotFoundError(f"Dataset file not found: {file_path}")
-        return pd.read_parquet(file_path)
+             raise DataError(f"Dataset file not found: {file_path}")
+
+        try:
+            return pd.read_parquet(file_path, engine='pyarrow')
+        except Exception as e:
+            raise DataError(f"Failed to load Parquet file: {e}")

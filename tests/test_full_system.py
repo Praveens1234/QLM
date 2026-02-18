@@ -75,14 +75,25 @@ def test_full_flow(setup_system):
     assert ds_list[0]['symbol'] == "TEST"
 
     # 3. Create Strategy
+    # Using the new vectorized signals
     strat_code = """
 from backend.core.strategy import Strategy
 import pandas as pd
 class MyStrategy(Strategy):
     def define_variables(self, df): return {}
-    def entry_long(self, df, vars): return pd.Series([True] + [False]*(len(df)-1))
+    def entry_long(self, df, vars):
+        # Entry on first candle
+        s = pd.Series([False]*len(df))
+        s.iloc[0] = True
+        return s
     def entry_short(self, df, vars): return pd.Series([False]*len(df))
-    def exit(self, df, vars, trade): return True
+    # Vectorized Exit: Exit on second candle
+    def exit_long_signal(self, df, vars):
+        s = pd.Series([False]*len(df))
+        s.iloc[1] = True
+        return s
+    def exit_short_signal(self, df, vars): return pd.Series([False]*len(df))
+    def exit(self, df, vars, trade): return True # Legacy fallback
     def risk_model(self, df, vars): return {}
 """
     sl.save_strategy("MyStrat", strat_code)
@@ -90,6 +101,7 @@ class MyStrategy(Strategy):
     # 4. Run Backtest
     result = engine.run(meta['id'], "MyStrat")
     assert result['status'] == 'success'
+    # Should have 1 trade: Enter at 0, Exit at 1
     assert result['metrics']['total_trades'] == 1
 
     # 5. Fail-Safe Check
