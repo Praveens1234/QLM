@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from backend.api.mcp_session import session_manager
-from backend.api.telemetry import telemetry
+from backend.core.telemetry import telemetry
 from backend.api.transport import mcp_transport
 
 router = APIRouter()

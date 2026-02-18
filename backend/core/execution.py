@@ -5,12 +5,14 @@ import asyncio
 import uuid
 from datetime import datetime, timezone
 import random
+import pandas as pd
+from backend.database import db
 
 logger = logging.getLogger("QLM.Execution")
 
 class Order:
-    def __init__(self, symbol: str, quantity: float, side: str, order_type: str = "MARKET", price: Optional[float] = None):
-        self.id = str(uuid.uuid4())
+    def __init__(self, symbol: str, quantity: float, side: str, order_type: str = "MARKET", price: Optional[float] = None, id: str = None):
+        self.id = id or str(uuid.uuid4())
         self.symbol = symbol
         self.quantity = quantity
         self.side = side.upper() # BUY/SELL
@@ -21,6 +23,7 @@ class Order:
         self.filled_at = None
         self.fill_price = None
         self.commission = 0.0
+        self.external_id = None
 
     def to_dict(self):
         return {
@@ -34,8 +37,88 @@ class Order:
             "created_at": self.created_at.isoformat(),
             "filled_at": self.filled_at.isoformat() if self.filled_at else None,
             "fill_price": self.fill_price,
-            "commission": self.commission
+            "commission": self.commission,
+            "external_id": self.external_id
         }
+
+    def save(self):
+        """Persist order to database."""
+        try:
+            created_at_str = self.created_at.isoformat() if self.created_at else None
+            filled_at_str = self.filled_at.isoformat() if self.filled_at else None
+
+            with db.get_connection() as conn:
+                conn.execute('''
+                    INSERT OR REPLACE INTO orders (id, symbol, quantity, side, type, price, status, created_at, filled_at, fill_price, commission, external_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    self.id, self.symbol, self.quantity, self.side, self.type, self.price, self.status,
+                    created_at_str, filled_at_str, self.fill_price, self.commission, self.external_id
+                ))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Failed to save order {self.id}: {e}")
+
+    @classmethod
+    def load(cls, order_id: str):
+        try:
+            with db.get_connection() as conn:
+                row = conn.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+                if row:
+                    order = cls(
+                        symbol=row['symbol'],
+                        quantity=row['quantity'],
+                        side=row['side'],
+                        order_type=row['type'],
+                        price=row['price'],
+                        id=row['id']
+                    )
+                    order.status = row['status']
+                    order.created_at = pd.to_datetime(row['created_at']) if row['created_at'] else None
+                    order.filled_at = pd.to_datetime(row['filled_at']) if row['filled_at'] else None
+                    order.fill_price = row['fill_price']
+                    order.commission = row['commission']
+                    order.external_id = row['external_id']
+                    return order
+        except Exception as e:
+            logger.error(f"Failed to load order {order_id}: {e}")
+        return None
+
+class Position:
+    def __init__(self, symbol: str, quantity: float, entry_price: float, id: str = None):
+        self.id = id or str(uuid.uuid4())
+        self.symbol = symbol
+        self.quantity = quantity
+        self.entry_price = entry_price
+        self.current_price = entry_price
+        self.unrealized_pnl = 0.0
+        self.realized_pnl = 0.0
+        self.status = "OPEN"
+        self.opened_at = datetime.now(timezone.utc)
+        self.closed_at = None
+
+    def update_price(self, price: float):
+        self.current_price = price
+        # PnL logic (Long only for simplicity or signed qty?)
+        # Let's assume signed quantity: +Long, -Short
+        self.unrealized_pnl = (self.current_price - self.entry_price) * self.quantity
+
+    def save(self):
+        try:
+            opened_at_str = self.opened_at.isoformat() if self.opened_at else None
+            closed_at_str = self.closed_at.isoformat() if self.closed_at else None
+
+            with db.get_connection() as conn:
+                conn.execute('''
+                    INSERT OR REPLACE INTO positions (id, symbol, quantity, entry_price, current_price, unrealized_pnl, realized_pnl, status, opened_at, closed_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    self.id, self.symbol, self.quantity, self.entry_price, self.current_price,
+                    self.unrealized_pnl, self.realized_pnl, self.status, opened_at_str, closed_at_str
+                ))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Failed to save position {self.id}: {e}")
 
 class ExecutionHandler(ABC):
     """
@@ -56,6 +139,7 @@ class ExecutionHandler(ABC):
 class PaperTradingAdapter(ExecutionHandler):
     """
     Simulates order execution with configurable latency and slippage.
+    Persists state to SQLite via Order.save().
     """
     def __init__(self, latency_ms: int = 100, slippage_bps: int = 5, commission_pct: float = 0.1):
         self.orders: Dict[str, Order] = {}
@@ -63,6 +147,24 @@ class PaperTradingAdapter(ExecutionHandler):
         self.slippage_bps = slippage_bps # Basis points (1/10000)
         self.commission_pct = commission_pct
         self.market_prices: Dict[str, float] = {} # Current market price cache
+        self._load_state()
+
+    def _load_state(self):
+        """Load pending orders from DB."""
+        try:
+            with db.get_connection() as conn:
+                rows = conn.execute("SELECT * FROM orders WHERE status = 'PENDING'").fetchall()
+                for row in rows:
+                    order = Order(
+                        symbol=row['symbol'], quantity=row['quantity'], side=row['side'],
+                        order_type=row['type'], price=row['price'], id=row['id']
+                    )
+                    order.status = row['status']
+                    order.created_at = pd.to_datetime(row['created_at'])
+                    self.orders[order.id] = order
+            logger.info(f"Loaded {len(self.orders)} pending orders from persistence.")
+        except Exception as e:
+            logger.error(f"Failed to load persistence state: {e}")
 
     def update_price(self, symbol: str, price: float):
         self.market_prices[symbol] = price
@@ -71,6 +173,7 @@ class PaperTradingAdapter(ExecutionHandler):
         logger.info(f"PaperTrade: Submitting {order.side} {order.quantity} {order.symbol}")
         self.orders[order.id] = order
         order.status = "PENDING"
+        order.save()
 
         # Simulate Network Latency
         await asyncio.sleep(self.latency_ms / 1000.0)
@@ -110,6 +213,7 @@ class PaperTradingAdapter(ExecutionHandler):
         order.filled_at = datetime.now(timezone.utc)
         order.commission = (fill_price * order.quantity) * (self.commission_pct / 100.0)
 
+        order.save()
         logger.info(f"PaperTrade: Filled {order.id} @ {fill_price:.2f} (Slippage: {slippage_pct*100:.4f}%)")
         return order
 
@@ -117,6 +221,7 @@ class PaperTradingAdapter(ExecutionHandler):
         order = self.orders.get(order_id)
         if order and order.status == "PENDING":
             order.status = "CANCELLED"
+            order.save()
             return True
         return False
 

@@ -7,8 +7,8 @@ from backend.core.engine import BacktestEngine
 from backend.core.data import DataManager
 from backend.ai.analytics import calculate_market_structure, optimize_strategy, optimize_strategy_genetic
 from backend.ai.config_manager import AIConfigManager
-from backend.api.limiter import request_limiter
-from backend.api.interceptor import mcp_safe
+from backend.core.limiter import request_limiter
+from backend.core.interceptor import mcp_safe
 import os
 import shutil
 import pandas as pd

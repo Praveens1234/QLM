@@ -9,35 +9,18 @@ logger = logging.getLogger("QLM.AI.Prompts")
 class PromptManager:
     """
     Loads and manages dynamic MCP prompts from YAML templates.
-    Supports partial inclusions (e.g., {{> partial_name}}).
     """
     def __init__(self, prompt_dir: str = "backend/ai/prompts"):
         self.prompt_dir = prompt_dir
         if not os.path.exists(prompt_dir):
             os.makedirs(prompt_dir)
         self.prompts: Dict[str, Dict] = {}
-        self.partials: Dict[str, str] = {}
         self._load_prompts()
 
     def _load_prompts(self):
         self.prompts.clear()
-        self.partials.clear()
-
-        # First pass: Load partials (files starting with _)
         for filename in os.listdir(self.prompt_dir):
-            if filename.startswith("_") and (filename.endswith(".yaml") or filename.endswith(".yml")):
-                name = filename[1:].split(".")[0] # remove _ and extension
-                try:
-                    with open(os.path.join(self.prompt_dir, filename), "r") as f:
-                        data = yaml.safe_load(f)
-                        if "content" in data:
-                            self.partials[name] = data["content"]
-                except Exception as e:
-                    logger.error(f"Failed to load partial {filename}: {e}")
-
-        # Second pass: Load prompts
-        for filename in os.listdir(self.prompt_dir):
-            if not filename.startswith("_") and (filename.endswith(".yaml") or filename.endswith(".yml")):
+            if filename.endswith(".yaml") or filename.endswith(".yml"):
                 try:
                     with open(os.path.join(self.prompt_dir, filename), "r") as f:
                         data = yaml.safe_load(f)
@@ -47,13 +30,14 @@ class PromptManager:
                     logger.error(f"Failed to load prompt {filename}: {e}")
 
     def list_prompts(self) -> List[Prompt]:
+        # Refresh on list (dev mode friendly)
         self._load_prompts()
         result = []
         for name, data in self.prompts.items():
             result.append(Prompt(
                 name=name,
                 description=data.get("description", ""),
-                arguments=[]
+                arguments=[] # Logic for args not yet implemented in YAML schema
             ))
         return result
 
@@ -63,16 +47,13 @@ class PromptManager:
 
         data = self.prompts[name]
         messages = []
+
+        # Simple string replacement for args
         args = arguments or {}
 
         for msg in data.get("messages", []):
             content = msg.get("content", "")
-
-            # Inject Partials
-            for partial_name, partial_content in self.partials.items():
-                content = content.replace(f"{{{{> {partial_name}}}}}", partial_content)
-
-            # Inject Variables
+            # Inject variables
             for k, v in args.items():
                 content = content.replace(f"{{{{{k}}}}}", str(v))
 

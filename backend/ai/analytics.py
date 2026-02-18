@@ -211,6 +211,7 @@ def optimize_strategy_genetic(strategy_name: str, dataset_id: str, param_grid: D
                 params[keys[i]] = values_list[i][valid_idx]
 
             try:
+                # print(f"Evaluating: {params}")
                 try:
                     strategy_instance = StrategyClass(parameters=params)
                 except TypeError:

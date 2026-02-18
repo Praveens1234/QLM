@@ -4,10 +4,10 @@ import traceback
 import time
 from typing import Callable, Any, Dict
 from backend.core.exceptions import QLMError, MCPError, MCPInternalError
-from backend.api.circuit_breaker import circuit_breaker
+from backend.core.circuit_breaker import circuit_breaker
 from backend.core.forensics import crash_recorder
-from backend.api.telemetry import telemetry
-from backend.api.audit import audit_logger
+from backend.core.telemetry import telemetry
+from backend.core.audit_logger import audit_logger
 
 logger = logging.getLogger("QLM.MCP.Interceptor")
 

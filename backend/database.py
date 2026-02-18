@@ -42,13 +42,12 @@ class Database:
         """
         Initialize the database schema.
         Idempotent: Only creates tables if they don't exist.
-        Includes Migrations for AI Architecture Overhaul.
         """
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
 
-                # --- Config Table (Global Settings) ---
+                # --- Config Table ---
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS config (
                         key TEXT PRIMARY KEY,
@@ -57,26 +56,17 @@ class Database:
                     )
                 ''')
 
-                # --- Providers Table (Enhanced) ---
-                # Check if we need to migrate (add 'type' column if missing)
-                # For simplicity in this environment, we use IF NOT EXISTS and ALTER in try/except block
+                # --- Providers Table ---
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS providers (
                         id TEXT PRIMARY KEY,
                         name TEXT,
-                        type TEXT DEFAULT 'openai',
                         base_url TEXT,
                         api_key TEXT,
                         models TEXT, -- JSON list of models
                         is_active BOOLEAN DEFAULT 0
                     )
                 ''')
-
-                # Simple Migration: Add 'type' column if it doesn't exist
-                try:
-                    cursor.execute("ALTER TABLE providers ADD COLUMN type TEXT DEFAULT 'openai'")
-                except sqlite3.OperationalError:
-                    pass # Column likely exists
 
                 # --- Jobs/Memory Table ---
                 cursor.execute('''
@@ -131,7 +121,7 @@ class Database:
                     )
                 ''')
 
-                # --- Audit Logs ---
+                # --- Audit Logs (New Phase Requirement) ---
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS audit_logs (
                         id TEXT PRIMARY KEY,
@@ -139,6 +129,40 @@ class Database:
                         action TEXT,
                         details TEXT,
                         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+
+                # --- Orders Table (Execution Persistence) ---
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS orders (
+                        id TEXT PRIMARY KEY,
+                        symbol TEXT NOT NULL,
+                        quantity REAL NOT NULL,
+                        side TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        price REAL,
+                        status TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        filled_at TIMESTAMP,
+                        fill_price REAL,
+                        commission REAL DEFAULT 0.0,
+                        external_id TEXT
+                    )
+                ''')
+
+                # --- Positions Table (Execution Persistence) ---
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS positions (
+                        id TEXT PRIMARY KEY,
+                        symbol TEXT NOT NULL,
+                        quantity REAL NOT NULL,
+                        entry_price REAL NOT NULL,
+                        current_price REAL,
+                        unrealized_pnl REAL DEFAULT 0.0,
+                        realized_pnl REAL DEFAULT 0.0,
+                        status TEXT NOT NULL, -- OPEN, CLOSED
+                        opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        closed_at TIMESTAMP
                     )
                 ''')
 

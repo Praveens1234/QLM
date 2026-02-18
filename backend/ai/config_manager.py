@@ -1,119 +1,178 @@
 import json
+import os
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict, Any, Optional
 from backend.database import db
-from backend.ai.models import ProviderConfig, Model, AIConfig
-from backend.ai.factory import ProviderFactory
 
 logger = logging.getLogger("QLM.AI.Config")
 
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+
 class AIConfigManager:
     """
-    Manages AI Providers and Global Settings using SQLite.
-    Securely handles API keys (in-memory masking).
+    Manages AI Providers, Models, and Defaults using SQLite.
+    Migrates from legacy JSON if present.
     """
     def __init__(self):
-        pass # DB connection handled per method
+        self._ensure_migration()
 
-    def get_config(self) -> AIConfig:
+    def _ensure_migration(self):
         """
-        Load full configuration from DB.
+        Migrate legacy JSON config to SQLite if needed.
         """
-        config = AIConfig()
+        if os.path.exists(CONFIG_PATH):
+            try:
+                with open(CONFIG_PATH, "r") as f:
+                    data = json.load(f)
+
+                # Check if DB is empty
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT COUNT(*) FROM providers")
+                    if cursor.fetchone()[0] == 0:
+                        logger.info("Migrating legacy config.json to SQLite...")
+
+                        # Handle old schema (flat) vs new schema (providers list)
+                        if "providers" in data:
+                            for p in data["providers"]:
+                                cursor.execute('''
+                                    INSERT INTO providers (id, name, base_url, api_key, models, is_active)
+                                    VALUES (?, ?, ?, ?, ?, ?)
+                                ''', (
+                                    p["id"], p["name"], p["base_url"], p["api_key"],
+                                    json.dumps(p.get("available_models", [])),
+                                    False
+                                ))
+
+                            # Set active
+                            self._set_active_internal(cursor, data.get("active_provider_id", ""), data.get("active_model_id", ""))
+
+                        elif "api_key" in data: # Very old flat schema
+                            prov_id = "default"
+                            cursor.execute('''
+                                INSERT INTO providers (id, name, base_url, api_key, models, is_active)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                            ''', (
+                                prov_id, "Default Provider", data.get("base_url"), data.get("api_key"),
+                                json.dumps([data.get("model")] if data.get("model") else []),
+                                True
+                            ))
+                            self._set_active_internal(cursor, prov_id, data.get("model", ""))
+
+                    conn.commit()
+
+                # Rename legacy file to avoid re-migration
+                os.rename(CONFIG_PATH, CONFIG_PATH + ".bak")
+
+            except Exception as e:
+                logger.error(f"Migration failed: {e}")
+
+    def add_provider(self, name: str, base_url: str, api_key: str) -> str:
+        provider_id = name.lower().replace(" ", "_")
 
         with db.get_connection() as conn:
             cursor = conn.cursor()
 
-            # 1. Load Settings
-            cursor.execute("SELECT key, value FROM config")
-            rows = cursor.fetchall()
-            settings = {row["key"]: row["value"] for row in rows}
-
-            config.active_provider_id = settings.get("active_provider_id")
-            config.active_model_id = settings.get("active_model_id")
-            config.system_prompt = settings.get("system_prompt", config.system_prompt)
-            config.temperature = float(settings.get("temperature", config.temperature))
-
-            # 2. Load Providers
-            cursor.execute("SELECT * FROM providers")
-            prov_rows = cursor.fetchall()
-
-            for row in prov_rows:
-                models_data = json.loads(row["models"]) if row["models"] else []
-                models = [Model(**m) for m in models_data]
-
-                prov = ProviderConfig(
-                    id=row["id"],
-                    name=row["name"],
-                    type=row["type"],
-                    base_url=row["base_url"],
-                    api_key=row["api_key"],
-                    is_active=bool(row["is_active"]),
-                    models=models
-                )
-                config.providers.append(prov)
-
-        return config
-
-    def add_provider(self, config: ProviderConfig):
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-
-            models_json = json.dumps([m.dict() for m in config.models])
-
+            # Upsert
             cursor.execute('''
-                INSERT INTO providers (id, name, type, base_url, api_key, models, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO providers (id, name, base_url, api_key, models)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
-                    name=excluded.name,
-                    type=excluded.type,
                     base_url=excluded.base_url,
-                    api_key=excluded.api_key,
-                    models=excluded.models
-            ''', (
-                config.id, config.name, config.type, config.base_url,
-                config.api_key, models_json, config.is_active
-            ))
+                    api_key=excluded.api_key
+            ''', (provider_id, name, base_url, api_key, json.dumps([])))
+
+            # If no active provider, set this one
+            cursor.execute("SELECT value FROM config WHERE key='active_provider_id'")
+            if not cursor.fetchone():
+                self._set_active_internal(cursor, provider_id, "")
+
             conn.commit()
 
-    def remove_provider(self, provider_id: str):
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM providers WHERE id=?", (provider_id,))
-            conn.commit()
+        return provider_id
 
-    def set_active_provider(self, provider_id: str, model_id: str):
+    def set_models(self, provider_id: str, models: List[str]):
         with db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", ("active_provider_id", provider_id))
-            cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", ("active_model_id", model_id))
-            conn.commit()
 
-    def update_models(self, provider_id: str, models: List[Model]):
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            models_json = json.dumps([m.dict() for m in models])
-            cursor.execute("UPDATE providers SET models=? WHERE id=?", (models_json, provider_id))
-            conn.commit()
+            # Update models
+            cursor.execute("UPDATE providers SET models=? WHERE id=?", (json.dumps(models), provider_id))
 
-    def get_provider_config(self, provider_id: str) -> Optional[ProviderConfig]:
-        """
-        Get specific provider config including API key.
-        """
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM providers WHERE id=?", (provider_id,))
+            if cursor.rowcount == 0:
+                 raise ValueError("Provider not found")
+
+            # Auto-set active model if current active provider has no model set
+            cursor.execute("SELECT value FROM config WHERE key='active_provider_id'")
             row = cursor.fetchone()
+            active_pid = row[0] if row else None
 
-            if not row: return None
+            cursor.execute("SELECT value FROM config WHERE key='active_model_id'")
+            row_m = cursor.fetchone()
+            active_mid = row_m[0] if row_m else ""
 
-            models = [Model(**m) for m in json.loads(row["models"])] if row["models"] else []
-            return ProviderConfig(
-                id=row["id"],
-                name=row["name"],
-                type=row["type"],
-                base_url=row["base_url"],
-                api_key=row["api_key"],
-                is_active=bool(row["is_active"]),
-                models=models
-            )
+            if active_pid == provider_id and not active_mid and models:
+                self._set_active_internal(cursor, provider_id, models[0])
+
+            conn.commit()
+
+    def _set_active_internal(self, cursor, provider_id: str, model_id: str):
+        # Check provider exists
+        cursor.execute("SELECT models FROM providers WHERE id=?", (provider_id,))
+        row = cursor.fetchone()
+        if not row:
+            if not provider_id: pass
+            else: logger.warning(f"Setting active provider {provider_id} but it doesn't exist in DB.")
+
+        cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", ("active_provider_id", provider_id))
+        cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", ("active_model_id", model_id))
+
+    def set_active(self, provider_id: str, model_id: str):
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            self._set_active_internal(cursor, provider_id, model_id)
+            conn.commit()
+
+    def get_active_config(self) -> Dict[str, str]:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT value FROM config WHERE key='active_provider_id'")
+            pid_row = cursor.fetchone()
+            pid = pid_row[0] if pid_row else None
+
+            cursor.execute("SELECT value FROM config WHERE key='active_model_id'")
+            mid_row = cursor.fetchone()
+            mid = mid_row[0] if mid_row else ""
+
+            if not pid:
+                return {}
+
+            cursor.execute("SELECT name, base_url, api_key FROM providers WHERE id=?", (pid,))
+            p_row = cursor.fetchone()
+
+            if not p_row:
+                return {}
+
+            return {
+                "base_url": p_row["base_url"],
+                "api_key": p_row["api_key"],
+                "model": mid,
+                "provider_name": p_row["name"]
+            }
+
+    def get_all_providers(self) -> List[Dict]:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name, base_url, api_key, models FROM providers")
+            rows = cursor.fetchall()
+
+            safe_providers = []
+            for row in rows:
+                safe_providers.append({
+                    "id": row["id"],
+                    "name": row["name"],
+                    "base_url": row["base_url"],
+                    "models": json.loads(row["models"]) if row["models"] else [],
+                    "has_key": bool(row["api_key"])
+                })
+            return safe_providers

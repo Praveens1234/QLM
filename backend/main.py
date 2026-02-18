@@ -2,13 +2,13 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.routing import Route, Mount
 import os
 import traceback
 from pydantic import BaseModel
 
 from backend.core.exceptions import QLMError, StrategyError, DataError, SystemError, OptimizationError
 from backend.utils.logging import configure_logging, get_logger
+from backend.api.error_handler import global_exception_handler as detailed_exception_handler
 
 # Configure Logging
 configure_logging()
@@ -25,31 +25,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global Exception Handler
-@app.exception_handler(QLMError)
-async def qlm_exception_handler(request: Request, exc: QLMError):
-    logger.error("QLM Error", error=str(exc), type=exc.__class__.__name__, details=exc.details)
-    return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        content={"error": str(exc), "type": exc.__class__.__name__, "details": exc.details},
-    )
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logger.error("Global Unhandled Exception", error=str(exc), traceback=traceback.format_exc())
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"error": "Internal Server Error", "message": str(exc)},
-    )
+# Use centralized exception handler
+app.add_exception_handler(Exception, detailed_exception_handler)
 
 # API Router
 from backend.api import router as api_router
 from backend.api import dashboard
-from backend.api import ai_settings # New Settings API
-
 app.include_router(api_router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
-app.include_router(ai_settings.router, prefix="/api")
 
 # MCP Transport & Management
 from backend.api.mcp import handle_mcp_sse, handle_mcp_messages, get_mcp_status, toggle_mcp
@@ -61,7 +44,7 @@ class ASGIWrapper:
     async def __call__(self, scope, receive, send):
         await self.app(scope, receive, send)
 
-# Add MCP Routes
+# Add MCP Routes using ASGIWrapper via add_route (prevents auto-wrapping in Request/Response)
 app.add_route("/api/mcp/sse", ASGIWrapper(handle_mcp_sse), methods=["GET"])
 app.add_route("/api/mcp/messages", ASGIWrapper(handle_mcp_messages), methods=["POST"])
 

@@ -555,12 +555,132 @@ async function validateStrategy() {
 }
 
 // Backtest Functions
+let backtestMode = 'backtest';
+
+function setBacktestMode(mode) {
+    backtestMode = mode;
+    const btnBt = document.getElementById('btn-mode-bt');
+    const btnOpt = document.getElementById('btn-mode-opt');
+    const optConfig = document.getElementById('opt-config');
+    const actionBtn = document.getElementById('btn-run-action');
+
+    if (mode === 'backtest') {
+        btnBt.className = "flex-1 bg-indigo-600 text-white text-xs font-bold py-2 rounded border border-indigo-500 shadow-md transition-all";
+        btnOpt.className = "flex-1 bg-slate-800 text-slate-400 hover:text-white text-xs font-bold py-2 rounded border border-slate-700 hover:bg-slate-700 transition-all";
+        optConfig.classList.add('hidden');
+        actionBtn.innerHTML = `<i class="fa-solid fa-rocket"></i> Run Simulation`;
+    } else {
+        btnBt.className = "flex-1 bg-slate-800 text-slate-400 hover:text-white text-xs font-bold py-2 rounded border border-slate-700 hover:bg-slate-700 transition-all";
+        btnOpt.className = "flex-1 bg-emerald-600 text-white text-xs font-bold py-2 rounded border border-emerald-500 shadow-md transition-all";
+        optConfig.classList.remove('hidden');
+        actionBtn.innerHTML = `<i class="fa-solid fa-flask"></i> Run Optimization`;
+    }
+}
+
 function loadBacktestOptions() {
     const dSelect = document.getElementById('bt-dataset');
     const sSelect = document.getElementById('bt-strategy');
 
     dSelect.innerHTML = datasets.map(d => `<option value="${d.id}">${d.symbol} (${d.timeframe})</option>`).join('');
     sSelect.innerHTML = strategies.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+}
+
+function runBacktestAction() {
+    if (backtestMode === 'optimization') {
+        runOptimization();
+    } else {
+        runBacktest();
+    }
+}
+
+async function runOptimization() {
+    const datasetId = document.getElementById('bt-dataset').value;
+    const strategyName = document.getElementById('bt-strategy').value;
+    const method = document.getElementById('opt-method').value;
+    const target = document.getElementById('opt-target').value;
+
+    const badge = document.getElementById('bt-status-badge');
+    const status = document.getElementById('bt-status');
+    badge.classList.remove('hidden');
+    badge.innerText = "OPTIMIZING";
+    badge.className = "bg-purple-500/10 text-purple-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase animate-pulse";
+    status.innerText = "Running Optimization...";
+
+    try {
+        const res = await fetch(`${API_URL}/backtest/optimize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                dataset_id: datasetId,
+                strategy_name: strategyName,
+                method: method,
+                target_metric: target
+            })
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.status === "success") {
+            badge.innerText = "COMPLETED";
+            badge.className = "bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
+            status.innerText = "Optimization Finished";
+            renderOptimizationResults(data.results);
+        } else {
+            throw new Error(data.detail || "Optimization failed");
+        }
+    } catch(e) {
+        Toast.error("Optimization Error: " + e.message);
+        badge.innerText = "FAILED";
+        badge.className = "bg-rose-500/10 text-rose-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase";
+        status.innerText = "Failed";
+    }
+}
+
+function renderOptimizationResults(results) {
+    const container = document.getElementById('bt-results');
+    const best = results.best_metrics;
+    const params = results.best_params;
+
+    let paramsHtml = Object.entries(params).map(([k, v]) => `
+        <div class="flex justify-between text-xs border-b border-slate-800 pb-1 last:border-0">
+            <span class="text-slate-500 font-mono">${k}</span>
+            <span class="text-emerald-400 font-bold font-mono">${v}</span>
+        </div>
+    `).join('');
+
+    container.innerHTML = `
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm mb-6">
+            <h3 class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-trophy text-amber-400"></i> Best Parameters Found
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-slate-950 rounded-lg p-4 space-y-2 border border-slate-800">
+                    ${paramsHtml}
+                </div>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-slate-500 uppercase font-bold">Net Profit</span>
+                        <span class="text-lg font-mono font-bold ${best.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}">$${best.net_profit}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-slate-500 uppercase font-bold">Sharpe Ratio</span>
+                        <span class="text-lg font-mono font-bold text-indigo-400">${best.sharpe_ratio}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-slate-500 uppercase font-bold">Win Rate</span>
+                        <span class="text-lg font-mono font-bold text-white">${best.win_rate}%</span>
+                    </div>
+                     <div class="flex justify-between items-center">
+                        <span class="text-xs text-slate-500 uppercase font-bold">Total Trades</span>
+                        <span class="text-lg font-mono font-bold text-slate-300">${best.total_trades}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-slate-800 text-xs text-slate-500 text-center">
+                Optimization Method: <span class="text-white font-bold">${results.method}</span> • Total Runs: <span class="text-white font-bold">${results.total_runs || (results.generations * results.population_size)}</span>
+            </div>
+        </div>
+    `;
 }
 
 async function runBacktest() {
@@ -684,6 +804,30 @@ function renderResults(results) {
                 <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Avg Duration</span>
                 <div class="text-xl font-bold text-white mt-1 font-mono tracking-tight">${m.avg_duration}m</div>
              </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Avg R</span>
+                <div class="text-xl font-bold text-indigo-400 mt-1 font-mono tracking-tight">${m.avg_r_multiple || '0.00'}R</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">SQN</span>
+                <div class="text-xl font-bold text-indigo-400 mt-1 font-mono tracking-tight">${m.sqn}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Expectancy</span>
+                <div class="text-xl font-bold text-emerald-400 mt-1 font-mono tracking-tight">$${m.expectancy}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Trades/Day</span>
+                <div class="text-xl font-bold text-slate-300 mt-1 font-mono tracking-tight">${m.trades_per_day}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Avg MAE</span>
+                <div class="text-xl font-bold text-rose-400 mt-1 font-mono tracking-tight">${m.avg_mae}</div>
+             </div>
+             <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
+                <span class="text-[10px] text-slate-500 uppercase tracking-wide font-bold">Avg MFE</span>
+                <div class="text-xl font-bold text-emerald-400 mt-1 font-mono tracking-tight">${m.avg_mfe}</div>
+             </div>
         </div>
         
         <!-- Trade Ledger -->
@@ -702,12 +846,16 @@ function renderResults(results) {
                             <th class="px-6 py-3 tracking-wider">Exit Time (UTC)</th>
                             <th class="px-6 py-3 tracking-wider text-right">Exit</th>
                             <th class="px-6 py-3 tracking-wider text-right">PnL</th>
+                            <th class="px-6 py-3 tracking-wider text-right">R-Mult</th>
+                            <th class="px-6 py-3 tracking-wider text-right">MAE</th>
+                            <th class="px-6 py-3 tracking-wider text-right">MFE</th>
                             <th class="px-6 py-3 tracking-wider text-right">Reason</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800 font-mono text-xs">
                         ${results.trades.map(t => {
                             const pnlClass = t.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                            const rClass = (t.r_multiple || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400';
                             const dirClass = t.direction === 'long' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20';
 
                             return `
@@ -721,6 +869,9 @@ function renderResults(results) {
                                 <td class="px-6 py-3">${t.exit_time}</td>
                                 <td class="px-6 py-3 text-right text-white">${t.exit_price.toFixed(2)}</td>
                                 <td class="px-6 py-3 text-right font-bold ${pnlClass}">${t.pnl.toFixed(2)}</td>
+                                <td class="px-6 py-3 text-right font-bold ${rClass}">${(t.r_multiple || 0).toFixed(2)}R</td>
+                                <td class="px-6 py-3 text-right text-rose-300">${(t.mae || 0).toFixed(2)}</td>
+                                <td class="px-6 py-3 text-right text-emerald-300">${(t.mfe || 0).toFixed(2)}</td>
                                 <td class="px-6 py-3 text-right text-slate-500">${t.exit_reason}</td>
                             </tr>
                             `;

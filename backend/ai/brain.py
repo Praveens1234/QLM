@@ -24,7 +24,6 @@ TOOL_DISPLAY_NAMES = {
 class Brain:
     """
     Implements a ReAct (Reasoning + Acting) loop for the AI Agent.
-    Includes Loop Detection and Crash Protection.
     """
     def __init__(self, client: AIClient, tools: AITools):
         self.client = client
@@ -40,9 +39,6 @@ class Brain:
 
         steps = 0
         current_history = history.copy()
-
-        # Crash Protection: Track recent tool calls to detect loops
-        recent_actions = []
 
         while steps < max_steps:
             logger.info(f"Thinking Step {steps + 1}/{max_steps}")
@@ -60,9 +56,6 @@ class Brain:
                 traceback.print_exc()
                 return f"**Connection Error**: Failed to contact AI provider ({str(e)})."
 
-            if "choices" not in response or not response["choices"]:
-                 return "AI Provider returned an empty response."
-
             choice = response['choices'][0]
             message = choice['message']
 
@@ -79,17 +72,6 @@ class Brain:
 
             # 2. Execute Tools
             tool_calls = message['tool_calls']
-
-            # Loop Detection Logic
-            call_signatures = [f"{tc['function']['name']}:{tc['function']['arguments']}" for tc in tool_calls]
-            for sig in call_signatures:
-                recent_actions.append(sig)
-
-            # Check last 3 actions for identical repetition
-            if len(recent_actions) >= 3 and recent_actions[-1] == recent_actions[-2] == recent_actions[-3]:
-                logger.warning("Agent Loop Detected. Forcing stop.")
-                return "I seem to be stuck in a loop repeating the same action. I will stop here to avoid wasting resources. Please refine your request."
-
             for tool_call in tool_calls:
                 fn_name = tool_call['function']['name']
                 fn_args_str = tool_call['function']['arguments']
@@ -106,20 +88,20 @@ class Brain:
                     fn_args = json.loads(fn_args_str)
                     logger.info(f"Brain executing: {fn_name} with keys {list(fn_args.keys())}")
 
-                    # execute method is already @mcp_safe, so it catches crashes
                     tool_result = await self.tools.execute(fn_name, fn_args)
 
-                    # Success Callback
-                    # Check if result indicates success (mcp_safe returns dict)
-                    if isinstance(tool_result, dict) and "error" in tool_result:
-                         logger.warning(f"Tool {fn_name} error: {tool_result['error']}")
-                    elif on_tool_success:
-                         await on_tool_success(fn_name, fn_args, tool_result)
+                    # Logical Error Check
+                    if isinstance(tool_result, dict) and tool_result.get("error"):
+                        logger.warning(f"Tool {fn_name} returned error: {tool_result['error']}")
+                    else:
+                         # Success Callback
+                         if on_tool_success:
+                             await on_tool_success(fn_name, fn_args, tool_result)
 
                 except Exception as e:
-                    # Should be caught by mcp_safe, but just in case
-                    tool_result = {"error": f"Tool Critical Crash: {str(e)}"}
+                    tool_result = {"error": f"Tool Crash: {str(e)}"}
                     logger.error(f"Tool {fn_name} crash: {e}")
+                    traceback.print_exc()
 
                 # Create Tool Message
                 tool_msg = {

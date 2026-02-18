@@ -18,7 +18,7 @@ def run_numba_backtest(
 ):
     """
     High-performance Numba-compiled backtest loop.
-    Returns: (entry_times, exit_times, entry_prices, exit_prices, pnls, reasons, directions, maes, mfes)
+    Updated: Strict Gap Handling for SL/TP.
     """
     n = len(closes)
 
@@ -32,6 +32,7 @@ def run_numba_backtest(
     out_directions = np.zeros(n, dtype=np.int8)
     out_maes = np.zeros(n, dtype=np.float64)
     out_mfes = np.zeros(n, dtype=np.float64)
+    out_entry_indices = np.zeros(n, dtype=np.int64)
 
     trade_count = 0
 
@@ -43,7 +44,6 @@ def run_numba_backtest(
     curr_size = 0.0
     entry_time = 0
 
-    # Track intra-trade extremes
     curr_mae = 0.0
     curr_mfe = 0.0
 
@@ -59,52 +59,62 @@ def run_numba_backtest(
             exit_price = 0.0
             reason = 0
 
-            # Update MAE/MFE for current bar (before exit check to include current bar's wicks)
+            # Update MAE/MFE logic
             if direction == 1: # Long
-                # MFE: High - Entry
                 bar_mfe = h - entry_price
                 if bar_mfe > curr_mfe: curr_mfe = bar_mfe
-
-                # MAE: Entry - Low (max loss excursion)
                 bar_mae = entry_price - l
                 if bar_mae > curr_mae: curr_mae = bar_mae
 
-                # SL/TP Checks
+                # Check SL (Gap Handling: If open < SL, exit at Open)
                 if not np.isnan(curr_sl) and l <= curr_sl:
-                    exit_price = curr_sl
                     reason = 1 # SL
-                    # Adjust MAE if SL hit on wick
-                    if (entry_price - curr_sl) > curr_mae: curr_mae = entry_price - curr_sl
+                    if o < curr_sl:
+                        exit_price = o # Gapped down through SL
+                    else:
+                        exit_price = curr_sl # Hit intrabar
 
+                    if (entry_price - exit_price) > curr_mae: curr_mae = entry_price - exit_price
+
+                # Check TP (Gap Handling: If open > TP, exit at Open)
                 elif not np.isnan(curr_tp) and h >= curr_tp:
-                    exit_price = curr_tp
                     reason = 2 # TP
-                    # Adjust MFE if TP hit on wick
-                    if (curr_tp - entry_price) > curr_mfe: curr_mfe = curr_tp - entry_price
+                    if o > curr_tp:
+                        exit_price = o # Gapped up through TP
+                    else:
+                        exit_price = curr_tp
+
+                    if (exit_price - entry_price) > curr_mfe: curr_mfe = exit_price - entry_price
 
                 elif exit_long[i]:
                     exit_price = c
                     reason = 3 # Signal
 
             elif direction == -1: # Short
-                # MFE: Entry - Low
                 bar_mfe = entry_price - l
                 if bar_mfe > curr_mfe: curr_mfe = bar_mfe
-
-                # MAE: High - Entry
                 bar_mae = h - entry_price
                 if bar_mae > curr_mae: curr_mae = bar_mae
 
-                # SL/TP Checks
+                # Check SL (Gap Up)
                 if not np.isnan(curr_sl) and h >= curr_sl:
-                    exit_price = curr_sl
                     reason = 1 # SL
-                    if (curr_sl - entry_price) > curr_mae: curr_mae = curr_sl - entry_price
+                    if o > curr_sl:
+                        exit_price = o # Gapped up through SL
+                    else:
+                        exit_price = curr_sl
 
+                    if (exit_price - entry_price) > curr_mae: curr_mae = exit_price - entry_price
+
+                # Check TP (Gap Down)
                 elif not np.isnan(curr_tp) and l <= curr_tp:
-                    exit_price = curr_tp
                     reason = 2 # TP
-                    if (entry_price - curr_tp) > curr_mfe: curr_mfe = entry_price - curr_tp
+                    if o < curr_tp:
+                        exit_price = o # Gapped down through TP
+                    else:
+                        exit_price = curr_tp
+
+                    if (entry_price - exit_price) > curr_mfe: curr_mfe = entry_price - exit_price
 
                 elif exit_short[i]:
                     exit_price = c
@@ -120,8 +130,8 @@ def run_numba_backtest(
                 out_reasons[trade_count] = reason
                 out_maes[trade_count] = curr_mae
                 out_mfes[trade_count] = curr_mfe
+                out_entry_indices[trade_count] = active_idx
 
-                # PnL
                 if direction == 1:
                     pnl = (exit_price - entry_price) * curr_size
                 else:
@@ -142,8 +152,8 @@ def run_numba_backtest(
                 curr_tp = tp_arr[i]
                 curr_size = size_arr[i]
                 entry_time = c_time
-                curr_mae = 0.0 # Reset
-                curr_mfe = 0.0 # Reset
+                curr_mae = 0.0
+                curr_mfe = 0.0
 
             elif entry_short[i]:
                 active_idx = i
@@ -165,5 +175,6 @@ def run_numba_backtest(
         out_reasons[:trade_count],
         out_directions[:trade_count],
         out_maes[:trade_count],
-        out_mfes[:trade_count]
+        out_mfes[:trade_count],
+        out_entry_indices[:trade_count]
     )

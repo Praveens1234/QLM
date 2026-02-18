@@ -2,7 +2,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from backend.core.engine import BacktestEngine
 from backend.api.ws import manager
-from typing import Optional, Dict, Any
+from backend.ai.analytics import optimize_strategy, optimize_strategy_genetic
+from typing import Optional, Dict, Any, List
 import asyncio
 from starlette.concurrency import run_in_threadpool
 import logging
@@ -16,6 +17,54 @@ class BacktestRequest(BaseModel):
     dataset_id: str
     strategy_name: str
     version: Optional[int] = None
+
+class OptimizeRequest(BaseModel):
+    dataset_id: str
+    strategy_name: str
+    method: str = "grid" # grid, genetic
+    target_metric: str = "net_profit"
+    params: Optional[Dict[str, List[Any]]] = None
+
+@router.post("/optimize")
+async def run_optimization(request: OptimizeRequest):
+    try:
+        # Default Param Grid for Demo if not provided
+        # In a real app, frontend would inspect strategy and build this.
+        param_grid = request.params
+        if not param_grid:
+            # Simple demo grid
+            param_grid = {
+                "ma_fast": [5, 10, 20],
+                "ma_slow": [30, 50, 100],
+                "rsi_period": [14, 21],
+                "rsi_overbought": [70, 80],
+                "rsi_oversold": [20, 30]
+            }
+
+        if request.method == "genetic":
+            result = await run_in_threadpool(
+                optimize_strategy_genetic,
+                request.strategy_name,
+                request.dataset_id,
+                param_grid,
+                population_size=20,
+                generations=5,
+                target_metric=request.target_metric
+            )
+        else:
+            result = await run_in_threadpool(
+                optimize_strategy,
+                request.strategy_name,
+                request.dataset_id,
+                param_grid,
+                request.target_metric
+            )
+
+        return {"status": "success", "results": result}
+
+    except Exception as e:
+        logger.error(f"Optimization API Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/run")
 async def run_backtest(request: BacktestRequest):
