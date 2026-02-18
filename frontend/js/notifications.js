@@ -1,60 +1,54 @@
-// Toast Notification System
-const Toast = {
-    container: null,
+export class ToastSystem {
+    constructor() {
+        this.container = document.createElement('div');
+        this.container.className = 'fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none';
+        document.body.appendChild(this.container);
+    }
 
-    init: () => {
-        if (!document.getElementById('toast-container')) {
-            const container = document.createElement('div');
-            container.id = 'toast-container';
-            container.className = 'fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-none';
-            document.body.appendChild(container);
-            Toast.container = container;
-        } else {
-            Toast.container = document.getElementById('toast-container');
-        }
-    },
-
-    show: (message, type = 'info', duration = 5000) => {
-        if (!Toast.container) Toast.init();
-
+    show(message, type = 'info') {
         const toast = document.createElement('div');
         toast.className = `
-            pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border border-slate-700
-            transform transition-all duration-300 translate-y-2 opacity-0
-            ${type === 'error' ? 'bg-rose-950 text-rose-200' :
-              type === 'success' ? 'bg-emerald-950 text-emerald-200' :
-              'bg-slate-800 text-slate-200'}
+            pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg
+            transform transition-all duration-300 translate-x-10 opacity-0
+            min-w-[300px] max-w-md border backdrop-blur-md
         `;
 
-        const icon = type === 'error' ? 'fa-circle-exclamation' :
-                     type === 'success' ? 'fa-circle-check' : 'fa-info-circle';
+        // Colors based on type
+        if (type === 'success') {
+            toast.className += ' bg-emerald-900/80 border-emerald-500/30 text-emerald-100';
+            toast.innerHTML = `<i class="fa-solid fa-check-circle text-emerald-400"></i>`;
+        } else if (type === 'error') {
+            toast.className += ' bg-rose-900/80 border-rose-500/30 text-rose-100';
+            toast.innerHTML = `<i class="fa-solid fa-circle-exclamation text-rose-400"></i>`;
+        } else {
+            toast.className += ' bg-slate-800/90 border-slate-600/30 text-slate-100';
+            toast.innerHTML = `<i class="fa-solid fa-info-circle text-indigo-400"></i>`;
+        }
 
-        toast.innerHTML = `
-            <i class="fa-solid ${icon} text-lg"></i>
-            <div class="text-xs font-medium">${message}</div>
-        `;
+        const text = document.createElement('span');
+        text.className = 'text-sm font-medium';
+        text.innerText = message;
+        toast.appendChild(text);
 
-        Toast.container.appendChild(toast);
+        this.container.appendChild(toast);
 
         // Animate In
         requestAnimationFrame(() => {
-            toast.classList.remove('translate-y-2', 'opacity-0');
+            toast.classList.remove('translate-x-10', 'opacity-0');
         });
 
-        // Remove after duration
+        // Auto Dismiss
         setTimeout(() => {
-            toast.classList.add('translate-y-2', 'opacity-0');
+            toast.classList.add('opacity-0', 'translate-x-10');
             setTimeout(() => toast.remove(), 300);
-        }, duration);
-    },
+        }, 4000);
+    }
 
-    error: (msg) => Toast.show(msg, 'error'),
-    success: (msg) => Toast.show(msg, 'success'),
-    info: (msg) => Toast.show(msg, 'info')
-};
+    success(msg) { this.show(msg, 'success'); }
+    error(msg) { this.show(msg, 'error'); }
+    info(msg) { this.show(msg, 'info'); }
+}
 
-// Global Error Handler
-window.addEventListener('unhandledrejection', event => {
-    console.error('Unhandled promise rejection:', event.reason);
-    Toast.error(`System Error: ${event.reason.message || event.reason}`);
-});
+export const toast = new ToastSystem();
+// Backwards compatibility for now
+window.Toast = toast;
