@@ -52,8 +52,7 @@ class Brain:
                     tools=self.tools.get_definitions()
                 )
             except Exception as e:
-                logger.error(f"LLM Call Failed: {e}")
-                traceback.print_exc()
+                logger.error(f"LLM Call Failed: {e}", exc_info=True)
                 return f"**Connection Error**: Failed to contact AI provider ({str(e)})."
 
             choice = response['choices'][0]
@@ -100,8 +99,7 @@ class Brain:
 
                 except Exception as e:
                     tool_result = {"error": f"Tool Crash: {str(e)}"}
-                    logger.error(f"Tool {fn_name} crash: {e}")
-                    traceback.print_exc()
+                    logger.error(f"Tool {fn_name} crash: {e}", exc_info=True)
 
                 # Create Tool Message
                 tool_msg = {

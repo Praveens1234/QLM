@@ -4,6 +4,7 @@ import logging
 from typing import Optional, List, Dict, Any, Tuple
 from contextlib import contextmanager
 from backend.core.retry import db_retry
+from backend.core.config import settings
 
 logger = logging.getLogger("QLM.Database")
 
@@ -15,9 +16,9 @@ class Database:
     Includes Automatic Retry for Locking Errors.
     """
 
-    def __init__(self, db_path: str = "data/qlm.db"):
-        self.db_path = db_path
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    def __init__(self, db_path: str = None):
+        self.db_path = db_path or settings.DB_PATH
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._init_pragmas()
         self._init_schema()
 

@@ -3,6 +3,7 @@ import os
 import logging
 from typing import List, Dict, Any, Optional
 from backend.database import db
+from backend.core.config import settings
 
 logger = logging.getLogger("QLM.AI.Config")
 
@@ -11,10 +12,24 @@ CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
 class AIConfigManager:
     """
     Manages AI Providers, Models, and Defaults using SQLite.
+    Falls back to Environment Variables via `backend.core.config.settings` if DB is empty.
     Migrates from legacy JSON if present.
     """
     def __init__(self):
         self._ensure_migration()
+        self._ensure_env_defaults()
+
+    def _ensure_env_defaults(self):
+        """
+        Populate DB with providers from environment variables if not present.
+        """
+        # OpenAI
+        if settings.OPENAI_API_KEY:
+            self.add_provider("OpenAI", "https://api.openai.com/v1", settings.OPENAI_API_KEY)
+
+        # Anthropic
+        if settings.ANTHROPIC_API_KEY:
+            self.add_provider("Anthropic", "https://api.anthropic.com", settings.ANTHROPIC_API_KEY)
 
     def _ensure_migration(self):
         """
@@ -131,6 +146,25 @@ class AIConfigManager:
             cursor = conn.cursor()
             self._set_active_internal(cursor, provider_id, model_id)
             conn.commit()
+
+    def get_provider(self, provider_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve full provider details (including API Key).
+        Use internally only.
+        """
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name, base_url, api_key, models FROM providers WHERE id=?", (provider_id,))
+            row = cursor.fetchone()
+            if row:
+                return {
+                    "id": row["id"],
+                    "name": row["name"],
+                    "base_url": row["base_url"],
+                    "api_key": row["api_key"],
+                    "models": json.loads(row["models"]) if row["models"] else []
+                }
+        return None
 
     def get_active_config(self) -> Dict[str, str]:
         with db.get_connection() as conn:

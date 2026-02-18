@@ -7,7 +7,7 @@ import traceback
 from pydantic import BaseModel
 
 from backend.core.exceptions import QLMError, StrategyError, DataError, SystemError, OptimizationError
-from backend.utils.logging import configure_logging, get_logger
+from backend.core.logging import configure_logging, get_logger
 from backend.api.error_handler import global_exception_handler as detailed_exception_handler
 
 # Configure Logging

@@ -540,4 +540,10 @@ QLM is an institutional-grade algorithmic trading platform designed for quantita
             return await self._run_sync(_manifest)
 
         else:
-            return {"error": f"Tool '{tool_name}' not found."}
+            # Self-correction: Suggest valid tools
+            valid_tools = [d['function']['name'] for d in self.get_definitions()]
+            return {
+                "error": f"Tool '{tool_name}' not found.",
+                "valid_tools": valid_tools,
+                "hint": "Please check the tool name and try again."
+            }

@@ -78,34 +78,28 @@ async def get_active_config():
 
 @router.get("/config/models/{provider_id}")
 async def fetch_models(provider_id: str):
-    # Temporarily switch client to this provider to fetch models
-    # This requires client to be able to use a temp config or we just use requests directly here?
-    # Better: Use the client but configured temporarily.
-    # Or just use the active one if it matches?
-    # Let's instantiate a temporary client.
     from backend.ai.client import AIClient
 
-    # Get provider details
-    providers = config_manager.get_all_providers() # unsafe method needed to get key
-    # Wait, get_all_providers masks keys? No, I implemented it to return has_key bool.
-    # I need internal access.
-
-    target_p = None
-    for p in config_manager.config["providers"]:
-        if p["id"] == provider_id:
-            target_p = p
-            break
+    # Securely retrieve provider details (including key)
+    target_p = config_manager.get_provider(provider_id)
 
     if not target_p:
         raise HTTPException(status_code=404, detail="Provider not found")
 
+    if not target_p["api_key"]:
+        raise HTTPException(status_code=400, detail="Provider has no API Key configured.")
+
     temp_client = AIClient()
     temp_client.configure(target_p["api_key"], target_p["base_url"], "")
 
-    models = await temp_client.list_models()
-    # Save these models to config
-    config_manager.set_models(provider_id, models)
-    return {"models": models}
+    try:
+        models = await temp_client.list_models()
+        # Save these models to config
+        config_manager.set_models(provider_id, models)
+        return {"models": models}
+    except Exception as e:
+        logger.error(f"Failed to fetch models: {e}")
+        raise HTTPException(status_code=502, detail=f"Provider Error: {str(e)}")
 
 # Session Routes
 @router.get("/sessions")
