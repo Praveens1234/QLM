@@ -160,8 +160,11 @@ class DataManager:
             # Drop rows with NaN in OHLC
             df.dropna(subset=['open', 'high', 'low', 'close'], inplace=True)
             
+            # Filter non-positive prices (Data Quality)
+            df = df[(df['open'] > 0) & (df['high'] > 0) & (df['low'] > 0) & (df['close'] > 0)]
+
             if df.empty:
-                raise DataError("Dataset is empty after removing NaNs.")
+                raise DataError("Dataset is empty after removing NaNs/Zeros.")
 
             # 4. Sort & Deduplicate
             df.sort_values('datetime', inplace=True)

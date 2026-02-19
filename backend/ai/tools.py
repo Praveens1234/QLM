@@ -264,6 +264,20 @@ class AITools:
                         "properties": {}
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "consult_skill",
+                    "description": "Retrieve expert knowledge/skill documentation.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "topic": {"type": "string", "enum": ["coding", "market_analysis", "debugging", "general", "regime"]}
+                        },
+                        "required": ["topic"]
+                    }
+                }
             }
         ]
 
@@ -538,6 +552,16 @@ QLM is an institutional-grade algorithmic trading platform designed for quantita
                 return intro + tools_doc
 
             return await self._run_sync(_manifest)
+
+        elif tool_name == "consult_skill":
+            topic = args.get("topic")
+            def _consult():
+                path = os.path.join("backend", "ai", "skills", f"{topic}.md")
+                if os.path.exists(path):
+                    with open(path, "r") as f:
+                        return f.read()
+                return "Skill topic not found."
+            return await self._run_sync(_consult)
 
         else:
             # Self-correction: Suggest valid tools
