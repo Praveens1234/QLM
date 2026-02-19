@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch, AsyncMock
 import asyncio
 from backend.core.execution_live import LiveExecutionHandler, Order
-from backend.core.exceptions import SystemError
+from backend.core.exceptions import QLMSystemError
 import ccxt.async_support as ccxt
 import ccxt as ccxt_sync
 

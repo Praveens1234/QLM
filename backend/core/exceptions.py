@@ -12,8 +12,8 @@ class DataError(QLMError):
     """Raised when data ingestion or processing fails."""
     pass
 
-class SystemError(QLMError):
-    """Raised for critical system failures (e.g., DB lock, OOM)."""
+class QLMSystemError(QLMError):
+    """System-level errors (DB, file I/O)."""
     pass
 
 class OptimizationError(QLMError):

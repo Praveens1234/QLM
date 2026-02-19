@@ -18,9 +18,9 @@ export class BacktestView {
         const btnOpt = document.getElementById('btn-mode-opt');
         const btnRun = document.getElementById('btn-run-action');
 
-        if(btnBt) btnBt.addEventListener('click', () => this.setMode('backtest'));
-        if(btnOpt) btnOpt.addEventListener('click', () => this.setMode('optimization'));
-        if(btnRun) btnRun.addEventListener('click', () => this.run());
+        if (btnBt) btnBt.addEventListener('click', () => this.setMode('backtest'));
+        if (btnOpt) btnOpt.addEventListener('click', () => this.setMode('optimization'));
+        if (btnRun) btnRun.addEventListener('click', () => this.run());
     }
 
     async mount() {
@@ -59,7 +59,7 @@ export class BacktestView {
 
             dSelect.innerHTML = datasets.map(d => `<option value="${d.id}">${d.symbol} (${d.timeframe})</option>`).join('');
             sSelect.innerHTML = strategies.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
-        } catch (e) {}
+        } catch (e) { }
     }
 
     async run() {
@@ -135,7 +135,7 @@ export class BacktestView {
     }
 
     handleError(msg) {
-        if(window.Toast) window.Toast.error(msg.message || msg.details || "Error");
+        if (window.Toast) window.Toast.error(msg.message || msg.details || "Error");
         const bar = document.getElementById('bt-progress-bar');
         bar.classList.add('bg-rose-500');
         bar.style.width = '100%';
@@ -151,7 +151,7 @@ export class BacktestView {
             this._renderOptResults(results);
         } else {
             // Use ResultsView for backtest
-            import('./ResultsView.js').then(({ ResultsView }) => {
+            import('./ResultsView.js?v=5').then(({ ResultsView }) => {
                 const view = new ResultsView('bt-results');
                 view.render(results);
             });

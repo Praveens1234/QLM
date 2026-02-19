@@ -2,7 +2,7 @@ from fastapi import Request, status
 from fastapi.responses import JSONResponse
 import logging
 import traceback
-from backend.core.exceptions import SystemError, OptimizationError, StrategyError, DataError, QLMError
+from backend.core.exceptions import QLMSystemError, OptimizationError, StrategyError, DataError, QLMError
 from ccxt import ExchangeError, NetworkError, RateLimitExceeded, DDoSProtection
 
 logger = logging.getLogger("QLM.API")
@@ -21,7 +21,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     }
 
     # 1. System & Critical Errors
-    if isinstance(exc, SystemError):
+    if isinstance(exc, QLMSystemError):
         error_content["error"] = "System Critical Error"
         error_content["code"] = 503 # Service Unavailable
         logger.critical(f"System Error at {request.url.path}: {exc}")

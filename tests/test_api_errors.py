@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from backend.main import app
-from backend.core.exceptions import SystemError, OptimizationError
+from backend.core.exceptions import QLMSystemError, OptimizationError
 from fastapi import APIRouter
 
 # Create a router for testing
@@ -10,7 +10,7 @@ test_router = APIRouter()
 @test_router.get("/api/test_error/{error_type}")
 async def trigger_error(error_type: str):
     if error_type == "system":
-        raise SystemError("Simulated System Crash")
+        raise QLMSystemError("Simulated System Crash")
     elif error_type == "optimization":
         raise OptimizationError("Simulated Optimization Failure")
     elif error_type == "validation":

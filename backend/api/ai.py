@@ -26,6 +26,11 @@ class ProviderCreate(BaseModel):
     base_url: str
     api_key: str
 
+class ProviderUpdate(BaseModel):
+    name: Optional[str] = None
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+
 class ActiveConfigSet(BaseModel):
     provider_id: str
     model_id: str
@@ -62,6 +67,27 @@ async def list_providers():
 async def add_provider(provider: ProviderCreate):
     pid = config_manager.add_provider(provider.name, provider.base_url, provider.api_key)
     return {"status": "success", "id": pid}
+
+@router.delete("/config/providers/{provider_id}")
+async def delete_provider(provider_id: str):
+    try:
+        config_manager.delete_provider(provider_id)
+        return {"status": "success"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.put("/config/providers/{provider_id}")
+async def update_provider(provider_id: str, provider: ProviderUpdate):
+    try:
+        config_manager.update_provider(
+            provider_id,
+            name=provider.name,
+            base_url=provider.base_url,
+            api_key=provider.api_key
+        )
+        return {"status": "success"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 @router.post("/config/active")
 async def set_active_config(config: ActiveConfigSet):

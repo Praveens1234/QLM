@@ -15,7 +15,7 @@ export class DashboardView {
             const [datasets, strategies, liveStatus] = await Promise.all([
                 api.get('/data/'),
                 api.get('/strategies/'),
-                api.get('/live/dashboard/live/status')
+                api.get('/live/status')
             ]);
 
             this.renderStat('strategies', strategies.length);

@@ -80,8 +80,8 @@ class MCPTransport:
             return message
 
         try:
-            # We pass the original receive for now as deep interception requires full buffering
-            await self.sse.handle_post_message(scope, receive, send)
+            # Use validated_receive to validate JSON-RPC payloads before passing to MCP
+            await self.sse.handle_post_message(scope, validated_receive, send)
         except Exception as e:
             logger.error(f"MCP Message Error: {e}")
             await self._send_error(scope, receive, send, 500, str(e))

@@ -1,0 +1,47 @@
+=== TEST 1: List Providers ===
+  PASS: Status 200
+  PASS: Returns list
+  PASS: Provider has 'id'
+  PASS: Provider has 'name'
+  PASS: Provider has 'models'
+  PASS: Provider has 'has_key'
+  PASS: Provider has 'api_key_masked'
+  Found 2 providers
+
+=== TEST 2: Active Config has provider_id ===
+  PASS: Status 200
+  PASS: Has provider_id
+  PASS: Has model
+  PASS: Has provider_name
+  Active: {
+  "provider_id": "test_provider",
+  "base_url": "https://test.example.com/v1",
+  "api_key": "***",
+  "model": "test-model-v1",
+  "provider_name": "Test Provider"
+}
+
+=== TEST 3: Add Provider ===
+  PASS: Status 200
+  PASS: Returns id
+
+=== TEST 4: Update Provider (PUT) ===
+  PASS: Status 200
+  PASS: Name updated
+
+=== TEST 5: Set Active Config ===
+  PASS: Status 200
+  PASS: Active provider_id correct
+  PASS: Active model correct
+
+=== TEST 6: Delete Provider ===
+  PASS: Status 200
+  PASS: Provider removed
+  PASS: Active config cleared
+
+=== TEST 7: Delete Non-existent Provider ===
+  PASS: Returns 404
+
+==================================================
+RESULTS: 22 passed, 0 failed out of 22 tests
+==================================================

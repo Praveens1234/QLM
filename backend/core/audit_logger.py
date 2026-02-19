@@ -1,6 +1,7 @@
 from typing import Dict, Any
 import logging
 import json
+import uuid
 from datetime import datetime, timezone
 from backend.database import db
 from backend.core.retry import db_retry
@@ -42,5 +43,4 @@ class AuditLogger:
             logger.error(f"Failed to write audit log: {e}")
 
 # Singleton
-import uuid
 audit_logger = AuditLogger()

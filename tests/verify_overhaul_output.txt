@@ -1,0 +1,64 @@
+Dataset: XAUUSD 1M (165530 rows)
+
+============================================================
+TEST 1: CAPITAL MODE (USD)
+============================================================
+  Status: success
+  Mode: capital
+  Unit: USD
+  Total Trades: 397
+  Total Long: 289
+  Total Short: 108
+  Total Wins: 198
+  Total Losses: 199
+  Win Rate: 49.87%
+  Net Profit: $-24422.91
+  Profit Factor: 0.49
+  Max Drawdown: $35009.06
+  Max Runup: $26.45
+  Expectancy: $-61.52
+  Avg RRR: -11.6396
+  Final Equity: $-14422.91
+
+  First Trade Ledger Entry:
+    Entry DT: 2025-01-04 08:07:00
+    DIR: short
+    Entry Price: 3133.045
+    Exit Price: 3138.33029
+    Exit DT: 2025-01-04 10:23:00
+    PnL: -5.29
+    RRR: -1.0
+    SL: 3138.33029
+    TP: 3127.75971
+    Max DD: 5.77
+    Max Runup: 3.75
+    Holding Time: 136.0 min
+    Status: SL Hit
+
+  Exit Reasons: {'SL Hit': 199, 'TP Hit': 198}
+
+============================================================
+TEST 2: RRR MODE (R-multiples)
+============================================================
+  Status: success
+  Mode: rrr
+  Unit: R
+  Total Trades: 397
+  Net Profit (R): -4620.93
+  Avg RRR: -11.6396
+
+  First Trade (RRR mode):
+    PnL (R): -1.0
+    RRR: -1.0
+    Status: SL Hit
+
+============================================================
+TEST 3: LEVERAGE (10x)
+============================================================
+  Net Profit (10x leverage): $-244229.09
+  Net Profit (1x leverage):  $-24422.91
+  Ratio (should be ~10x): 10.0x
+
+============================================================
+VERIFICATION COMPLETE
+============================================================

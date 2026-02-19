@@ -18,7 +18,7 @@ def get_live_handler():
         _live_handler = LiveExecutionHandler("binance", "mock_key", "mock_secret", sandbox=True)
     return _live_handler
 
-@router.get("/dashboard/live/status")
+@router.get("/status")
 async def get_live_status():
     """Returns active orders and positions."""
     try:

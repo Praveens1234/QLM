@@ -5,6 +5,7 @@ export class BacktestService {
     constructor() {
         this.progressListeners = [];
         this.resultListeners = [];
+        this.errorListeners = [];
 
         wsClient.subscribe((msg) => {
             if (msg.type === 'progress') {
@@ -19,11 +20,11 @@ export class BacktestService {
 
     onProgress(cb) { this.progressListeners.push(cb); }
     onResult(cb) { this.resultListeners.push(cb); }
-    onError(cb) { this.errorListener = cb; }
+    onError(cb) { this.errorListeners.push(cb); }
 
     notifyProgress(msg) { this.progressListeners.forEach(cb => cb(msg)); }
     notifyResult(res) { this.resultListeners.forEach(cb => cb(res)); }
-    notifyError(err) { if(this.errorListener) this.errorListener(err); }
+    notifyError(err) { this.errorListeners.forEach(cb => cb(err)); }
 
     async runBacktest(datasetId, strategyName) {
         return await api.post('/backtest/run', { dataset_id: datasetId, strategy_name: strategyName });

@@ -48,7 +48,7 @@ class CrashRecorder:
                             local_vars[k] = v
                         else:
                             local_vars[k] = str(v)
-                    except:
+                    except Exception:
                         local_vars[k] = "<Unserializable>"
         except Exception as e:
             local_vars = {"error_capturing_locals": str(e)}
@@ -56,8 +56,8 @@ class CrashRecorder:
         report = {
             "crash_id": crash_id,
             "timestamp": timestamp,
-            "exception_type": str(exc_type.__name__),
-            "exception_message": str(exc_value),
+            "exception_type": str(exc_type.__name__) if exc_type else "Unknown",
+            "exception_message": str(exc_value) if exc_value else "Unknown",
             "traceback": tb_lines,
             "context_args": context or {},
             "local_variables": local_vars

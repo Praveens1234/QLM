@@ -40,6 +40,14 @@ export class AIService {
     async addProvider(config) {
         return await api.post('/ai/config/providers', config);
     }
+
+    async fetchModels(providerId) {
+        return await api.get(`/ai/config/models/${providerId}`);
+    }
+
+    async deleteProvider(providerId) {
+        return await api.delete(`/ai/config/providers/${providerId}`);
+    }
 }
 
 export const aiService = new AIService();

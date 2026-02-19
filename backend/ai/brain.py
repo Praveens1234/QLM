@@ -9,16 +9,16 @@ logger = logging.getLogger("QLM.AI.Brain")
 
 # Human-readable status mapping
 TOOL_DISPLAY_NAMES = {
-    "list_datasets": "🔍 Scanning Data",
-    "list_strategies": "📂 Checking Strategies",
-    "get_strategy_code": "📖 Reading Code",
-    "create_strategy": "📝 Writing Strategy",
-    "validate_strategy": "✅ Validating Logic",
-    "run_backtest": "🚀 Running Simulation",
-    "get_market_data": "📊 Fetching Market Data",
-    "import_dataset_from_url": "⬇️ Downloading Dataset",
-    "analyze_market_structure": "🧠 Analyzing Market",
-    "optimize_parameters": "⚙️ Optimizing"
+    "list_datasets": "[SCAN] Scanning Data",
+    "list_strategies": "[SCAN] Checking Strategies",
+    "get_strategy_code": "[READ] Reading Code",
+    "create_strategy": "[WRITE] Writing Strategy",
+    "validate_strategy": "[CHECK] Validating Logic",
+    "run_backtest": "[RUN] Running Simulation",
+    "get_market_data": "[DATA] Fetching Market Data",
+    "import_dataset_from_url": "[DOWNLOAD] Downloading Dataset",
+    "analyze_market_structure": "[ANALYZE] Analyzing Market",
+    "optimize_parameters": "[OPTIMIZE] Optimizing"
 }
 
 class Brain:

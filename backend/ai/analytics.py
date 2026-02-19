@@ -108,6 +108,9 @@ def optimize_strategy(strategy_name: str, dataset_id: str, param_grid: Dict[str,
 
         # 2. Load Context
         engine, df, StrategyClass = _load_optimization_context(strategy_name, dataset_id)
+        
+        # Pre-calculate data arrays to avoid repeated copying in threads (Fix for Freeze/Memory Leak)
+        precalc_arrays = engine._prepare_data_arrays(df)
 
         results = []
 
@@ -122,7 +125,7 @@ def optimize_strategy(strategy_name: str, dataset_id: str, param_grid: Dict[str,
                      if hasattr(strategy_instance, 'set_parameters'):
                          strategy_instance.set_parameters(params)
 
-                res = engine._execute_fast(df, strategy_instance)
+                res = engine._execute_fast(df, strategy_instance, precalc_arrays=precalc_arrays)
                 metrics = res['metrics']
 
                 return {
@@ -133,7 +136,8 @@ def optimize_strategy(strategy_name: str, dataset_id: str, param_grid: Dict[str,
             except Exception as e:
                 return {"params": params, "error": str(e), "status": "failed"}
 
-        with ThreadPoolExecutor(max_workers=8) as executor:
+        # Limit workers to 4 on Windows to prevent threading issues/freezes
+        with ThreadPoolExecutor(max_workers=4) as executor:
             futures = [executor.submit(_run_single, combo) for combo in combinations]
 
             for future in as_completed(futures):
@@ -170,6 +174,9 @@ def optimize_strategy_genetic(strategy_name: str, dataset_id: str, param_grid: D
 
         # 1. Setup Context
         engine, df, StrategyClass = _load_optimization_context(strategy_name, dataset_id)
+        
+        # Pre-calculate arrays
+        precalc_arrays = engine._prepare_data_arrays(df)
 
         keys = list(param_grid.keys())
         values_list = [param_grid[k] for k in keys]
@@ -219,7 +226,7 @@ def optimize_strategy_genetic(strategy_name: str, dataset_id: str, param_grid: D
                      if hasattr(strategy_instance, 'set_parameters'):
                          strategy_instance.set_parameters(params)
 
-                res = engine._execute_fast(df, strategy_instance)
+                res = engine._execute_fast(df, strategy_instance, precalc_arrays=precalc_arrays)
                 metric_val = res['metrics'].get(target_metric, -float('inf'))
 
                 # Penalize low trade count? (Optional)
@@ -292,7 +299,7 @@ def optimize_strategy_genetic(strategy_name: str, dataset_id: str, param_grid: D
         except TypeError:
             strategy_instance = StrategyClass()
             strategy_instance.set_parameters(best['params'])
-        res = engine._execute_fast(df, strategy_instance)
+        res = engine._execute_fast(df, strategy_instance, precalc_arrays=precalc_arrays)
         best_metrics = res['metrics']
 
         return {

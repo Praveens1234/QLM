@@ -28,8 +28,12 @@ class SMATrendFollowingStrategy(Strategy):
         low = df['low']
 
         # Optimized SMA periods for 5M timeframe
-        sma_fast = close.rolling(window=10).mean()
-        sma_slow = close.rolling(window=50).mean()
+        # Prefer 'ma_fast'/'ma_slow' keys to match default API grid, but support explicit names too
+        fast_period = int(self.parameters.get('ma_fast', self.parameters.get('sma_fast_period', 10)))
+        slow_period = int(self.parameters.get('ma_slow', self.parameters.get('sma_slow_period', 50)))
+        
+        sma_fast = close.rolling(window=fast_period).mean()
+        sma_slow = close.rolling(window=slow_period).mean()
 
         # ATR14 calculation
         tr1 = high - low

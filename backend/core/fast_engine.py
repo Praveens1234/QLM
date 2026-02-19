@@ -166,6 +166,28 @@ def run_numba_backtest(
                 curr_mae = 0.0
                 curr_mfe = 0.0
 
+    # Force-close any open trade at end of data
+    if active_idx != -1:
+        exit_price = closes[n - 1]
+        c_time = times[n - 1]
+
+        if direction == 1:
+            pnl = (exit_price - entry_price) * curr_size
+        else:
+            pnl = (entry_price - exit_price) * curr_size
+
+        out_entry_times[trade_count] = entry_time
+        out_exit_times[trade_count] = c_time
+        out_entry_prices[trade_count] = entry_price
+        out_exit_prices[trade_count] = exit_price
+        out_directions[trade_count] = direction
+        out_reasons[trade_count] = 4  # EOD (End of Data)
+        out_maes[trade_count] = curr_mae
+        out_mfes[trade_count] = curr_mfe
+        out_entry_indices[trade_count] = active_idx
+        out_pnls[trade_count] = pnl
+        trade_count += 1
+
     return (
         out_entry_times[:trade_count],
         out_exit_times[:trade_count],

@@ -106,6 +106,46 @@ class AIConfigManager:
 
         return provider_id
 
+    def delete_provider(self, provider_id: str):
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM providers WHERE id=?", (provider_id,))
+            if cursor.rowcount == 0:
+                raise ValueError("Provider not found")
+
+            # If this was the active provider, clear active config
+            cursor.execute("SELECT value FROM config WHERE key='active_provider_id'")
+            row = cursor.fetchone()
+            if row and row[0] == provider_id:
+                cursor.execute("DELETE FROM config WHERE key='active_provider_id'")
+                cursor.execute("DELETE FROM config WHERE key='active_model_id'")
+
+            conn.commit()
+
+    def update_provider(self, provider_id: str, name: str = None, base_url: str = None, api_key: str = None):
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            updates = []
+            params = []
+            if name is not None:
+                updates.append("name=?")
+                params.append(name)
+            if base_url is not None:
+                updates.append("base_url=?")
+                params.append(base_url)
+            if api_key is not None:
+                updates.append("api_key=?")
+                params.append(api_key)
+
+            if not updates:
+                return
+
+            params.append(provider_id)
+            cursor.execute(f"UPDATE providers SET {', '.join(updates)} WHERE id=?", params)
+            if cursor.rowcount == 0:
+                raise ValueError("Provider not found")
+            conn.commit()
+
     def set_models(self, provider_id: str, models: List[str]):
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -188,6 +228,7 @@ class AIConfigManager:
                 return {}
 
             return {
+                "provider_id": pid,
                 "base_url": p_row["base_url"],
                 "api_key": p_row["api_key"],
                 "model": mid,
@@ -206,6 +247,7 @@ class AIConfigManager:
                     "id": row["id"],
                     "name": row["name"],
                     "base_url": row["base_url"],
+                    "api_key_masked": row["api_key"][:4] + "***" if row["api_key"] and len(row["api_key"]) > 4 else "***",
                     "models": json.loads(row["models"]) if row["models"] else [],
                     "has_key": bool(row["api_key"])
                 })

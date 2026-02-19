@@ -36,30 +36,6 @@ async def validate_strategy(strategy: StrategyCreate):
     result = loader.validate_strategy_code(strategy.code)
     return result
 
-@router.get("/{name}/versions")
-async def get_strategy_versions(name: str):
-    versions = loader._get_versions(name) # helper access
-    if not versions:
-        raise HTTPException(status_code=404, detail="Strategy not found")
-    return {"name": name, "versions": versions}
-
-@router.get("/{name}/{version}")
-async def get_strategy_code(name: str, version: int):
-    code = loader.get_strategy_code(name, version)
-    if code is None:
-        raise HTTPException(status_code=404, detail="Strategy version not found")
-    return {"name": name, "version": version, "code": code}
-
-@router.delete("/{name}")
-async def delete_strategy(name: str):
-    try:
-        loader.delete_strategy(name)
-        return {"status": "deleted", "name": name}
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Strategy not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.get("/templates/list")
 async def list_templates():
     """
@@ -89,3 +65,29 @@ async def get_template(name: str):
     with open(filepath, "r") as f:
         code = f.read()
     return {"name": name, "code": code}
+
+@router.get("/{name}/versions")
+async def get_strategy_versions(name: str):
+    versions = loader._get_versions(name) # helper access
+    if not versions:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    return {"name": name, "versions": versions}
+
+@router.get("/{name}/{version}")
+async def get_strategy_code(name: str, version: int):
+    code = loader.get_strategy_code(name, version)
+    if code is None:
+        raise HTTPException(status_code=404, detail="Strategy version not found")
+    return {"name": name, "version": version, "code": code}
+
+@router.delete("/{name}")
+async def delete_strategy(name: str):
+    try:
+        loader.delete_strategy(name)
+        return {"status": "deleted", "name": name}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+

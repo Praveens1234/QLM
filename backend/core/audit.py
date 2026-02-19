@@ -16,6 +16,8 @@ class LedgerAuditor:
         for i, trade in enumerate(trades):
             # 1. Check PnL Consistency
             # PnL ~= (Exit - Entry) * Size * Direction
+            entry = 0
+            exit_p = 0
             try:
                 entry = float(trade.get("entry_price", 0))
                 exit_p = float(trade.get("exit_price", 0))

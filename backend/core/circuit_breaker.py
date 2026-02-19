@@ -45,6 +45,7 @@ class CircuitBreaker:
         if self.state.get(tool_name) == "OPEN":
             # Check if timeout passed to allow a retry (Half-Open logic)
             if time.time() - self.last_failure_time.get(tool_name, 0) > self.recovery_timeout:
+                self.state[tool_name] = "HALF_OPEN"
                 logger.info(f"Circuit Breaker HALF_OPEN for tool: {tool_name}")
                 return True # Allow one test request
             return False
