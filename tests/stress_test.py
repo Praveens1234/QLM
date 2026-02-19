@@ -11,7 +11,7 @@ import os
 import uuid
 
 # Configure Logging
-from backend.utils.logging import configure_logging
+from backend.core.logging import configure_logging
 configure_logging()
 logger = logging.getLogger("QLM.StressTest")
 

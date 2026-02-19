@@ -74,12 +74,14 @@ export class BacktestView {
             } else {
                 const method = document.getElementById('opt-method').value;
                 const target = document.getElementById('opt-target').value;
+
                 const badge = document.getElementById('bt-status-badge');
                 badge.classList.remove('hidden');
-                badge.innerText = "OPTIMIZING";
+                badge.innerText = method === 'genetic' ? "EVOLVING" : "SEARCHING";
                 badge.className = "bg-purple-500/10 text-purple-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase animate-pulse";
-                document.getElementById('bt-status').innerText = "Running Optimization...";
+                document.getElementById('bt-status').innerText = `Running ${method.toUpperCase()} Optimization...`;
 
+                // Handle async response
                 const res = await backtestService.runOptimization({
                     dataset_id: datasetId,
                     strategy_name: strategyName,
@@ -88,12 +90,14 @@ export class BacktestView {
                 });
 
                 if (res.status === 'success') {
-                    this.renderResults(res.results);
+                    this.renderResults(res.results); // Note: response structure is {status: ..., results: {...}}
                     this.completeProgress("Optimization Finished");
+                } else {
+                    throw new Error(res.error || "Optimization failed");
                 }
             }
         } catch (e) {
-            this.handleError({ message: e.message });
+            this.handleError({ message: e.message || "Operation Failed" });
         }
     }
 

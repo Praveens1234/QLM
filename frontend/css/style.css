@@ -387,7 +387,6 @@ input:focus, select:focus, textarea:focus {
     }
 
     .sidebar-nav.open {
-        transform: translateX(100%); /* Since left is -100%, we move right by 100% of self, i.e., to 0? No, left is -100%. translateX(100%) brings it to 0. But left is usually easier. */
         left: 0;
     }
 
@@ -396,25 +395,58 @@ input:focus, select:focus, textarea:focus {
     }
 
     #main-content {
-        padding-top: 0; /* Header takes space */
+        height: calc(100vh - 60px); /* Adjust for header */
+        margin-top: 60px;
     }
 
     .page {
         padding: 1rem;
+        height: 100%;
+        overflow-y: auto;
     }
 
+    /* Stack Grids on Mobile */
+    .grid-cols-2, .grid-cols-4, .grid-cols-6, .grid-cols-8 {
+        grid-template-columns: 1fr; /* Default to single column */
+    }
+
+    /* Exception for Metrics cards - 2 cols looks okay on phones */
+    .grid-cols-2.md\:grid-cols-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* AI Layout Mobile */
     .ai-layout {
         flex-direction: column;
-        height: calc(100vh - 120px);
+        height: 100%;
+        gap: 1rem;
     }
 
     .ai-sidebar {
         width: 100%;
-        height: 150px;
+        height: auto;
+        max-height: 200px;
         border-right: none;
         border-bottom: 1px solid var(--card-border);
-        padding-right: 0;
-        padding-bottom: 1rem;
+        padding: 1rem;
+    }
+
+    .chat-container {
+        padding: 1rem;
+    }
+
+    .chat-message {
+        max-width: 95%;
+        font-size: 0.9rem;
+    }
+
+    /* Table Responsive */
+    .overflow-x-auto {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    th, td {
+        white-space: nowrap; /* Prevent wrapping breaking layout, let it scroll */
     }
 }
 

@@ -122,15 +122,9 @@ class BacktestEngine:
         entry_long = strategy.entry_long(df, vars_dict).fillna(False).values.astype(bool)
         entry_short = strategy.entry_short(df, vars_dict).fillna(False).values.astype(bool)
 
-        if hasattr(strategy, 'exit_long_signal'):
-             exit_long = strategy.exit_long_signal(df, vars_dict).fillna(False).values.astype(bool)
-        else:
-             exit_long = np.zeros(n_rows, dtype=bool)
-
-        if hasattr(strategy, 'exit_short_signal'):
-             exit_short = strategy.exit_short_signal(df, vars_dict).fillna(False).values.astype(bool)
-        else:
-             exit_short = np.zeros(n_rows, dtype=bool)
+        # Use exit signals directly (base class guarantees existence)
+        exit_long = strategy.exit_long_signal(df, vars_dict).fillna(False).values.astype(bool)
+        exit_short = strategy.exit_short_signal(df, vars_dict).fillna(False).values.astype(bool)
 
         # Risk Model
         risk = strategy.risk_model(df, vars_dict)
@@ -182,9 +176,7 @@ class BacktestEngine:
             }
 
             # Recalculate commission
-            comm = self.commission_model.calculate(trade_obj["entry_price"], trade_size) + \
-                   self.commission_model.calculate(trade_obj["exit_price"], trade_size)
-
+            comm = CommissionModel.apply_to_trade(trade_obj, self.commission_model)
             net_pnl = gross_pnl - comm
 
             # Calculate Risk & R-Multiple
@@ -309,11 +301,11 @@ class BacktestEngine:
                         gross_pnl = (exit_price - active_trade['entry_price']) * trade_size
                     else:
                         gross_pnl = (active_trade['entry_price'] - exit_price) * trade_size
-                        
-                    # Calculate Commission
-                    comm = self.commission_model.calculate(active_trade['entry_price'], trade_size) + \
-                           self.commission_model.calculate(exit_price, trade_size)
 
+                    active_trade['exit_price'] = exit_price
+
+                    # Calculate Commission
+                    comm = CommissionModel.apply_to_trade(active_trade, self.commission_model)
                     net_pnl = gross_pnl - comm
 
                     exit_dt = pd.to_datetime(current_time, unit='ns', utc=True)
@@ -322,7 +314,6 @@ class BacktestEngine:
                     active_trade['exit_time'] = exit_dt.strftime('%Y-%m-%d %H:%M:%S')
                     active_trade['entry_time'] = entry_dt.strftime('%Y-%m-%d %H:%M:%S')
                     active_trade['duration'] = round((current_time - int(entry_dt.value)) / (1e9 * 60), 2)
-                    active_trade['exit_price'] = exit_price
                     active_trade['pnl'] = net_pnl
                     active_trade['gross_pnl'] = gross_pnl
                     active_trade['commission'] = comm

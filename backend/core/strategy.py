@@ -32,9 +32,19 @@ class Strategy(ABC):
     def entry_short(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series: pass
 
     def exit_long_signal(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series:
+        """
+        Vectorized exit signal for Long positions.
+        Required for Fast Mode execution.
+        Returns a boolean Series where True indicates an exit signal.
+        """
         return pd.Series(False, index=df.index)
 
     def exit_short_signal(self, df: pd.DataFrame, vars: Dict[str, pd.Series]) -> pd.Series:
+        """
+        Vectorized exit signal for Short positions.
+        Required for Fast Mode execution.
+        Returns a boolean Series where True indicates an exit signal.
+        """
         return pd.Series(False, index=df.index)
 
     @abstractmethod
@@ -66,12 +76,50 @@ class StrategyLoader:
             path = os.path.join(self.strategy_dir, name)
             if os.path.isdir(path):
                 versions = self._get_versions(name)
+                latest = max(versions) if versions else 0
+
+                # Parse metadata from latest version
+                metadata = {}
+                if latest > 0:
+                    code = self.get_strategy_code(name, latest)
+                    if code:
+                        metadata = self._parse_metadata(code)
+
                 strategies.append({
                     "name": name,
                     "versions": versions,
-                    "latest_version": max(versions) if versions else 0
+                    "latest_version": latest,
+                    "metadata": metadata
                 })
         return strategies
+
+    def _parse_metadata(self, code: str) -> Dict[str, str]:
+        """
+        Extract metadata from Strategy class docstring.
+        Format expected: Key: Value (e.g., Author: John Doe)
+        """
+        try:
+            tree = ast.parse(code)
+            for node in tree.body:
+                if isinstance(node, ast.ClassDef):
+                    # Check if it inherits Strategy
+                    is_strategy = False
+                    for base in node.bases:
+                        if isinstance(base, ast.Name) and base.id == 'Strategy':
+                            is_strategy = True
+                            break
+
+                    if is_strategy and ast.get_docstring(node):
+                        doc = ast.get_docstring(node)
+                        meta = {}
+                        for line in doc.split('\n'):
+                            if ':' in line:
+                                key, val = line.split(':', 1)
+                                meta[key.strip().lower()] = val.strip()
+                        return meta
+            return {}
+        except:
+            return {}
 
     def _get_versions(self, name: str) -> List[int]:
         path = os.path.join(self.strategy_dir, name)
@@ -173,21 +221,69 @@ class StrategyLoader:
 
     def _validate_code(self, code: str):
         """
-        Basic AST validation to block dangerous imports.
+        Enhanced AST validation to block dangerous imports and system calls.
         """
         tree = ast.parse(code)
+
+        # Allowed Root Modules
+        SAFE_MODULES = {
+            'math', 'numpy', 'pandas', 'typing', 'datetime', 'collections',
+            'itertools', 'functools', 'random', 'statistics', 'scipy', 'sklearn',
+            'talib', 'backend'
+        }
+
+        # Blocked sub-modules (even if root is safe)
+        BLOCKED_SUBMODULES = {
+            'backend.database', 'backend.core.system', 'backend.api'
+        }
+
+        # Dangerous Builtins
+        DANGEROUS_FUNCTIONS = {
+            'exec', 'eval', '__import__', 'open', 'compile', 'globals', 'locals', 'input', 'breakpoint'
+        }
+
         for node in ast.walk(tree):
+            # 1. Check Imports
             if isinstance(node, (ast.Import, ast.ImportFrom)):
-                names = node.names if isinstance(node, ast.Import) else [node.module]
-                for alias in names:
-                    mod_name = alias.name if isinstance(node, ast.Import) else alias
-                    if mod_name and mod_name.split('.')[0] not in ['math', 'numpy', 'pandas', 'backend', 'typing', 'datetime']:
-                        raise ValueError(f"Import '{mod_name}' is not allowed.")
-            
+                # Handle Import vs ImportFrom
+                if isinstance(node, ast.Import):
+                    for n in node.names:
+                        mod_name = n.name
+                        root_mod = mod_name.split('.')[0]
+                        if root_mod not in SAFE_MODULES:
+                            raise ValueError(f"Security Violation: Import '{root_mod}' is not allowed.")
+                        if any(mod_name.startswith(b) for b in BLOCKED_SUBMODULES):
+                            raise ValueError(f"Security Violation: Import '{mod_name}' is restricted.")
+
+                else:
+                    # ImportFrom: from module import name
+                    if not node.module: continue # Skip relative imports
+
+                    root_mod = node.module.split('.')[0]
+                    if root_mod not in SAFE_MODULES:
+                        raise ValueError(f"Security Violation: Import '{root_mod}' is not allowed.")
+
+                    if any(node.module.startswith(b) for b in BLOCKED_SUBMODULES):
+                        raise ValueError(f"Security Violation: Import '{node.module}' is restricted.")
+
+                    # Check imported names (prevent 'from backend import api')
+                    for n in node.names:
+                        full_name = f"{node.module}.{n.name}"
+                        if any(full_name.startswith(b) for b in BLOCKED_SUBMODULES):
+                            raise ValueError(f"Security Violation: Import '{full_name}' is restricted.")
+
+            # 2. Check Function Calls
             elif isinstance(node, ast.Call):
+                func_name = None
                 if isinstance(node.func, ast.Name):
-                    if node.func.id in ['exec', 'eval', '__import__', 'open']:
-                        raise ValueError(f"Function '{node.func.id}' is not allowed.")
+                    func_name = node.func.id
+                elif isinstance(node.func, ast.Attribute):
+                    # Check for subprocess.call, os.system etc if module was somehow aliased
+                    # But we block imports so this is secondary defense
+                    pass
+
+                if func_name and func_name in DANGEROUS_FUNCTIONS:
+                    raise ValueError(f"Security Violation: Function '{func_name}' is not allowed.")
 
     def validate_strategy_code(self, code: str) -> Dict[str, Any]:
         """
@@ -272,50 +368,62 @@ class StrategyLoader:
             # Instantiate
             strat_instance = strategy_cls()
             
-            # Create Dummy Data
-            dates = pd.date_range(start="2023-01-01", periods=10, freq="h")
-            df = pd.DataFrame({
-                "open": [100.0]*10, "high": [105.0]*10, "low": [95.0]*10, "close": [100.0]*10, "volume": [1000.0]*10,
-                "datetime": dates,
-                "dtv": dates.astype('int64')
+            # Create Robust Dummy Data
+            dates = pd.date_range(start="2023-01-01", periods=20, freq="h")
+            
+            # Scenario 1: Normal Data
+            df_norm = pd.DataFrame({
+                "open": [100.0]*20, "high": [105.0]*20, "low": [95.0]*20, "close": [100.0]*20, "volume": [1000.0]*20,
+                "datetime": dates, "dtv": dates.astype('int64')
             })
+
+            # Scenario 2: Edge Cases (NaNs, Zeros)
+            df_edge = df_norm.copy()
+            df_edge.loc[5:10, ['open', 'high', 'low', 'close']] = np.nan
+            df_edge.loc[11:15, 'volume'] = 0.0
+
+            for df in [df_norm, df_edge]:
+                # Run Methods & Check Returns
+                vars_dict = strat_instance.define_variables(df)
+                if not isinstance(vars_dict, dict):
+                     return {"valid": False, "error": "Runtime Error: define_variables must return a Dict"}
+
+                # Entries
+                longs = strat_instance.entry_long(df, vars_dict)
+                if not isinstance(longs, pd.Series) or longs.dtype != bool:
+                     return {"valid": False, "error": "Runtime Error: entry_long must return a Boolean Series"}
+
+                shorts = strat_instance.entry_short(df, vars_dict)
+                if not isinstance(shorts, pd.Series) or shorts.dtype != bool:
+                     return {"valid": False, "error": "Runtime Error: entry_short must return a Boolean Series"}
+
+                # Check Vectorized Exits (Fast Mode)
+                ex_l = strat_instance.exit_long_signal(df, vars_dict)
+                if not isinstance(ex_l, pd.Series) or ex_l.dtype != bool:
+                     return {"valid": False, "error": "Runtime Error: exit_long_signal must return a Boolean Series"}
+
+                # Risk
+                risk = strat_instance.risk_model(df, vars_dict)
+                if not isinstance(risk, dict):
+                     return {"valid": False, "error": "Runtime Error: risk_model must return a Dict"}
+
+                # Exit (Simulate an active trade)
+                dummy_trade = {
+                    "entry_time": dates[0],
+                    "entry_price": 100.0,
+                    "direction": "long",
+                    "sl": 90.0,
+                    "tp": 110.0,
+                    "current_idx": 5
+                }
+                try:
+                    should_exit = strat_instance.exit(df, vars_dict, dummy_trade)
+                    if not isinstance(should_exit, (bool, np.bool_)):
+                         return {"valid": False, "error": "Runtime Error: exit must return a boolean"}
+                except Exception as e:
+                    return {"valid": False, "error": f"Runtime Error in exit(): {str(e)}"}
             
-            # Run Methods & Check Returns
-            vars_dict = strat_instance.define_variables(df)
-            if not isinstance(vars_dict, dict):
-                 return {"valid": False, "error": "Runtime Error: define_variables must return a Dict"}
-
-            # Entries
-            longs = strat_instance.entry_long(df, vars_dict)
-            if not isinstance(longs, pd.Series) or longs.dtype != bool:
-                 return {"valid": False, "error": "Runtime Error: entry_long must return a Boolean Series"}
-                 
-            shorts = strat_instance.entry_short(df, vars_dict)
-            if not isinstance(shorts, pd.Series) or shorts.dtype != bool:
-                 return {"valid": False, "error": "Runtime Error: entry_short must return a Boolean Series"}
-
-            # Risk
-            risk = strat_instance.risk_model(df, vars_dict)
-            if not isinstance(risk, dict):
-                 return {"valid": False, "error": "Runtime Error: risk_model must return a Dict"}
-
-            # Exit (Simulate an active trade)
-            dummy_trade = {
-                "entry_time": dates[0],
-                "entry_price": 100.0,
-                "direction": "long",
-                "sl": 90.0,
-                "tp": 110.0,
-                "current_idx": 5
-            }
-            try:
-                should_exit = strat_instance.exit(df, vars_dict, dummy_trade)
-                if not isinstance(should_exit, (bool, np.bool_)):
-                     return {"valid": False, "error": "Runtime Error: exit must return a boolean"}
-            except Exception as e:
-                return {"valid": False, "error": f"Runtime Error in exit(): {str(e)}"}
-            
-            return {"valid": True, "message": "Strategy Validated & Simulated Successfully."}
+            return {"valid": True, "message": "Strategy Validated & Simulated Successfully (Passed Normal & Edge Cases)."}
             
         except Exception as e:
             return {"valid": False, "error": f"Runtime Error: {str(e)}"}
