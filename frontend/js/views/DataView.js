@@ -31,6 +31,27 @@ export class DataView {
             document.getElementById('modal-discrepancy').classList.add('hidden');
             this.currentDatasetId = null;
         });
+
+        // Global Row Inspector
+        const btnInspectGlobal = document.getElementById('btn-inspect-row');
+        if (btnInspectGlobal) {
+            btnInspectGlobal.addEventListener('click', () => {
+                const selectEl = document.getElementById('inspect-dataset-select');
+                const inputEl = document.getElementById('inspect-row-input');
+                const datasetId = selectEl?.value;
+                const query = inputEl?.value?.trim();
+
+                if (!datasetId) {
+                    if (window.Toast) window.Toast.warning("Please select a dataset first.");
+                    return;
+                }
+                if (!query) {
+                    if (window.Toast) window.Toast.warning("Please enter a row number or datetime.");
+                    return;
+                }
+                this.inspectCustomRow(datasetId, query);
+            });
+        }
     }
 
     switchTab(tab) {
@@ -345,7 +366,7 @@ export class DataView {
             });
 
             if (window.Toast && discrepancyType) {
-                 window.Toast.info(`Inspecting ${discrepancyType} at row ${index}`);
+                window.Toast.info(`Inspecting ${discrepancyType} at row ${index}`);
             }
 
         } catch (e) {
@@ -387,7 +408,7 @@ export class DataView {
     async inspectCustomRow(datasetId, query) {
         const inputField = document.getElementById('inspect-row-input');
         const btnInspect = document.getElementById('btn-inspect-row');
-        
+
         if (btnInspect) {
             btnInspect.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
             btnInspect.disabled = true;
