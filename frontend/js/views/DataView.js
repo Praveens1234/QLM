@@ -115,6 +115,17 @@ export class DataView {
             </tr>
         `).join('');
 
+        // Populate Select Dropdown for Inspector
+        if (selectEl) {
+            const currentVal = selectEl.value;
+            selectEl.innerHTML = `<option value="" disabled ${!currentVal ? 'selected' : ''}>Select Dataset...</option>` +
+                datasets.map(d => `<option value="${d.id}">${d.symbol} (${d.timeframe})</option>`).join('');
+
+            if (currentVal && datasets.some(d => d.id === currentVal)) {
+                selectEl.value = currentVal;
+            }
+        }
+
         // Bind delete buttons
         tbody.querySelectorAll('.btn-delete').forEach(btn => {
             btn.addEventListener('click', (e) => {
