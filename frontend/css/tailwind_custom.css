@@ -1,13 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg-color: #0f172a;
-  --text-primary: #f8fafc;
+    --bg-color: #0f172a;
+    --text-primary: #f8fafc;
 }
 
 body {
-    background-color: #020617; /* Slate 950 */
-    color: #e2e8f0; /* Slate 200 */
+    background-color: #020617;
+    /* Slate 950 */
+    color: #e2e8f0;
+    /* Slate 200 */
 }
 
 /* ============================================
@@ -31,18 +33,37 @@ body {
    ============================================ */
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
 }
 
 @keyframes pulseGlow {
-    0%, 100% { box-shadow: 0 0 8px rgba(99, 102, 241, 0.3); }
-    50% { box-shadow: 0 0 16px rgba(99, 102, 241, 0.6); }
+
+    0%,
+    100% {
+        box-shadow: 0 0 8px rgba(99, 102, 241, 0.3);
+    }
+
+    50% {
+        box-shadow: 0 0 16px rgba(99, 102, 241, 0.6);
+    }
 }
 
 .animate-fade-in {
@@ -68,6 +89,7 @@ body {
     background: rgba(99, 102, 241, 0.08) !important;
     color: white !important;
 }
+
 .nav-item.active-nav::before {
     content: '';
     position: absolute;
@@ -80,12 +102,16 @@ body {
     border-radius: 0 4px 4px 0;
     box-shadow: 0 0 12px rgba(99, 102, 241, 0.5);
 }
+
 .nav-item.active-nav i:first-child {
     color: #818cf8 !important;
 }
 
 /* Consistent Focus Rings */
-input:focus, select:focus, textarea:focus, button:focus-visible {
+input:focus,
+select:focus,
+textarea:focus,
+button:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4);
 }
@@ -124,59 +150,6 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 }
 
 /* ============================================
-   MOBILE BOTTOM TAB BAR
-   ============================================ */
-.mobile-bottom-bar {
-    display: none;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 60;
-    background: rgba(15, 23, 42, 0.95);
-    backdrop-filter: blur(16px);
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
-    padding: 6px 0 env(safe-area-inset-bottom, 6px) 0;
-}
-
-.mobile-bottom-bar .tab-items {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-}
-
-.mobile-bottom-bar .tab-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    padding: 6px 12px;
-    color: #64748b;
-    font-size: 9px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    transition: color 0.2s;
-    cursor: pointer;
-    border: none;
-    background: none;
-    -webkit-tap-highlight-color: transparent;
-}
-
-.mobile-bottom-bar .tab-item i {
-    font-size: 18px;
-    margin-bottom: 1px;
-}
-
-.mobile-bottom-bar .tab-item.active-tab {
-    color: #818cf8;
-}
-
-.mobile-bottom-bar .tab-item:active {
-    transform: scale(0.9);
-}
-
-/* ============================================
    MOBILE OPTIMIZATIONS — Primary Breakpoint
    ============================================ */
 @media (max-width: 768px) {
@@ -185,48 +158,49 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
     .glass-panel {
         backdrop-filter: blur(8px);
     }
+
     .bg-grid {
-        background-image: none; /* Remove grid pattern to save GPU */
-    }
-
-    /* --- Bottom Tab Bar --- */
-    .mobile-bottom-bar {
-        display: block;
-    }
-
-    /* --- Page Container --- */
-    #page-container {
-        padding-bottom: 72px !important; /* Space for bottom tab bar */
+        background-image: none;
+        /* Remove grid pattern to save GPU */
     }
 
     /* --- Touch Targets --- */
     .nav-item {
         padding: 1rem;
     }
-    input, select, button {
+
+    input,
+    select,
+    button {
         min-height: 44px;
     }
 
     /* --- Typography --- */
     h2.text-2xl {
-        font-size: 1.25rem !important; /* Reduce to text-xl */
+        font-size: 1.25rem !important;
+        /* Reduce to text-xl */
     }
 
     /* --- Page Headers --- */
-    .page > div:first-child {
+    .page>div:first-child {
         flex-direction: column !important;
         align-items: flex-start !important;
         gap: 0.75rem !important;
     }
 
     /* --- Data Manager Import Forms --- */
-    #import-local, #import-url {
+    #import-local,
+    #import-url {
         flex-direction: column !important;
     }
-    #import-local > div, #import-url > div {
+
+    #import-local>div,
+    #import-url>div {
         width: 100% !important;
     }
-    #import-local > button, #import-url > button {
+
+    #import-local>button,
+    #import-url>button {
         width: 100% !important;
     }
 
@@ -234,14 +208,16 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
     .overflow-x-auto {
         -webkit-overflow-scrolling: touch;
     }
-    th, td {
+
+    th,
+    td {
         white-space: nowrap;
         padding: 0.5rem 0.75rem !important;
         font-size: 0.75rem !important;
     }
 
     /* --- Discrepancy Modal: Full-Screen on Mobile --- */
-    #modal-discrepancy > div:nth-child(2) > div {
+    #modal-discrepancy>div:nth-child(2)>div {
         width: 100% !important;
         max-width: 100% !important;
         height: 100% !important;
@@ -260,7 +236,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
     }
 
     /* Inspect Row Input */
-    #discrepancy-detail-view > div:first-child {
+    #discrepancy-detail-view>div:first-child {
         flex-direction: column !important;
         gap: 0.5rem !important;
     }
@@ -270,12 +246,15 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
         height: auto !important;
         min-height: calc(100vh - 10rem);
     }
+
     #page-strategies .lg\:w-64 {
         height: 120px !important;
     }
+
     #editor-container {
         min-height: 45vh;
     }
+
     #page-strategies .flex.gap-3.items-center {
         flex-wrap: wrap;
     }
@@ -284,6 +263,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
     #page-backtest .lg\:col-span-2 {
         order: 2;
     }
+
     #bt-results {
         max-height: 60vh;
         overflow-y: auto;
@@ -298,6 +278,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
     .chat-container {
         padding: 0.75rem;
     }
+
     .chat-message {
         max-width: 95%;
         font-size: 0.85rem;
@@ -312,6 +293,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
     #bt-results .overflow-x-auto {
         border-radius: 0.5rem;
     }
+
     #bt-results table th,
     #bt-results table td {
         padding: 0.4rem 0.5rem !important;
@@ -327,19 +309,12 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
         font-size: 1.1rem !important;
     }
 
-    .stat-value, .text-3xl {
+    .stat-value,
+    .text-3xl {
         font-size: 1.5rem !important;
     }
 
     #bt-results .grid {
         grid-template-columns: 1fr !important;
-    }
-
-    .mobile-bottom-bar .tab-item {
-        padding: 6px 8px;
-        font-size: 8px;
-    }
-    .mobile-bottom-bar .tab-item i {
-        font-size: 16px;
     }
 }

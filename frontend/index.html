@@ -389,6 +389,24 @@
                                     <span class="text-sm font-medium text-slate-300">Scanning dataset...</span>
                                 </div>
 
+                                <!-- Custom Row Inspector (Always Visible) -->
+                                <div
+                                    class="w-full flex-col sm:flex-row flex sm:items-center justify-between bg-slate-800/50 p-3 rounded-lg border border-slate-700 gap-3">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fa-solid fa-crosshairs text-indigo-400"></i>
+                                        <h4 class="text-sm font-semibold text-slate-300">Custom Row Inspector</h4>
+                                    </div>
+                                    <div class="flex items-center gap-2 flex-1 max-w-sm sm:ml-4">
+                                        <input type="text" id="inspect-row-input"
+                                            placeholder="Enter Row # or Datetime..."
+                                            class="w-full flex-1 bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded pl-3 pr-2 py-1.5 focus:outline-none focus:border-indigo-500 transition-colors">
+                                        <button id="btn-inspect-row"
+                                            class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded text-sm font-medium transition-colors whitespace-nowrap shadow-sm">
+                                            Inspect
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <!-- List Section -->
                                 <div class="flex-1 flex flex-col min-h-[250px] space-y-3">
                                     <div class="flex items-center justify-between">
@@ -439,21 +457,6 @@
                                                 Editor Mode</span>
                                         </div>
 
-                                        <!-- Custom Row Inspector -->
-                                        <div
-                                            class="flex items-center gap-2 bg-slate-800/80 p-1.5 rounded-lg border border-slate-700">
-                                            <div class="relative w-48">
-                                                <i
-                                                    class="fa-solid fa-crosshairs absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                                                <input type="text" id="inspect-row-input"
-                                                    placeholder="Row # or Datetime..."
-                                                    class="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded pl-7 pr-2 py-1 focus:outline-none focus:border-indigo-500 transition-colors">
-                                            </div>
-                                            <button id="btn-inspect-row"
-                                                class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap">
-                                                Inspect
-                                            </button>
-                                        </div>
                                     </div>
 
                                     <div
@@ -740,31 +743,7 @@
 
         </div>
 
-        <!-- Mobile Bottom Tab Bar -->
-        <nav class="mobile-bottom-bar">
-            <div class="tab-items">
-                <button onclick="router.navigate('dashboard')" class="tab-item active-tab" data-tab="dashboard">
-                    <i class="fa-solid fa-chart-pie"></i>
-                    <span>Home</span>
-                </button>
-                <button onclick="router.navigate('data')" class="tab-item" data-tab="data">
-                    <i class="fa-solid fa-database"></i>
-                    <span>Data</span>
-                </button>
-                <button onclick="router.navigate('strategies')" class="tab-item" data-tab="strategies">
-                    <i class="fa-solid fa-code"></i>
-                    <span>Strategy</span>
-                </button>
-                <button onclick="router.navigate('backtest')" class="tab-item" data-tab="backtest">
-                    <i class="fa-solid fa-play"></i>
-                    <span>Backtest</span>
-                </button>
-                <button onclick="router.navigate('mcp')" class="tab-item" data-tab="mcp">
-                    <i class="fa-solid fa-network-wired"></i>
-                    <span>MCP</span>
-                </button>
-            </div>
-        </nav>
+        </div>
     </main>
 
     <script type="module" src="/js/app.js?v=2"></script>

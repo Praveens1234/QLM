@@ -11,12 +11,11 @@ export class Layout {
         // Expose toggle globally for onclick attributes (legacy support)
         window.toggleSidebar = this.toggleSidebar.bind(this);
 
-        // Listen for route changes to close mobile menu + update bottom tab
+        // Listen for route changes to close mobile menu
         window.addEventListener('hashchange', () => {
             if (window.innerWidth < 768) {
                 this.closeSidebar();
             }
-            this.updateBottomTab();
         });
 
         // Swipe-to-close sidebar on mobile
@@ -47,8 +46,6 @@ export class Layout {
             }
         }, { passive: true });
 
-        // Initialize bottom tab bar on load
-        this.updateBottomTab();
     }
 
     toggleSidebar() {
@@ -82,17 +79,5 @@ export class Layout {
         this.sidebar.classList.add('-translate-x-full');
         this.overlay.classList.add('opacity-0', 'pointer-events-none');
         setTimeout(() => this.overlay.classList.add('hidden'), 300);
-    }
-
-    updateBottomTab() {
-        const hash = window.location.hash.replace('#', '') || 'dashboard';
-        const tabs = document.querySelectorAll('.mobile-bottom-bar .tab-item');
-        tabs.forEach(tab => {
-            if (tab.dataset.tab === hash) {
-                tab.classList.add('active-tab');
-            } else {
-                tab.classList.remove('active-tab');
-            }
-        });
     }
 }
