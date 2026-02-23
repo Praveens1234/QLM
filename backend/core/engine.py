@@ -372,6 +372,19 @@ class BacktestEngine:
         trades = []
 
         for i in range(len(entry_times)):
+            entry_px = float(entry_prices[i])
+            exit_px = float(exit_prices[i])
+            
+            # 1. Invalidate Zero Prices
+            if entry_px == 0.0 or exit_px == 0.0:
+                continue
+                
+            # 2. Invalidate Weekend Trades
+            entry_dt = pd.to_datetime(int(entry_times[i]), unit='ns', utc=True)
+            exit_dt = pd.to_datetime(int(exit_times[i]), unit='ns', utc=True)
+            if entry_dt.weekday() >= 5 or exit_dt.weekday() >= 5: # 5=Sat, 6=Sun
+                continue
+
             r_code = reasons[i]
             reason_str = reason_map.get(r_code, "Unknown")
             direction_str = "long" if directions[i] == 1 else "short"
@@ -382,8 +395,8 @@ class BacktestEngine:
             trade_size = float(size_arr[entry_idx]) if entry_idx < len(size_arr) else 1.0
 
             trade_obj = {
-                "entry_price": float(entry_prices[i]),
-                "exit_price": float(exit_prices[i]),
+                "entry_price": entry_px,
+                "exit_price": exit_px,
                 "size": trade_size
             }
 
@@ -538,6 +551,19 @@ class BacktestEngine:
                         "exit_price": exit_price,
                         "size": trade_size
                     }
+                    
+                    # 1. Invalidate Zero Prices
+                    if active_trade['_entry_price'] == 0.0 or exit_price == 0.0:
+                        active_trade = None
+                        continue
+                        
+                    # 2. Invalidate Weekend Trades
+                    entry_dt = pd.to_datetime(int(active_trade['_entry_time_ns']), unit='ns', utc=True)
+                    exit_dt = pd.to_datetime(int(current_time), unit='ns', utc=True)
+                    if entry_dt.weekday() >= 5 or exit_dt.weekday() >= 5: # 5=Sat, 6=Sun
+                        active_trade = None
+                        continue
+
                     comm = CommissionModel.apply_to_trade(trade_obj, self.commission_model)
 
                     trade = self._build_trade_record(
