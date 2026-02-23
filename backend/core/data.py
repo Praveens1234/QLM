@@ -427,6 +427,40 @@ class DataManager:
             
         return records
 
+    def inspect_dataset_row(self, file_path: str, query: str) -> Dict[str, Any]:
+        """
+        Takes a string query (either an integer index or a datetime string)
+        and finds the corresponding row index, then delegates to get_dataset_window.
+        """
+        df = self.load_dataset(file_path)
+        
+        # Try finding by exact Integer Index first
+        try:
+            target_idx = int(query)
+            if target_idx < 0 or target_idx >= len(df):
+                raise ValueError("Index out of bounds.")
+        except ValueError:
+            # Not an integer, try treating it as a Datetime string
+            try:
+                dt_query = pd.to_datetime(query, utc=True, dayfirst=True)
+                
+                # We need to find the closest row or exact row
+                # df['datetime'] is a timezone aware pandas Series
+                diffs = (df['datetime'] - dt_query).abs()
+                target_idx = int(diffs.idxmin())
+            except Exception:
+                raise DataError(f"Could not parse query '{query}' as either an index or a valid Date/Time.")
+                
+        # Get context window
+        context = self.get_dataset_window(file_path, target_idx, window=5)
+        
+        return {
+            "query": query,
+            "target_index": target_idx,
+            "target_datetime": df.iloc[target_idx]['datetime'].isoformat(),
+            "context": context
+        }
+
     def update_dataset_row(self, file_path: str, index: int, updates: Dict[str, float]) -> None:
         """
         Saves individual row edits directly back into the PyArrow Parquet file safely enforcing correct schemas.

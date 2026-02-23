@@ -10,7 +10,10 @@ body {
     color: #e2e8f0; /* Slate 200 */
 }
 
-/* Utilities */
+/* ============================================
+   UTILITIES & DESIGN SYSTEM
+   ============================================ */
+
 .glass-panel {
     background: rgba(15, 23, 42, 0.6);
     backdrop-filter: blur(12px);
@@ -23,14 +26,68 @@ body {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-/* Animations */
+/* ============================================
+   ANIMATIONS & MICRO-INTERACTIONS
+   ============================================ */
+
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(5px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+@keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 8px rgba(99, 102, 241, 0.3); }
+    50% { box-shadow: 0 0 16px rgba(99, 102, 241, 0.6); }
+}
+
 .animate-fade-in {
     animation: fadeIn 0.3s ease-out forwards;
+}
+
+.skeleton-pulse {
+    background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 6px;
+}
+
+/* Card Hover Lift Effect */
+.glass-panel[class*="hover:"],
+.glass-panel.hoverable {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* Active Nav Indicator - Glowing Left Edge */
+.nav-item.active-nav {
+    position: relative;
+    background: rgba(99, 102, 241, 0.08) !important;
+    color: white !important;
+}
+.nav-item.active-nav::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 60%;
+    background: linear-gradient(180deg, #6366f1, #818cf8);
+    border-radius: 0 4px 4px 0;
+    box-shadow: 0 0 12px rgba(99, 102, 241, 0.5);
+}
+.nav-item.active-nav i:first-child {
+    color: #818cf8 !important;
+}
+
+/* Consistent Focus Rings */
+input:focus, select:focus, textarea:focus, button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4);
 }
 
 /* Chat Bubbles */
@@ -61,23 +118,228 @@ body {
         linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
 }
 
-/* Mobile Optimizations */
+/* Smooth Scroll */
+#page-container {
+    scroll-behavior: smooth;
+}
+
+/* ============================================
+   MOBILE BOTTOM TAB BAR
+   ============================================ */
+.mobile-bottom-bar {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 60;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(16px);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 6px 0 env(safe-area-inset-bottom, 6px) 0;
+}
+
+.mobile-bottom-bar .tab-items {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.mobile-bottom-bar .tab-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 12px;
+    color: #64748b;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: color 0.2s;
+    cursor: pointer;
+    border: none;
+    background: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-bottom-bar .tab-item i {
+    font-size: 18px;
+    margin-bottom: 1px;
+}
+
+.mobile-bottom-bar .tab-item.active-tab {
+    color: #818cf8;
+}
+
+.mobile-bottom-bar .tab-item:active {
+    transform: scale(0.9);
+}
+
+/* ============================================
+   MOBILE OPTIMIZATIONS — Primary Breakpoint
+   ============================================ */
 @media (max-width: 768px) {
+
+    /* --- Performance --- */
     .glass-panel {
-        backdrop-filter: blur(8px); /* Reduce blur cost on mobile */
+        backdrop-filter: blur(8px);
+    }
+    .bg-grid {
+        background-image: none; /* Remove grid pattern to save GPU */
     }
 
+    /* --- Bottom Tab Bar --- */
+    .mobile-bottom-bar {
+        display: block;
+    }
+
+    /* --- Page Container --- */
+    #page-container {
+        padding-bottom: 72px !important; /* Space for bottom tab bar */
+    }
+
+    /* --- Touch Targets --- */
     .nav-item {
-        padding: 1rem; /* Larger touch targets */
+        padding: 1rem;
     }
-
     input, select, button {
-        min-height: 44px; /* Accessible touch target size */
+        min-height: 44px;
     }
 
-    /* Stack tables */
-    .responsive-table th,
-    .responsive-table td {
+    /* --- Typography --- */
+    h2.text-2xl {
+        font-size: 1.25rem !important; /* Reduce to text-xl */
+    }
+
+    /* --- Page Headers --- */
+    .page > div:first-child {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.75rem !important;
+    }
+
+    /* --- Data Manager Import Forms --- */
+    #import-local, #import-url {
+        flex-direction: column !important;
+    }
+    #import-local > div, #import-url > div {
+        width: 100% !important;
+    }
+    #import-local > button, #import-url > button {
+        width: 100% !important;
+    }
+
+    /* --- Data Table --- */
+    .overflow-x-auto {
+        -webkit-overflow-scrolling: touch;
+    }
+    th, td {
         white-space: nowrap;
+        padding: 0.5rem 0.75rem !important;
+        font-size: 0.75rem !important;
+    }
+
+    /* --- Discrepancy Modal: Full-Screen on Mobile --- */
+    #modal-discrepancy > div:nth-child(2) > div {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        border-radius: 0 !important;
+    }
+
+    /* Discrepancy modal header */
+    #modal-discrepancy .px-6.py-4 {
+        padding: 0.75rem 1rem !important;
+    }
+
+    /* Discrepancy modal body */
+    #discrepancy-modal-body {
+        padding: 0.75rem !important;
+    }
+
+    /* Inspect Row Input */
+    #discrepancy-detail-view > div:first-child {
+        flex-direction: column !important;
+        gap: 0.5rem !important;
+    }
+
+    /* --- Strategy Lab --- */
+    #page-strategies {
+        height: auto !important;
+        min-height: calc(100vh - 10rem);
+    }
+    #page-strategies .lg\:w-64 {
+        height: 120px !important;
+    }
+    #editor-container {
+        min-height: 45vh;
+    }
+    #page-strategies .flex.gap-3.items-center {
+        flex-wrap: wrap;
+    }
+
+    /* --- Backtest Runner --- */
+    #page-backtest .lg\:col-span-2 {
+        order: 2;
+    }
+    #bt-results {
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    /* --- MCP Page --- */
+    #page-mcp .h-\[500px\] {
+        height: 300px !important;
+    }
+
+    /* --- Chat Layout --- */
+    .chat-container {
+        padding: 0.75rem;
+    }
+    .chat-message {
+        max-width: 95%;
+        font-size: 0.85rem;
+    }
+
+    /* --- Backtest Metrics Grid Fix --- */
+    #bt-results .grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    /* --- Trade Ledger Table --- */
+    #bt-results .overflow-x-auto {
+        border-radius: 0.5rem;
+    }
+    #bt-results table th,
+    #bt-results table td {
+        padding: 0.4rem 0.5rem !important;
+        font-size: 0.65rem !important;
+    }
+}
+
+/* ============================================
+   SMALL PHONE BREAKPOINT (iPhone SE, etc.)
+   ============================================ */
+@media (max-width: 375px) {
+    h2.text-2xl {
+        font-size: 1.1rem !important;
+    }
+
+    .stat-value, .text-3xl {
+        font-size: 1.5rem !important;
+    }
+
+    #bt-results .grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .mobile-bottom-bar .tab-item {
+        padding: 6px 8px;
+        font-size: 8px;
+    }
+    .mobile-bottom-bar .tab-item i {
+        font-size: 16px;
     }
 }

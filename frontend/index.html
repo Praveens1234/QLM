@@ -114,18 +114,6 @@
                 <div class="h-px bg-slate-800 mx-3"></div>
             </div>
 
-            <button onclick="router.navigate('assistant')" id="nav-assistant" aria-label="AI Architect"
-                class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all relative overflow-hidden">
-                <div
-                    class="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity">
-                </div>
-                <i
-                    class="fa-solid fa-robot w-5 text-center text-indigo-400 group-hover:text-indigo-300 transition-colors relative z-10"></i>
-                <span class="font-medium relative z-10">AI Architect</span>
-                <span
-                    class="ml-auto bg-indigo-500/20 text-indigo-300 text-[9px] font-bold px-1.5 py-0.5 rounded border border-indigo-500/20">BETA</span>
-            </button>
-
             <button onclick="router.navigate('mcp')" id="nav-mcp" aria-label="MCP Service"
                 class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
                 <i
@@ -165,6 +153,17 @@
                 class="text-slate-400 hover:text-white p-2 focus:outline-none">
                 <i class="fa-solid fa-bars text-lg"></i>
             </button>
+        </header>
+
+        <!-- Desktop Header / Toolbar -->
+        <header
+            class="hidden md:flex h-14 border-b border-slate-800 items-center px-4 bg-slate-900/80 backdrop-blur sticky top-0 z-30 justify-between">
+            <div class="flex items-center gap-4">
+                <button onclick="toggleSidebar()" aria-label="Toggle Sidebar"
+                    class="text-slate-500 hover:text-white transition-colors focus:outline-none flex items-center justify-center w-8 h-8 rounded hover:bg-slate-800">
+                    <i class="fa-solid fa-bars text-lg"></i>
+                </button>
+            </div>
         </header>
 
         <!-- Page Container -->
@@ -242,21 +241,6 @@
                             Idle</div>
                         <div class="text-xs text-slate-500 font-medium uppercase tracking-wide mt-1">Engine Status</div>
                     </div>
-
-                    <!-- Welcome Card -->
-                    <div
-                        class="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-5 text-white flex flex-col justify-center items-start shadow-xl shadow-indigo-900/20 col-span-1 md:col-span-2 lg:col-span-1 group">
-                        <div
-                            class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all">
-                        </div>
-                        <h3 class="font-bold text-lg mb-1 relative z-10">AI Architect</h3>
-                        <p class="text-indigo-100 text-xs leading-relaxed mb-4 relative z-10 opacity-90">Design
-                            strategies with natural language.</p>
-                        <button onclick="router.navigate('assistant')"
-                            class="text-xs bg-white text-indigo-600 font-bold px-4 py-2 rounded-lg hover:bg-indigo-50 transition-colors w-full text-center relative z-10 shadow-sm">
-                            Launch Assistant
-                        </button>
-                    </div>
                 </div>
 
                 <!-- Recent Activity Placeholder -->
@@ -269,7 +253,7 @@
 
             <!-- Data Manager -->
             <section id="page-data" class="page hidden animate-fade-in space-y-6 max-w-7xl mx-auto">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
                         <h2 class="text-2xl font-bold text-white tracking-tight">Data Manager</h2>
                         <p class="text-slate-400 text-sm mt-1">Import & Manage Historical Data</p>
@@ -375,6 +359,135 @@
                         </table>
                     </div>
                 </div>
+
+                <!-- Discrepancy Modal -->
+                <div id="modal-discrepancy" class="fixed inset-0 z-[100] hidden">
+                    <div class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"></div>
+                    <div class="absolute inset-0 z-10 flex items-center justify-center p-4">
+                        <div
+                            class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl shadow-black/50 overflow-hidden w-[95vw] max-w-7xl h-[95vh] flex flex-col transform transition-all">
+                            <!-- Header -->
+                            <div
+                                class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
+                                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                                    <i class="fa-solid fa-magnifying-glass-chart text-indigo-400"></i>
+                                    Dataset Discrepancies
+                                </h3>
+                                <button id="btn-close-discrepancy"
+                                    class="text-slate-400 hover:text-white transition-colors">
+                                    <i class="fa-solid fa-xmark text-lg"></i>
+                                </button>
+                            </div>
+
+                            <!-- Body -->
+                            <div class="p-6 overflow-y-auto flex-1 flex flex-col gap-6 relative"
+                                id="discrepancy-modal-body">
+                                <!-- Loading overlay -->
+                                <div id="discrepancy-loading"
+                                    class="absolute inset-0 bg-slate-900/80 z-20 flex flex-col items-center justify-center backdrop-blur-sm">
+                                    <i class="fa-solid fa-circle-notch fa-spin text-3xl text-indigo-500 mb-3"></i>
+                                    <span class="text-sm font-medium text-slate-300">Scanning dataset...</span>
+                                </div>
+
+                                <!-- List Section -->
+                                <div class="flex-1 flex flex-col min-h-[250px] space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <h4 class="text-sm font-semibold text-slate-300">Detected Issues</h4>
+                                            <span id="discrepancy-count"
+                                                class="text-xs font-mono bg-slate-800 px-2 py-1 rounded text-slate-400">0
+                                                found</span>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <button id="btn-export-txt"
+                                                class="px-3 py-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold uppercase transition-all shadow-sm flex items-center gap-1.5"><i
+                                                    class="fa-regular fa-copy"></i> Copy TXT</button>
+                                            <button id="btn-export-json"
+                                                class="px-3 py-1 bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600/40 text-indigo-400 rounded text-[10px] font-bold uppercase transition-all shadow-sm flex items-center gap-1.5"><i
+                                                    class="fa-solid fa-download"></i> JSON</button>
+                                        </div>
+                                    </div>
+                                    <div
+                                        class="glass-panel rounded-lg overflow-hidden border border-slate-800 flex-1 overflow-y-auto relative">
+                                        <table class="w-full text-left border-collapse">
+                                            <thead
+                                                class="bg-slate-800/50 text-[10px] uppercase tracking-wider text-slate-400 sticky top-0">
+                                                <tr>
+                                                    <th class="px-4 py-2 font-medium">Time (UTC)</th>
+                                                    <th class="px-4 py-2 font-medium">Type</th>
+                                                    <th class="px-4 py-2 font-medium">Details</th>
+                                                    <th class="px-4 py-2 font-medium w-20 text-right">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="discrepancy-list-body"
+                                                class="text-sm divide-y divide-slate-800/50">
+                                                <!-- List injected here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Detail / Edit Section (Hidden by default) -->
+                                <div id="discrepancy-detail-view"
+                                    class="hidden flex-col gap-4 pt-4 border-t border-slate-800">
+                                    <div class="flex flex-col gap-3 sm:flex-row justify-between items-center">
+                                        <div class="flex items-center gap-3">
+                                            <h4 class="text-sm font-semibold text-slate-300">Context Window & Editor
+                                            </h4>
+                                            <span
+                                                class="text-[10px] uppercase font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">Data
+                                                Editor Mode</span>
+                                        </div>
+
+                                        <!-- Custom Row Inspector -->
+                                        <div
+                                            class="flex items-center gap-2 bg-slate-800/80 p-1.5 rounded-lg border border-slate-700">
+                                            <div class="relative w-48">
+                                                <i
+                                                    class="fa-solid fa-crosshairs absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                                <input type="text" id="inspect-row-input"
+                                                    placeholder="Row # or Datetime..."
+                                                    class="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded pl-7 pr-2 py-1 focus:outline-none focus:border-indigo-500 transition-colors">
+                                            </div>
+                                            <button id="btn-inspect-row"
+                                                class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap">
+                                                Inspect
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        class="glass-panel rounded-lg overflow-x-auto border border-slate-800 relative">
+                                        <!-- Overlay for window loading -->
+                                        <div id="window-loading"
+                                            class="absolute inset-0 bg-slate-900/50 z-10 hidden items-center justify-center">
+                                            <i class="fa-solid fa-circle-notch fa-spin text-indigo-500 text-2xl"></i>
+                                        </div>
+                                        <table class="w-full text-right border-collapse whitespace-nowrap">
+                                            <thead
+                                                class="bg-slate-800/50 text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                                                <tr>
+                                                    <th class="px-3 py-2 font-medium text-left">Time</th>
+                                                    <th class="px-3 py-2 font-medium">Open</th>
+                                                    <th class="px-3 py-2 font-medium">High</th>
+                                                    <th class="px-3 py-2 font-medium">Low</th>
+                                                    <th class="px-3 py-2 font-medium">Close</th>
+                                                    <th class="px-3 py-2 font-medium border-r border-slate-800">Volume
+                                                    </th>
+                                                    <th class="px-2 py-2 w-16 text-center">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="discrepancy-window-body"
+                                                class="text-xs font-mono divide-y divide-slate-800/50">
+                                                <!-- Context window injected here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- Strategy Lab -->
@@ -441,7 +554,7 @@
 
             <!-- Backtest Runner -->
             <section id="page-backtest" class="page hidden animate-fade-in space-y-6 max-w-7xl mx-auto">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
                         <h2 class="text-2xl font-bold text-white tracking-tight">Backtest Runner</h2>
                         <p class="text-slate-400 text-sm mt-1">Simulate strategies on historical data</p>
@@ -555,71 +668,9 @@
                 </div>
             </section>
 
-            <!-- AI Assistant -->
-            <section id="page-assistant"
-                class="page hidden animate-fade-in h-[calc(100vh-8rem)] flex gap-6 max-w-[1920px] mx-auto">
-                <!-- Sessions Sidebar -->
-                <div
-                    class="w-64 flex-shrink-0 flex flex-col glass-panel rounded-xl overflow-hidden hidden lg:flex shadow-sm">
-                    <div class="p-4 border-b border-slate-800">
-                        <button
-                            class="w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 rounded-lg py-2.5 text-xs font-bold uppercase tracking-wide transition-colors flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-plus"></i> New Chat
-                        </button>
-                    </div>
-                    <ul id="session-list" class="flex-1 overflow-y-auto p-2 space-y-1"></ul>
-                </div>
-
-                <!-- Chat Area -->
-                <div class="flex-1 flex flex-col glass-panel rounded-xl overflow-hidden shadow-2xl relative">
-                    <!-- Chat Header -->
-                    <div
-                        class="h-14 border-b border-slate-800 flex items-center px-6 justify-between bg-slate-900/50 backdrop-blur z-10">
-                        <div class="flex items-center gap-3">
-                            <div
-                                class="h-2 w-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]">
-                            </div>
-                            <span class="text-sm font-bold text-white tracking-tight">QLM Assistant</span>
-                        </div>
-                        <button aria-label="Chat History" class="lg:hidden text-slate-400 hover:text-white"
-                            id="mobile-history-btn"><i class="fa-solid fa-history"></i></button>
-                    </div>
-
-                    <!-- Messages -->
-                    <div id="chat-container" class="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth bg-slate-950/50">
-                        <!-- Messages go here -->
-                        <div class="flex justify-start">
-                            <div
-                                class="max-w-[85%] rounded-2xl rounded-tl-none bg-slate-800 border border-slate-700 p-5 text-sm text-slate-300 shadow-md">
-                                <p class="leading-relaxed">Hello! I am your <strong>Quantitative Trading
-                                        Assistant</strong>. I can help you:</p>
-                                <ul class="list-disc list-inside mt-2 space-y-1 text-slate-400 text-xs">
-                                    <li>Analyze Market Structure</li>
-                                    <li>Write & Fix Strategy Code</li>
-                                    <li>Run Backtests & Optimize Parameters</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Input -->
-                    <div class="p-4 border-t border-slate-800 bg-slate-900/80 backdrop-blur">
-                        <div class="flex gap-3 relative max-w-4xl mx-auto">
-                            <input type="text" id="ai-input" placeholder="Ask me to create a strategy..."
-                                autocomplete="off"
-                                class="w-full bg-slate-950 border border-slate-700 rounded-xl px-5 py-3.5 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all pr-14 shadow-inner">
-                            <button aria-label="Send Message" id="ai-send-btn"
-                                class="absolute right-2 top-2 bottom-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg w-10 transition-colors flex items-center justify-center shadow-md">
-                                <i class="fa-solid fa-paper-plane text-xs"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
             <!-- MCP Dashboard -->
             <section id="page-mcp" class="page hidden animate-fade-in max-w-5xl mx-auto space-y-6">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
                         <h2 class="text-2xl font-bold text-white tracking-tight">MCP Service</h2>
                         <p class="text-slate-400 text-sm mt-1">External AI Connection & Control</p>
@@ -666,7 +717,7 @@
                 </div>
 
                 <!-- Activity Log -->
-                <div class="glass-panel rounded-xl overflow-hidden shadow-sm flex flex-col h-[500px]">
+                <div class="glass-panel rounded-xl overflow-hidden shadow-sm flex flex-col h-[300px] md:h-[500px]">
                     <div class="px-6 py-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
                         <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Activity Log</h3>
                         <button aria-label="Refresh MCP Logs" class="text-slate-500 hover:text-white text-xs"><i
@@ -682,113 +733,38 @@
             <!-- Settings -->
             <section id="page-settings" class="page hidden animate-fade-in max-w-3xl mx-auto space-y-6">
                 <h2 class="text-2xl font-bold text-white tracking-tight mb-6">Settings</h2>
-
-                <!-- Active Config Status -->
-                <div id="active-config-banner" class="glass-panel rounded-xl p-4 shadow-sm border border-slate-700/50">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                            <div>
-                                <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Active
-                                    Configuration</div>
-                                <div class="flex items-center gap-2 mt-0.5">
-                                    <span id="active-config-provider-name"
-                                        class="text-sm font-semibold text-white">—</span>
-                                    <span class="text-slate-600">/</span>
-                                    <span id="active-config-model-name"
-                                        class="text-sm font-mono text-indigo-400">—</span>
-                                </div>
-                            </div>
-                        </div>
-                        <span id="active-config-status"
-                            class="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full bg-slate-800 text-slate-500 border border-slate-700">Not
-                            Set</span>
-                    </div>
-                </div>
-
-                <!-- AI Configuration -->
-                <div class="glass-panel rounded-xl p-6 shadow-sm">
-                    <h3
-                        class="text-xs font-bold text-slate-500 uppercase tracking-wide border-b border-slate-800 pb-2 mb-4">
-                        AI Configuration</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label
-                                class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Provider</label>
-                            <select id="active-provider"
-                                class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"></select>
-                        </div>
-                        <div>
-                            <label
-                                class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Model</label>
-                            <div class="flex gap-2">
-                                <select id="active-model"
-                                    class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono">
-                                    <option value="">Select a provider first</option>
-                                </select>
-                                <button id="btn-fetch-models"
-                                    class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[10px] uppercase px-3 py-2.5 rounded-lg transition-colors border border-slate-600 whitespace-nowrap"
-                                    title="Fetch available models from provider API">
-                                    <i class="fa-solid fa-rotate"></i> Fetch
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Manual Model ID -->
-                    <div class="mt-4 pt-3 border-t border-slate-800/50">
-                        <div class="flex items-center gap-2 mb-2">
-                            <input type="checkbox" id="use-custom-model"
-                                class="rounded bg-slate-900 border-slate-600 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-0">
-                            <label for="use-custom-model"
-                                class="text-[10px] font-bold text-slate-500 uppercase tracking-wide cursor-pointer">Use
-                                Custom Model ID</label>
-                        </div>
-                        <input type="text" id="custom-model-id" placeholder="e.g. gpt-4o, claude-3-opus-20240229"
-                            class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-indigo-500 hidden">
-                    </div>
-
-                    <div class="flex justify-end pt-4">
-                        <button id="btn-apply-config"
-                            class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase px-5 py-2.5 rounded-lg transition-colors shadow-lg shadow-indigo-500/20">
-                            <i class="fa-solid fa-check mr-1"></i> Apply Configuration
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Add Provider -->
-                <div class="glass-panel rounded-xl p-6 shadow-sm">
-                    <h3
-                        class="text-xs font-bold text-slate-500 uppercase tracking-wide border-b border-slate-800 pb-2 mb-4">
-                        Add Provider</h3>
-                    <div class="grid grid-cols-1 gap-4">
-                        <div class="grid grid-cols-2 gap-4">
-                            <input type="text" id="new-prov-name" placeholder="Name (e.g. OpenAI)"
-                                class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
-                            <input type="text" id="new-prov-url" placeholder="Base URL (e.g. https://api.openai.com/v1)"
-                                class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
-                        </div>
-                        <input type="password" id="new-prov-key" placeholder="API Key"
-                            class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
-                    </div>
-                    <div class="flex justify-end pt-4 gap-2">
-                        <button id="btn-add-provider"
-                            class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase px-4 py-2.5 rounded-lg transition-colors">
-                            <i class="fa-solid fa-plus mr-1"></i> Add Provider
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Registered Providers List -->
-                <div class="glass-panel rounded-xl overflow-hidden shadow-sm">
-                    <div class="px-6 py-4 bg-slate-800/30 border-b border-slate-800">
-                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Registered Providers</h3>
-                    </div>
-                    <ul id="provider-list" class="divide-y divide-slate-800 text-sm text-slate-400"></ul>
+                <div class="glass-panel xl p-6 text-slate-400 text-sm text-center">
+                    No settings available at this time.
                 </div>
             </section>
 
         </div>
+
+        <!-- Mobile Bottom Tab Bar -->
+        <nav class="mobile-bottom-bar">
+            <div class="tab-items">
+                <button onclick="router.navigate('dashboard')" class="tab-item active-tab" data-tab="dashboard">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Home</span>
+                </button>
+                <button onclick="router.navigate('data')" class="tab-item" data-tab="data">
+                    <i class="fa-solid fa-database"></i>
+                    <span>Data</span>
+                </button>
+                <button onclick="router.navigate('strategies')" class="tab-item" data-tab="strategies">
+                    <i class="fa-solid fa-code"></i>
+                    <span>Strategy</span>
+                </button>
+                <button onclick="router.navigate('backtest')" class="tab-item" data-tab="backtest">
+                    <i class="fa-solid fa-play"></i>
+                    <span>Backtest</span>
+                </button>
+                <button onclick="router.navigate('mcp')" class="tab-item" data-tab="mcp">
+                    <i class="fa-solid fa-network-wired"></i>
+                    <span>MCP</span>
+                </button>
+            </div>
+        </nav>
     </main>
 
     <script type="module" src="/js/app.js?v=2"></script>

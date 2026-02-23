@@ -24,6 +24,13 @@ export class DataView {
         // Refresh
         const btnRefresh = document.querySelector('#page-data .fa-refresh')?.parentElement;
         if (btnRefresh) btnRefresh.addEventListener('click', () => this.loadDatasets());
+
+        // Modal Close
+        const btnCloseDisp = document.getElementById('btn-close-discrepancy');
+        if (btnCloseDisp) btnCloseDisp.addEventListener('click', () => {
+            document.getElementById('modal-discrepancy').classList.add('hidden');
+            this.currentDatasetId = null;
+        });
     }
 
     switchTab(tab) {
@@ -77,6 +84,9 @@ export class DataView {
                 </td>
                 <td class="px-6 py-4 text-right text-xs text-slate-400 font-mono">${d.row_count.toLocaleString()}</td>
                 <td class="px-6 py-4 text-right">
+                    <button aria-label="Discrepancies" data-id="${d.id}" class="btn-discrepancy text-slate-500 hover:text-indigo-400 transition-colors p-1.5 rounded hover:bg-slate-800 opacity-0 group-hover:opacity-100 mr-2" title="Find Discrepancies">
+                        <i class="fa-solid fa-magnifying-glass-chart"></i>
+                    </button>
                     <button aria-label="Delete Dataset" data-id="${d.id}" class="btn-delete text-slate-500 hover:text-rose-500 transition-colors p-1.5 rounded hover:bg-slate-800 opacity-0 group-hover:opacity-100">
                         <i class="fa-solid fa-trash-can"></i>
                     </button>
@@ -91,6 +101,14 @@ export class DataView {
                 this.handleDelete(id);
             });
         });
+
+        // Bind discrepancy buttons
+        tbody.querySelectorAll('.btn-discrepancy').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const id = e.currentTarget.dataset.id;
+                this.openDiscrepancyModal(id);
+            });
+        });
     }
 
     async handleUpload() {
@@ -99,13 +117,13 @@ export class DataView {
         const tfInput = document.getElementById('upload-tf');
 
         if (!fileInput.files[0]) {
-            if(window.Toast) window.Toast.error("Please select a file");
+            if (window.Toast) window.Toast.error("Please select a file");
             return;
         }
 
         try {
             await dataService.upload(fileInput.files[0], symbolInput.value, tfInput.value);
-            if(window.Toast) window.Toast.success("Uploaded successfully");
+            if (window.Toast) window.Toast.success("Uploaded successfully");
             this.loadDatasets();
         } catch (e) {
             // Handled by ApiClient or Service
@@ -119,7 +137,7 @@ export class DataView {
         const btn = document.getElementById('btn-import-url');
 
         if (!url || !symbol || !timeframe) {
-            if(window.Toast) window.Toast.error("Please fill all fields");
+            if (window.Toast) window.Toast.error("Please fill all fields");
             return;
         }
 
@@ -128,7 +146,7 @@ export class DataView {
 
         try {
             await dataService.importUrl(url, symbol, timeframe);
-            if(window.Toast) window.Toast.success("Imported successfully");
+            if (window.Toast) window.Toast.success("Imported successfully");
             this.loadDatasets();
             document.getElementById('url-input').value = "";
         } catch (e) {
@@ -144,6 +162,251 @@ export class DataView {
         try {
             await dataService.delete(id);
             this.loadDatasets();
-        } catch (e) {}
+        } catch (e) { }
+    }
+
+    async openDiscrepancyModal(datasetId) {
+        this.currentDatasetId = datasetId;
+        const modal = document.getElementById('modal-discrepancy');
+        const loading = document.getElementById('discrepancy-loading');
+        const listBody = document.getElementById('discrepancy-list-body');
+        const detailView = document.getElementById('discrepancy-detail-view');
+        const countSpan = document.getElementById('discrepancy-count');
+
+        modal.classList.remove('hidden');
+        loading.classList.remove('hidden');
+        detailView.classList.add('hidden');
+        listBody.innerHTML = '';
+
+        try {
+            const res = await dataService.getDiscrepancies(datasetId);
+            const discrepancies = res.discrepancies || [];
+            this.currentDiscrepancies = discrepancies; // Save for export
+
+            countSpan.textContent = `${discrepancies.length} found`;
+
+            // Bind Exports
+            const btnExportTxt = document.getElementById('btn-export-txt');
+            const btnExportJson = document.getElementById('btn-export-json');
+            if (btnExportTxt) btnExportTxt.onclick = () => this.exportDiscrepancies('txt');
+            if (btnExportJson) btnExportJson.onclick = () => this.exportDiscrepancies('json');
+
+            if (discrepancies.length === 0) {
+                listBody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-xs text-slate-500 uppercase">No discrepancies detected</td></tr>`;
+            } else {
+                listBody.innerHTML = discrepancies.map(d => `
+                    <tr class="hover:bg-slate-800/30 transition-colors">
+                        <td class="px-4 py-3 font-mono text-xs text-slate-300 gap-2">${d.timestamp.replace('T', ' ')}</td>
+                        <td class="px-4 py-3">
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] uppercase font-bold border ${d.type === 'ZERO_VALUE' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}">
+                                ${d.type}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-xs text-slate-400 truncate max-w-xs" title="${d.details}">${d.details}</td>
+                        <td class="px-4 py-3 text-right">
+                            <button class="btn-view-context px-2 py-1 bg-indigo-500 hover:bg-indigo-400 text-white rounded text-[10px] font-bold uppercase transition-colors" data-index="${d.index}">Inspect</button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                listBody.querySelectorAll('.btn-view-context').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const index = parseInt(e.currentTarget.dataset.index);
+                        const type = e.currentTarget.closest('tr').querySelector('span').textContent.trim();
+                        this.openContextWindow(datasetId, index, type);
+                    });
+                });
+            }
+        } catch (e) {
+            if (window.Toast) window.Toast.error("Failed to scan dataset: " + e.message);
+            listBody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-xs text-rose-500 uppercase">Scan Failed</td></tr>`;
+        } finally {
+            loading.classList.add('hidden');
+        }
+    }
+
+    exportDiscrepancies(format) {
+        if (!this.currentDiscrepancies || this.currentDiscrepancies.length === 0) {
+            if (window.Toast) window.Toast.error("No discrepancies to export.");
+            return;
+        }
+
+        if (format === 'json') {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.currentDiscrepancies, null, 2));
+            const dl = document.createElement('a');
+            dl.setAttribute("href", dataStr);
+            dl.setAttribute("download", `discrepancies_${this.currentDatasetId}.json`);
+            document.body.appendChild(dl);
+            dl.click();
+            dl.remove();
+            if (window.Toast) window.Toast.success("Downloaded JSON");
+        } else if (format === 'txt') {
+            const lines = this.currentDiscrepancies.map(d => `[${d.timestamp}] ${d.type} (Idx: ${d.index}) - ${d.details}`);
+            const txt = lines.join('\\n');
+            navigator.clipboard.writeText(txt).then(() => {
+                if (window.Toast) window.Toast.success("Copied to clipboard as TXT");
+            }).catch(err => {
+                if (window.Toast) window.Toast.error("Failed to copy");
+            });
+        }
+    }
+
+    async openContextWindow(datasetId, index, discrepancyType = "") {
+        const detailView = document.getElementById('discrepancy-detail-view');
+        const windowLoading = document.getElementById('window-loading');
+        const windowBody = document.getElementById('discrepancy-window-body');
+
+        detailView.classList.remove('hidden');
+        windowLoading.classList.remove('hidden');
+        detailView.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+        try {
+            const res = await dataService.getWindow(datasetId, index);
+            const data = res.data || [];
+
+            windowBody.innerHTML = data.map(row => {
+                const isTarget = row.index === index;
+                const rowClass = isTarget ? 'bg-amber-500/5' : 'hover:bg-slate-800/30';
+                const inputClass = "w-20 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all text-right";
+
+                let extraActions = '';
+                if (isTarget) {
+                    extraActions += `<button class="btn-delete-row px-2 py-1 bg-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white rounded text-[10px] font-bold uppercase transition-colors ml-1" title="Delete Row"><i class="fa-solid fa-trash"></i></button>`;
+
+                    if (discrepancyType === 'TIME_GAP') {
+                        extraActions += `<button class="btn-interp-row px-2 py-1 bg-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-white rounded text-[10px] font-bold uppercase transition-colors ml-1" title="Auto-Interpolate Gap"><i class="fa-solid fa-wand-magic-sparkles"></i></button>`;
+                    } else if (discrepancyType === 'LOGIC_ERROR') {
+                        extraActions += `<button class="btn-autofix-row px-2 py-1 bg-fuchsia-500/20 text-fuchsia-400 hover:bg-fuchsia-500 hover:text-white rounded text-[10px] font-bold uppercase transition-colors ml-1" title="Auto-Fix Logic"><i class="fa-solid fa-wrench"></i></button>`;
+                    }
+                }
+
+                return `
+                    <tr class="${rowClass} transition-colors group" data-row-index="${row.index}">
+                        <td class="px-3 py-2 text-left text-slate-400">${row.datetime.replace('T', ' ')}</td>
+                        <td class="px-3 py-2"><input type="number" step="any" class="${inputClass}" data-field="open" value="${row.open}"></td>
+                        <td class="px-3 py-2"><input type="number" step="any" class="${inputClass}" data-field="high" value="${row.high}"></td>
+                        <td class="px-3 py-2"><input type="number" step="any" class="${inputClass}" data-field="low" value="${row.low}"></td>
+                        <td class="px-3 py-2"><input type="number" step="any" class="${inputClass}" data-field="close" value="${row.close}"></td>
+                        <td class="px-3 py-2 border-r border-slate-800"><input type="number" step="any" class="${inputClass}" data-field="volume" value="${row.volume}"></td>
+                        <td class="px-2 py-2 text-center whitespace-nowrap">
+                            <button class="btn-save-row px-2 py-1 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-white rounded text-[10px] font-bold uppercase transition-colors opacity-0 group-hover:opacity-100" title="Save Modifications">Save</button>
+                            ${extraActions}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            windowBody.querySelectorAll('.btn-save-row').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const tr = e.currentTarget.closest('tr');
+                    this.saveRowEdit(datasetId, tr);
+                });
+            });
+
+            windowBody.querySelectorAll('.btn-delete-row').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    if (!confirm("Delete this row entirely from the Parquet dataset?")) return;
+                    const index = parseInt(e.currentTarget.closest('tr').dataset.rowIndex);
+                    try {
+                        await dataService.deleteRow(datasetId, index);
+                        if (window.Toast) window.Toast.success("Row deleted permanently.");
+                        this.openDiscrepancyModal(datasetId); // Refresh
+                    } catch (err) {
+                        if (window.Toast) window.Toast.error("Delete failed: " + err.message);
+                    }
+                });
+            });
+
+            windowBody.querySelectorAll('.btn-interp-row').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    if (!confirm("Auto-interpolate missing bars into this gap? This will modify the sequence bounds.")) return;
+                    const index = parseInt(e.currentTarget.closest('tr').dataset.rowIndex);
+                    try {
+                        const r = await dataService.interpolateGap(datasetId, index);
+                        if (window.Toast) window.Toast.success(r.message || "Gap filled.");
+                        this.openDiscrepancyModal(datasetId); // Refresh
+                    } catch (err) {
+                        if (window.Toast) window.Toast.error("Interp failed: " + err.message);
+                    }
+                });
+            });
+
+            windowBody.querySelectorAll('.btn-autofix-row').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const index = parseInt(e.currentTarget.closest('tr').dataset.rowIndex);
+                    try {
+                        await dataService.autofixRow(datasetId, index);
+                        if (window.Toast) window.Toast.success("Logic inverted automatically.");
+                        this.openDiscrepancyModal(datasetId); // Refresh
+                    } catch (err) {
+                        if (window.Toast) window.Toast.error("Autofix failed: " + err.message);
+                    }
+                });
+            });
+
+            if (window.Toast && discrepancyType) {
+                 window.Toast.info(`Inspecting ${discrepancyType} at row ${index}`);
+            }
+
+        } catch (e) {
+            if (window.Toast) window.Toast.error("Failed to load context: " + e.message);
+            detailView.classList.add('hidden');
+        } finally {
+            windowLoading.classList.add('hidden');
+        }
+    }
+
+    async saveRowEdit(datasetId, tr) {
+        const index = parseInt(tr.dataset.rowIndex);
+        const btn = tr.querySelector('.btn-save-row');
+
+        const updates = {
+            open: parseFloat(tr.querySelector('[data-field="open"]').value),
+            high: parseFloat(tr.querySelector('[data-field="high"]').value),
+            low: parseFloat(tr.querySelector('[data-field="low"]').value),
+            close: parseFloat(tr.querySelector('[data-field="close"]').value),
+            volume: parseFloat(tr.querySelector('[data-field="volume"]').value)
+        };
+
+        const originalText = btn.innerHTML;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
+        btn.disabled = true;
+
+        try {
+            await dataService.updateRow(datasetId, index, updates);
+            if (window.Toast) window.Toast.success(`Row ${index} successfully updated in Parquet file`);
+            this.openDiscrepancyModal(datasetId);
+        } catch (e) {
+            if (window.Toast) window.Toast.error("Failed to update row: " + e.message);
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    async inspectCustomRow(datasetId, query) {
+        const inputField = document.getElementById('inspect-row-input');
+        const btnInspect = document.getElementById('btn-inspect-row');
+        
+        if (btnInspect) {
+            btnInspect.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
+            btnInspect.disabled = true;
+        }
+
+        try {
+            const res = await dataService.inspectRow(datasetId, query);
+            if (res.target_index !== undefined) {
+                if (window.Toast) window.Toast.success(`Found Dataset Match at Row ${res.target_index}`);
+                await this.openContextWindow(datasetId, res.target_index, "CUSTOM_INSPECT");
+            }
+        } catch (e) {
+            if (window.Toast) window.Toast.error("Could not find row: " + (e.response?.data?.detail || e.message));
+        } finally {
+            if (btnInspect) {
+                btnInspect.innerHTML = `Inspect`;
+                btnInspect.disabled = false;
+            }
+            if (inputField) inputField.value = '';
+        }
     }
 }
