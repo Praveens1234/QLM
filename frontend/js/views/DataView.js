@@ -25,33 +25,11 @@ export class DataView {
         const btnRefresh = document.querySelector('#page-data .fa-refresh')?.parentElement;
         if (btnRefresh) btnRefresh.addEventListener('click', () => this.loadDatasets());
 
-        // Modal Close
-        const btnCloseDisp = document.getElementById('btn-close-discrepancy');
-        if (btnCloseDisp) btnCloseDisp.addEventListener('click', () => {
+        // Discrepancy Modal Close
+        document.getElementById('btn-close-discrepancy').addEventListener('click', () => {
             document.getElementById('modal-discrepancy').classList.add('hidden');
             this.currentDatasetId = null;
         });
-
-        // Global Row Inspector
-        const btnInspectGlobal = document.getElementById('btn-inspect-row');
-        if (btnInspectGlobal) {
-            btnInspectGlobal.addEventListener('click', () => {
-                const selectEl = document.getElementById('inspect-dataset-select');
-                const inputEl = document.getElementById('inspect-row-input');
-                const datasetId = selectEl?.value;
-                const query = inputEl?.value?.trim();
-
-                if (!datasetId) {
-                    if (window.Toast) window.Toast.warning("Please select a dataset first.");
-                    return;
-                }
-                if (!query) {
-                    if (window.Toast) window.Toast.warning("Please enter a row number or datetime.");
-                    return;
-                }
-                this.inspectCustomRow(datasetId, query);
-            });
-        }
     }
 
     switchTab(tab) {
@@ -114,17 +92,6 @@ export class DataView {
                 </td>
             </tr>
         `).join('');
-
-        // Populate Select Dropdown for Inspector
-        if (selectEl) {
-            const currentVal = selectEl.value;
-            selectEl.innerHTML = `<option value="" disabled ${!currentVal ? 'selected' : ''}>Select Dataset...</option>` +
-                datasets.map(d => `<option value="${d.id}">${d.symbol} (${d.timeframe})</option>`).join('');
-
-            if (currentVal && datasets.some(d => d.id === currentVal)) {
-                selectEl.value = currentVal;
-            }
-        }
 
         // Bind delete buttons
         tbody.querySelectorAll('.btn-delete').forEach(btn => {
@@ -413,32 +380,6 @@ export class DataView {
         } finally {
             btn.innerHTML = originalText;
             btn.disabled = false;
-        }
-    }
-
-    async inspectCustomRow(datasetId, query) {
-        const inputField = document.getElementById('inspect-row-input');
-        const btnInspect = document.getElementById('btn-inspect-row');
-
-        if (btnInspect) {
-            btnInspect.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
-            btnInspect.disabled = true;
-        }
-
-        try {
-            const res = await dataService.inspectRow(datasetId, query);
-            if (res.target_index !== undefined) {
-                if (window.Toast) window.Toast.success(`Found Dataset Match at Row ${res.target_index}`);
-                await this.openContextWindow(datasetId, res.target_index, "CUSTOM_INSPECT");
-            }
-        } catch (e) {
-            if (window.Toast) window.Toast.error("Could not find row: " + (e.response?.data?.detail || e.message));
-        } finally {
-            if (btnInspect) {
-                btnInspect.innerHTML = `Inspect`;
-                btnInspect.disabled = false;
-            }
-            if (inputField) inputField.value = '';
         }
     }
 }

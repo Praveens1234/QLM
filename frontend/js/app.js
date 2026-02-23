@@ -7,26 +7,26 @@ import { DashboardView } from './views/DashboardView.js';
 import { DataView } from './views/DataView.js';
 import { StrategyView } from './views/StrategyView.js';
 import { BacktestView } from './views/BacktestView.js';
-import { AssistantView } from './views/AssistantView.js';
 import { MCPView } from './views/MCPView.js';
 import { SettingsView } from './views/SettingsView.js';
+import { InspectorView } from './views/InspectorView.js';
 import { toast } from './notifications.js';
 
 const dashboardView = new DashboardView();
 const dataView = new DataView();
 const strategyView = new StrategyView();
 const backtestView = new BacktestView();
-const assistantView = new AssistantView();
 const mcpView = new MCPView();
 const settingsView = new SettingsView();
+const inspectorView = new InspectorView();
 
 // Initialize Routes
 const routes = {
     'dashboard': { action: () => dashboardView.mount() },
     'data': { action: () => dataView.mount() },
+    'inspector': { action: () => inspectorView.mount() },
     'strategies': { action: () => strategyView.mount() },
     'backtest': { action: () => backtestView.mount() },
-    'assistant': { action: () => assistantView.mount() },
     'mcp': { action: () => mcpView.mount() },
     'settings': { action: () => settingsView.mount() }
 };

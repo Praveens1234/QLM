@@ -110,6 +110,13 @@
                 <span class="font-medium">Backtest Runner</span>
             </button>
 
+            <button onclick="router.navigate('inspector')" id="nav-inspector" aria-label="Data Inspector"
+                class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+                <i
+                    class="fa-solid fa-magnifying-glass-chart w-5 text-center text-slate-500 group-hover:text-emerald-400 transition-colors"></i>
+                <span class="font-medium">Data Inspector</span>
+            </button>
+
             <div class="pt-4 pb-1">
                 <div class="h-px bg-slate-800 mx-3"></div>
             </div>
@@ -336,34 +343,11 @@
 
                 <!-- Table -->
                 <div class="glass-panel rounded-xl overflow-hidden shadow-sm">
-                    <div
-                        class="px-6 py-4 border-b border-slate-800 flex flex-col md:flex-row justify-between md:items-center bg-slate-900/50 gap-4">
-                        <div class="flex items-center gap-4">
-                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Available Datasets</h3>
-                            <button aria-label="Refresh Datasets"
-                                class="text-slate-500 hover:text-white transition-colors text-xs p-1 rounded hover:bg-slate-800"><i
-                                    class="fa-solid fa-refresh"></i></button>
-                        </div>
-
-                        <!-- Global Row Inspector -->
-                        <div
-                            class="flex items-center gap-2 bg-slate-800/50 p-1.5 rounded-lg border border-slate-700 w-full md:w-auto">
-                            <select id="inspect-dataset-select"
-                                class="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded px-2 py-1.5 focus:outline-none focus:border-indigo-500 max-w-[120px] truncate">
-                                <option value="" disabled selected>Select Dataset...</option>
-                                <!-- Injected dynamically -->
-                            </select>
-                            <div class="relative flex-1 md:w-48">
-                                <i
-                                    class="fa-solid fa-crosshairs absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-[10px]"></i>
-                                <input type="text" id="inspect-row-input" placeholder="Row # or Datetime..."
-                                    class="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded pl-6 pr-2 py-1.5 focus:outline-none focus:border-indigo-500 transition-colors">
-                            </div>
-                            <button id="btn-inspect-row"
-                                class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap shadow-sm">
-                                Inspect
-                            </button>
-                        </div>
+                    <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide">Available Datasets</h3>
+                        <button aria-label="Refresh Datasets"
+                            class="text-slate-500 hover:text-white transition-colors text-xs p-1 rounded hover:bg-slate-800"><i
+                                class="fa-solid fa-refresh"></i></button>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm text-slate-400">
@@ -556,6 +540,78 @@
                             class="flex-1 border border-slate-800 rounded-xl bg-[#1e1e1e] overflow-hidden shadow-inner">
                         </div>
                         <textarea id="strategy-editor-fallback" class="hidden"></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Page: Data Inspector -->
+            <section id="page-inspector" class="page hidden animate-fade-in max-w-7xl mx-auto space-y-6">
+                <header class="flex justify-between items-end border-b border-slate-800 pb-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+                            <i class="fa-solid fa-magnifying-glass text-indigo-500"></i> Data Inspector
+                        </h2>
+                        <p class="text-slate-400 text-sm mt-1">Search and analyze specific data points in full precision
+                            across your datasets</p>
+                    </div>
+                </header>
+
+                <div class="glass-panel rounded-xl p-6 shadow-sm border border-slate-800">
+                    <form id="inspector-form" class="flex flex-col md:flex-row gap-4 lg:gap-6 items-end">
+                        <div class="flex flex-col w-full md:w-1/4">
+                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-2"><i
+                                    class="fa-solid fa-database mr-1"></i> Target Dataset</label>
+                            <div class="relative">
+                                <select id="page-inspector-dataset" required
+                                    class="w-full bg-slate-900 border border-slate-700 text-slate-300 text-sm rounded-lg px-4 py-2.5 focus:outline-none focus:border-indigo-500 transition-colors appearance-none cursor-pointer">
+                                    <option value="" disabled selected>Select Dataset...</option>
+                                </select>
+                                <i
+                                    class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none text-xs"></i>
+                            </div>
+                        </div>
+                        <div class="flex flex-col w-full md:w-1/4">
+                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-2"><i
+                                    class="fa-solid fa-filter mr-1"></i> Search Type</label>
+                            <div class="flex bg-slate-900 rounded-lg p-1 border border-slate-700 h-[42px]">
+                                <button type="button" id="search-type-row"
+                                    class="flex-1 text-sm font-medium px-4 h-full rounded-md bg-indigo-600 text-white transition-all shadow-sm">Row
+                                    Index</button>
+                                <button type="button" id="search-type-time"
+                                    class="flex-1 text-sm font-medium px-4 h-full rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-all">Datetime</button>
+                            </div>
+                        </div>
+                        <div class="flex flex-col w-full md:w-1/4">
+                            <label id="inspector-input-label"
+                                class="block text-xs font-bold text-slate-400 uppercase tracking-wide mb-2"><i
+                                    class="fa-solid fa-hashtag mr-1"></i> Row Number</label>
+                            <input type="text" id="page-inspector-input" required placeholder="e.g. 1500"
+                                class="w-full h-[42px] bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-lg px-4 focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-600">
+                        </div>
+                        <div class="w-full md:w-auto">
+                            <button type="submit" id="btn-run-page-inspect"
+                                class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-8 py-2.5 rounded-lg transition-all shadow-lg shadow-indigo-500/20 text-sm flex items-center justify-center gap-2 h-[42px] whitespace-nowrap">
+                                <i class="fa-solid fa-magnifying-glass"></i> Inspect
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Inspector Results Container -->
+                <div id="inspector-results-container" class="hidden flex-col gap-4 animate-fade-in pb-12">
+                    <div class="flex items-center justify-between mt-4 mb-2">
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-lg font-bold text-white"><i
+                                    class="fa-solid fa-crosshairs text-emerald-400 mr-2"></i> Inspection Results</h3>
+                            <span id="page-inspect-result-badge"
+                                class="px-2.5 py-1 rounded text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">Found
+                                Target</span>
+                        </div>
+                    </div>
+                    <div class="glass-panel overflow-hidden border border-slate-800 rounded-xl">
+                        <!-- Results Table injected here -->
+                        <div id="inspector-table-wrapper" class="overflow-x-auto w-full relative">
+                        </div>
                     </div>
                 </div>
             </section>
