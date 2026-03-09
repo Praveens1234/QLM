@@ -22,7 +22,7 @@ class ExcursionStrategy(Strategy):
     def risk_model(self, df, vars): return {}
 
 def test_mae_mfe_accuracy():
-    dates = pd.date_range(start="2023-01-01", periods=3, freq="1min")
+    dates = pd.date_range(start="2023-01-02", periods=3, freq="1min")
     # 0: Entry @ 100
     # 1: High 120 (MFE +20), Low 80 (MAE -20), Close 100
     # 2: Exit @ 100

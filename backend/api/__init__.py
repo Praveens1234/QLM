@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from backend.api import data, strategy, engine, ws, ai, live
+from backend.api import data, strategy, engine, ws, live
 
 router = APIRouter()
 
@@ -7,7 +7,6 @@ router.include_router(data.router, prefix="/data", tags=["Data"])
 router.include_router(strategy.router, prefix="/strategies", tags=["Strategies"])
 router.include_router(engine.router, prefix="/backtest", tags=["Backtest"])
 router.include_router(ws.router, tags=["WebSocket"])
-router.include_router(ai.router, prefix="/ai", tags=["AI Agent"])
 router.include_router(live.router, prefix="/live", tags=["Live Execution"])
 
 @router.get("/")

@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 import logging
 import traceback
 from backend.core.data import DataManager
@@ -82,11 +82,124 @@ class BacktestEngine:
     def set_commission(self, type: str, value: float):
         self.commission_model = CommissionModel(type, value)
 
+    def _sanitize_dataset(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, int]]:
+        """
+        Pre-backtest data integrity guard.
+        Returns a CLEANED COPY of the DataFrame (original parquet untouched)
+        and a report dict with counts of each fix applied.
+        
+        Handles:
+        1. NaN in OHLC -> drop row
+        2. Zero-price rows (O/H/L/C == 0) -> drop row
+        3. Negative prices -> drop row
+        4. OHLC logic violations (H < L) -> swap H/L, clamp O/C
+        5. Stale/frozen bars (O=H=L=C AND volume=0) -> drop row
+        6. Duplicate timestamps -> keep first
+        """
+        original_len = len(df)
+        report = {
+            "original_rows": original_len,
+            "nan_dropped": 0,
+            "zero_dropped": 0,
+            "negative_dropped": 0,
+            "logic_fixed": 0,
+            "stale_dropped": 0,
+            "duplicate_dropped": 0,
+            "final_rows": 0,
+            "total_removed": 0,
+        }
+
+        # Work on a copy
+        df = df.copy()
+
+        # 1. Drop rows with NaN in OHLC
+        nan_mask = df[['open', 'high', 'low', 'close']].isna().any(axis=1)
+        nan_count = nan_mask.sum()
+        if nan_count > 0:
+            df = df[~nan_mask]
+            report["nan_dropped"] = int(nan_count)
+            logger.warning(f"Sanitizer: Dropped {nan_count} rows with NaN OHLC.")
+
+        # 2. Drop zero-price rows (any OHLC == 0)
+        zero_mask = (df['open'] == 0) | (df['high'] == 0) | (df['low'] == 0) | (df['close'] == 0)
+        zero_count = zero_mask.sum()
+        if zero_count > 0:
+            df = df[~zero_mask]
+            report["zero_dropped"] = int(zero_count)
+            logger.warning(f"Sanitizer: Dropped {zero_count} rows with zero prices.")
+
+        # 3. Drop negative price rows
+        neg_mask = (df['open'] < 0) | (df['high'] < 0) | (df['low'] < 0) | (df['close'] < 0)
+        neg_count = neg_mask.sum()
+        if neg_count > 0:
+            df = df[~neg_mask]
+            report["negative_dropped"] = int(neg_count)
+            logger.warning(f"Sanitizer: Dropped {neg_count} rows with negative prices.")
+
+        # 4. Fix OHLC logic violations (High < Low) by swapping, then clamp O/C
+        if len(df) > 0:
+            inverted = df['high'] < df['low']
+            inv_count = inverted.sum()
+            if inv_count > 0:
+                # Swap high and low where inverted
+                df.loc[inverted, ['high', 'low']] = df.loc[inverted, ['low', 'high']].values
+                report["logic_fixed"] = int(inv_count)
+                logger.warning(f"Sanitizer: Fixed {inv_count} rows with inverted High/Low.")
+
+            # Clamp Open/Close within [Low, High]
+            df['open'] = df['open'].clip(lower=df['low'], upper=df['high'])
+            df['close'] = df['close'].clip(lower=df['low'], upper=df['high'])
+
+        # 5. Drop stale/frozen bars (all 4 prices identical AND volume == 0)
+        if len(df) > 0:
+            stale_mask = (
+                (df['open'] == df['high']) &
+                (df['high'] == df['low']) &
+                (df['low'] == df['close']) &
+                (df['volume'] == 0)
+            )
+            stale_count = stale_mask.sum()
+            if stale_count > 0:
+                df = df[~stale_mask]
+                report["stale_dropped"] = int(stale_count)
+                logger.warning(f"Sanitizer: Dropped {stale_count} stale/frozen bars (O=H=L=C, vol=0).")
+
+        # 6. Drop duplicate timestamps
+        if len(df) > 0 and 'datetime' in df.columns:
+            dup_count = df.duplicated(subset=['datetime'], keep='first').sum()
+            if dup_count > 0:
+                df = df.drop_duplicates(subset=['datetime'], keep='first')
+                report["duplicate_dropped"] = int(dup_count)
+                logger.warning(f"Sanitizer: Dropped {dup_count} duplicate timestamps.")
+
+        # Reset index to ensure contiguous range
+        df = df.reset_index(drop=True)
+        report["final_rows"] = len(df)
+        report["total_removed"] = original_len - len(df)
+
+        if report["total_removed"] > 0:
+            pct = (report["total_removed"] / original_len) * 100
+            logger.info(f"Sanitizer summary: Removed {report['total_removed']} of {original_len} rows ({pct:.2f}%). {len(df)} rows remain.")
+
+            # Fatal guard: if >50% of data is removed, abort
+            if pct > 50:
+                raise ValueError(
+                    f"Dataset critically corrupted: {pct:.1f}% of rows were removed by sanitization. "
+                    f"This dataset needs manual review before backtesting."
+                )
+        else:
+            logger.info(f"Sanitizer: Dataset is clean. All {original_len} rows passed integrity checks.")
+
+        return df, report
+
     def run(self, dataset_id: str, strategy_name: str, version: int = None,
             callback=None, use_fast: bool = True, parameters: Dict[str, Any] = None,
             mode: str = "capital", initial_capital: float = 10000.0,
             leverage: float = 1.0, position_sizing: str = "fixed",
-            fixed_size: float = 1.0, risk_per_trade: float = 0.01) -> Dict[str, Any]:
+            fixed_size: float = 1.0, risk_per_trade: float = 0.01,
+            slippage_mode: str = "none", slippage_value: float = 0.0,
+            spread_value: float = 0.0, entry_on_next_bar: bool = False,
+            skip_weekend_trades: bool = True) -> Dict[str, Any]:
         """
         Run a backtest for a given dataset and strategy.
         
@@ -97,6 +210,11 @@ class BacktestEngine:
             position_sizing: "fixed", "percent_equity", or "strategy_defined"
             fixed_size: Lot size for fixed position_sizing
             risk_per_trade: Fraction of equity risked per trade (percent_equity mode)
+            slippage_mode: "none", "fixed", "percent", or "random"
+            slippage_value: Slippage amount (pips for fixed, % for percent, max for random)
+            spread_value: Bid-ask spread in price units
+            entry_on_next_bar: If True, enter at next bar's open instead of current close
+            skip_weekend_trades: If True, skip trades entering/exiting on weekends
         """
         try:
             # 1. System Check
@@ -115,6 +233,11 @@ class BacktestEngine:
 
             df = self.data_manager.load_dataset(metadata['file_path'])
             logger.info(f"Loaded dataset {metadata['symbol']} with {len(df)} rows.")
+
+            # 2.5 Pre-Backtest Data Integrity Guard
+            df, sanitization_report = self._sanitize_dataset(df)
+            if len(df) < 10:
+                raise ValueError(f"Dataset has only {len(df)} rows after sanitization. Minimum 10 required.")
 
             # 3. Load Strategy
             if version is None:
@@ -144,6 +267,11 @@ class BacktestEngine:
                 "position_sizing": position_sizing,
                 "fixed_size": fixed_size,
                 "risk_per_trade": risk_per_trade,
+                "slippage_mode": slippage_mode,
+                "slippage_value": slippage_value,
+                "spread_value": spread_value,
+                "entry_on_next_bar": entry_on_next_bar,
+                "skip_weekend_trades": skip_weekend_trades,
             }
             
             # 4. Execution
@@ -174,6 +302,7 @@ class BacktestEngine:
             results['parameters'] = parameters or {}
             results['mode'] = mode
             results['initial_capital'] = initial_capital
+            results['sanitization'] = sanitization_report
             
             return results
 
@@ -311,10 +440,41 @@ class BacktestEngine:
         times = df['dtv'].values.astype(np.int64)
         return (opens, highs, lows, closes, times)
 
+    def _compute_slippage_arr(self, n_rows: int, exec_config: dict) -> np.ndarray:
+        """
+        Compute per-bar slippage array based on config.
+        Modes: 'fixed', 'percent', 'random'. Default: 0 (no slippage).
+        """
+        slippage_mode = exec_config.get("slippage_mode", "none")
+        slippage_value = exec_config.get("slippage_value", 0.0)
+
+        if slippage_mode == "fixed":
+            return np.full(n_rows, slippage_value, dtype=float)
+        elif slippage_mode == "percent":
+            # Will be multiplied by price in the post-processing; store as fraction
+            return np.full(n_rows, slippage_value / 100.0, dtype=float)
+        elif slippage_mode == "random":
+            return np.random.uniform(0, slippage_value, size=n_rows).astype(float)
+        else:
+            return np.zeros(n_rows, dtype=float)
+
+    def _compute_spread_arr(self, n_rows: int, exec_config: dict) -> np.ndarray:
+        """
+        Compute per-bar spread array. Value is full spread in price units.
+        """
+        spread_value = exec_config.get("spread_value", 0.0)
+        return np.full(n_rows, spread_value, dtype=float)
+
     def _execute_fast(self, df: pd.DataFrame, strategy: Strategy, callback=None,
                       exec_config: dict = None, precalc_arrays: tuple = None) -> Dict[str, Any]:
         """
-        High-Performance Numba Execution.
+        High-Performance Numba Execution with Realistic Market Simulation.
+        
+        Realism features (controlled via exec_config):
+          - slippage_mode: 'fixed', 'percent', 'random', or 'none'
+          - slippage_value: slippage amount
+          - spread_value: bid-ask spread in price units
+          - entry_on_next_bar: True to enter at next bar's open
         """
         if exec_config is None:
             exec_config = {"mode": "capital", "initial_capital": 10000.0,
@@ -346,6 +506,11 @@ class BacktestEngine:
         # Position Size — compute based on sizing mode
         size_arr = self._compute_size_arr(df, strategy, vars_dict, sl_arr, exec_config)
 
+        # Realism arrays
+        slippage_arr = self._compute_slippage_arr(n_rows, exec_config)
+        spread_arr = self._compute_spread_arr(n_rows, exec_config)
+        entry_on_next_bar = exec_config.get("entry_on_next_bar", False)
+
         # Data Arrays (Use pre-calculated if available to save memory/CPU)
         if precalc_arrays:
             opens, highs, lows, closes, times = precalc_arrays
@@ -362,7 +527,8 @@ class BacktestEngine:
         entry_times, exit_times, entry_prices, exit_prices, pnls, reasons, directions, maes, mfes, entry_indices = run_numba_backtest(
             opens, highs, lows, closes, times,
             entry_long, entry_short, exit_long, exit_short,
-            sl_arr, tp_arr, size_arr
+            sl_arr, tp_arr, size_arr,
+            slippage_arr, spread_arr, entry_on_next_bar
         )
 
         if callback: callback(90, "Calculating Metrics...", {})
@@ -379,11 +545,12 @@ class BacktestEngine:
             if entry_px == 0.0 or exit_px == 0.0:
                 continue
                 
-            # 2. Invalidate Weekend Trades
-            entry_dt = pd.to_datetime(int(entry_times[i]), unit='ns', utc=True)
-            exit_dt = pd.to_datetime(int(exit_times[i]), unit='ns', utc=True)
-            if entry_dt.weekday() >= 5 or exit_dt.weekday() >= 5: # 5=Sat, 6=Sun
-                continue
+            # 2. Invalidate Weekend Trades (configurable)
+            if exec_config.get("skip_weekend_trades", True):
+                entry_dt = pd.to_datetime(int(entry_times[i]), unit='ns', utc=True)
+                exit_dt = pd.to_datetime(int(exit_times[i]), unit='ns', utc=True)
+                if entry_dt.weekday() >= 5 or exit_dt.weekday() >= 5: # 5=Sat, 6=Sun
+                    continue
 
             r_code = reasons[i]
             reason_str = reason_map.get(r_code, "Unknown")
@@ -444,7 +611,8 @@ class BacktestEngine:
     def _execute_legacy(self, df: pd.DataFrame, strategy: Strategy, callback=None,
                         exec_config: dict = None) -> Dict[str, Any]:
         """
-        Original Python Loop Execution (Renamed from _execute).
+        Original Python Loop Execution with Realistic Market Simulation.
+        Supports slippage, spread, and next-bar entry for parity with fast engine.
         """
         if exec_config is None:
             exec_config = {"mode": "capital", "initial_capital": 10000.0,
@@ -467,8 +635,14 @@ class BacktestEngine:
         # Position Size — compute based on sizing mode
         size_arr = self._compute_size_arr(df, strategy, vars_dict, sl_arr, exec_config)
 
+        # Realism arrays
+        slippage_arr = self._compute_slippage_arr(n_rows, exec_config)
+        spread_arr = self._compute_spread_arr(n_rows, exec_config)
+        entry_on_next_bar = exec_config.get("entry_on_next_bar", False)
+
         trades = []
         active_trade = None
+        pending_entry = None  # For next-bar entry mode
         
         opens = df['open'].values
         highs = df['high'].values
@@ -489,7 +663,50 @@ class BacktestEngine:
                 progress = (i / n_rows) * 100
                 display_time = pd.to_datetime(current_time, unit='ns', utc=True).strftime('%Y-%m-%d %H:%M:%S')
                 callback(progress, "Running Legacy", {"current_time": display_time, "active_trade_count": 1 if active_trade else 0})
-            
+
+            # Handle pending entry (next-bar mode)
+            if pending_entry is not None and active_trade is None:
+                sig_idx = pending_entry['_signal_idx']
+                slip = float(slippage_arr[sig_idx])
+                half_spread = float(spread_arr[sig_idx]) / 2.0
+
+                if pending_entry['_direction'] == 'long':
+                    entry_px = open_p + slip + half_spread
+                else:
+                    entry_px = open_p - slip - half_spread
+
+                sl_val = float(sl_arr[sig_idx]) if not np.isnan(sl_arr[sig_idx]) else None
+                tp_val = float(tp_arr[sig_idx]) if not np.isnan(tp_arr[sig_idx]) else None
+                size_val = float(size_arr[sig_idx]) if not np.isnan(size_arr[sig_idx]) else 1.0
+                risk_val = abs(entry_px - sl_val) * size_val if sl_val is not None else 0.0
+
+                active_trade = {
+                    "_entry_time_ns": current_time,
+                    "_entry_price": entry_px,
+                    "_direction": pending_entry['_direction'],
+                    "_sl": sl_val,
+                    "_tp": tp_val,
+                    "_size": size_val,
+                    "_initial_risk": risk_val,
+                    "_mae": 0.0,
+                    "_mfe": 0.0,
+                }
+                pending_entry = None
+
+                # Entry-bar MAE/MFE
+                if active_trade['_direction'] == 'long':
+                    mfe_val = high_p - active_trade['_entry_price']
+                    mae_val = active_trade['_entry_price'] - low_p
+                else:
+                    mfe_val = active_trade['_entry_price'] - low_p
+                    mae_val = high_p - active_trade['_entry_price']
+                if mfe_val > active_trade['_mfe']:
+                    active_trade['_mfe'] = mfe_val
+                if mae_val > active_trade['_mae']:
+                    active_trade['_mae'] = mae_val
+
+                continue  # Don't check exit on entry bar
+
             if active_trade:
                 exit_price = 0.0
                 exit_reason = ""
@@ -541,6 +758,22 @@ class BacktestEngine:
                 
                 if exit_reason:
                     trade_size = active_trade.get('_size', 1.0)
+
+                    # Apply slippage + spread to exit
+                    slip = float(slippage_arr[i])
+                    half_spread = float(spread_arr[i]) / 2.0
+                    if exit_reason == "Signal":
+                        if active_trade['_direction'] == 'long':
+                            exit_price -= slip + half_spread
+                        else:
+                            exit_price += slip + half_spread
+                    elif exit_reason == "SL Hit":
+                        if active_trade['_direction'] == 'long':
+                            exit_price -= slip
+                        else:
+                            exit_price += slip
+                    # TP Hit: no slippage (limit order)
+
                     if active_trade['_direction'] == 'long':
                         gross_pnl = (exit_price - active_trade['_entry_price']) * trade_size
                     else:
@@ -557,12 +790,13 @@ class BacktestEngine:
                         active_trade = None
                         continue
                         
-                    # 2. Invalidate Weekend Trades
-                    entry_dt = pd.to_datetime(int(active_trade['_entry_time_ns']), unit='ns', utc=True)
-                    exit_dt = pd.to_datetime(int(current_time), unit='ns', utc=True)
-                    if entry_dt.weekday() >= 5 or exit_dt.weekday() >= 5: # 5=Sat, 6=Sun
-                        active_trade = None
-                        continue
+                    # 2. Invalidate Weekend Trades (configurable)
+                    if exec_config.get("skip_weekend_trades", True):
+                        entry_dt = pd.to_datetime(int(active_trade['_entry_time_ns']), unit='ns', utc=True)
+                        exit_dt = pd.to_datetime(int(current_time), unit='ns', utc=True)
+                        if entry_dt.weekday() >= 5 or exit_dt.weekday() >= 5: # 5=Sat, 6=Sun
+                            active_trade = None
+                            continue
 
                     comm = CommissionModel.apply_to_trade(trade_obj, self.commission_model)
 
@@ -587,29 +821,46 @@ class BacktestEngine:
                     active_trade = None
                     continue 
             
-            if not active_trade:
+            if not active_trade and pending_entry is None:
                 try:
                     is_long = sig_long[i]
                     is_short = sig_short[i]
 
                     if is_long or is_short:
                         direction = "long" if is_long else "short"
-                        sl_val = float(sl_arr[i]) if not np.isnan(sl_arr[i]) else None
-                        tp_val = float(tp_arr[i]) if not np.isnan(tp_arr[i]) else None
-                        size_val = float(size_arr[i]) if not np.isnan(size_arr[i]) else 1.0
-                        risk_val = abs(close_p - sl_val) * size_val if sl_val is not None else 0.0
 
-                        active_trade = {
-                            "_entry_time_ns": current_time,
-                            "_entry_price": close_p,
-                            "_direction": direction,
-                            "_sl": sl_val,
-                            "_tp": tp_val,
-                            "_size": size_val,
-                            "_initial_risk": risk_val,
-                            "_mae": 0.0,
-                            "_mfe": 0.0,
-                        }
+                        if entry_on_next_bar:
+                            # Defer entry to next bar
+                            if i + 1 < n_rows:
+                                pending_entry = {
+                                    "_direction": direction,
+                                    "_signal_idx": i,
+                                }
+                        else:
+                            # Classic: enter at current bar close + slippage + spread
+                            slip = float(slippage_arr[i])
+                            half_spread = float(spread_arr[i]) / 2.0
+                            if direction == 'long':
+                                entry_px = close_p + slip + half_spread
+                            else:
+                                entry_px = close_p - slip - half_spread
+
+                            sl_val = float(sl_arr[i]) if not np.isnan(sl_arr[i]) else None
+                            tp_val = float(tp_arr[i]) if not np.isnan(tp_arr[i]) else None
+                            size_val = float(size_arr[i]) if not np.isnan(size_arr[i]) else 1.0
+                            risk_val = abs(entry_px - sl_val) * size_val if sl_val is not None else 0.0
+
+                            active_trade = {
+                                "_entry_time_ns": current_time,
+                                "_entry_price": entry_px,
+                                "_direction": direction,
+                                "_sl": sl_val,
+                                "_tp": tp_val,
+                                "_size": size_val,
+                                "_initial_risk": risk_val,
+                                "_mae": 0.0,
+                                "_mfe": 0.0,
+                            }
                 except Exception as e:
                     logger.warning(f"Signal processing failed at idx {i}: {e}")
         
@@ -618,10 +869,15 @@ class BacktestEngine:
             last_close = float(closes[-1])
             last_time = int(times[-1])
             trade_size = active_trade.get('_size', 1.0)
-            
+
+            # Apply slippage + spread to EOD close
+            slip = float(slippage_arr[-1])
+            half_spread = float(spread_arr[-1]) / 2.0
             if active_trade['_direction'] == 'long':
+                last_close = last_close - slip - half_spread
                 gross_pnl = (last_close - active_trade['_entry_price']) * trade_size
             else:
+                last_close = last_close + slip + half_spread
                 gross_pnl = (active_trade['_entry_price'] - last_close) * trade_size
 
             trade_obj = {

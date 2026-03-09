@@ -1,0 +1,60 @@
+Testing MCP Async Catbox Upload...
+Loaded 14 tool definitions.
+Spawning async upload for Run ID: test-run-1234
+Polling Status: {'status': 'uploading', 'url': None}
+Waiting for upload to finish (max 10s)...
+Traceback (most recent call last):
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "c:\Users\prave\Downloads\ANTIGRAVITY\QLM 3\backend\api\mcp_tools.py", line 53, in _upload_ledger_to_catbox
+    stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30.0)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\subprocess.py", line 201, in communicate
+    stdin, stdout, stderr = await tasks.gather(stdin, stdout, stderr)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\subprocess.py", line 181, in _read_stream
+    output = await stream.read()
+             ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\streams.py", line 706, in read
+    block = await self.read(self._limit)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\streams.py", line 713, in read
+    await self._wait_for_data('read')
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\streams.py", line 545, in _wait_for_data
+    await self._waiter
+asyncio.exceptions.CancelledError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\prave\Downloads\ANTIGRAVITY\QLM 3\tests\test_async_mcp_upload.py", line 45, in <module>
+    asyncio.run(test_mcp_async_upload())
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 686, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\prave\Downloads\ANTIGRAVITY\QLM 3\tests\test_async_mcp_upload.py", line 36, in test_mcp_async_upload
+    await asyncio.wait_for(task, timeout=10.0)
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py", line 519, in wait_for
+    async with timeouts.timeout(timeout):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\timeouts.py", line 115, in __aexit__
+    raise TimeoutError from exc_val
+TimeoutError
+Exception ignored in: <function BaseSubprocessTransport.__del__ at 0x00000147543CA200>
+Traceback (most recent call last):
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_subprocess.py", line 126, in __del__
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_subprocess.py", line 104, in close
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\proactor_events.py", line 109, in close
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 794, in call_soon
+  File "C:\Users\prave\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 540, in _check_closed
+RuntimeError: Event loop is closed

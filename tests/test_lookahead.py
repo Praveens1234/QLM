@@ -34,7 +34,7 @@ def setup_data():
 
     dates = pd.date_range(start="2023-01-01", periods=100, freq="1D")
     df = pd.DataFrame({
-        "datetime": dates, "dtv": dates.astype(int),
+        "datetime": dates, "dtv": dates.astype('int64') // 10**9,
         "open": np.linspace(100, 200, 100),
         "high": np.linspace(105, 205, 100),
         "low": np.linspace(95, 195, 100),

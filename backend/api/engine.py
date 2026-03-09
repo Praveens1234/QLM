@@ -3,7 +3,6 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from backend.core.engine import BacktestEngine
 from backend.api.ws import manager
-from backend.ai.analytics import optimize_strategy, optimize_strategy_genetic
 from typing import Optional, Dict, Any, List
 import asyncio
 import io
@@ -27,6 +26,12 @@ class BacktestRequest(BaseModel):
     position_sizing: str = "fixed"     # "fixed", "percent_equity", "strategy_defined"
     fixed_size: float = 1.0            # Lot/unit size when position_sizing="fixed"
     risk_per_trade: float = 0.01       # Fraction of equity risked (percent_equity mode)
+    # --- Realistic Market Simulation ---
+    slippage_mode: str = "none"        # "none", "fixed", "percent", "random"
+    slippage_value: float = 0.0        # Slippage amount (pips/percent/max)
+    spread_value: float = 0.0          # Bid-ask spread in price units
+    entry_on_next_bar: bool = False    # True = enter at next bar's open (realistic)
+    skip_weekend_trades: bool = True   # True = skip trades on Saturday/Sunday
 
 class OptimizeRequest(BaseModel):
     dataset_id: str
@@ -109,6 +114,11 @@ async def run_backtest(request: BacktestRequest):
             position_sizing=request.position_sizing,
             fixed_size=request.fixed_size,
             risk_per_trade=request.risk_per_trade,
+            slippage_mode=request.slippage_mode,
+            slippage_value=request.slippage_value,
+            spread_value=request.spread_value,
+            entry_on_next_bar=request.entry_on_next_bar,
+            skip_weekend_trades=request.skip_weekend_trades,
         )
         
         status = results.get("status", "success")

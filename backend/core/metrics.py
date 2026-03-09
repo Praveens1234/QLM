@@ -119,8 +119,8 @@ class PerformanceEngine:
             trades_per_day = 0.0
             if total_trades > 0:
                 try:
-                    start_time = pd.to_datetime(df['exit_time'], errors='coerce').min()
-                    end_time = pd.to_datetime(df['exit_time'], errors='coerce').max()
+                    start_time = pd.to_datetime(df['exit_time'], format='%Y-%m-%d %H:%M:%S', errors='coerce').min()
+                    end_time = pd.to_datetime(df['exit_time'], format='%Y-%m-%d %H:%M:%S', errors='coerce').max()
                     if pd.notna(start_time) and pd.notna(end_time):
                         delta_days = (end_time - start_time).days
                         if delta_days > 0:
@@ -136,6 +136,39 @@ class PerformanceEngine:
 
             # R-Multiple Analysis
             avg_r = df['r_multiple'].mean() if 'r_multiple' in df.columns else 0.0
+
+            # Max Consecutive Wins / Losses
+            max_consec_wins = 0
+            max_consec_losses = 0
+            current_streak = 0
+            for pnl_val in df['pnl'].values:
+                if pnl_val > 0:
+                    if current_streak > 0:
+                        current_streak += 1
+                    else:
+                        current_streak = 1
+                    if current_streak > max_consec_wins:
+                        max_consec_wins = current_streak
+                else:
+                    if current_streak < 0:
+                        current_streak -= 1
+                    else:
+                        current_streak = -1
+                    if abs(current_streak) > max_consec_losses:
+                        max_consec_losses = abs(current_streak)
+
+            # Calmar Ratio (Annualized Return / Max Drawdown)
+            calmar_ratio = 0.0
+            if max_drawdown > 0 and total_trades > 0:
+                try:
+                    start_t = pd.to_datetime(df['exit_time'].iloc[0], format='%Y-%m-%d %H:%M:%S', errors='coerce')
+                    end_t = pd.to_datetime(df['exit_time'].iloc[-1], format='%Y-%m-%d %H:%M:%S', errors='coerce')
+                    if pd.notna(start_t) and pd.notna(end_t):
+                        years = max((end_t - start_t).days / 365.25, 1/365.25)
+                        annualized_return = net_profit / years
+                        calmar_ratio = annualized_return / max_drawdown
+                except Exception:
+                    pass
 
             # Return on Capital
             roi_pct = (net_profit / initial_capital) * 100 if mode == "capital" else 0.0
@@ -172,6 +205,9 @@ class PerformanceEngine:
                 "trades_per_day": round(float(trades_per_day), 2),
                 "avg_mae": round(float(avg_mae), 2),
                 "avg_mfe": round(float(avg_mfe), 2),
+                "max_consecutive_wins": int(max_consec_wins),
+                "max_consecutive_losses": int(max_consec_losses),
+                "calmar_ratio": round(float(calmar_ratio), 4),
                 "initial_capital": float(initial_capital),
                 "final_equity": round(float(initial_capital + net_profit), 2) if mode == "capital" else round(float(initial_capital), 2),
             }
@@ -213,6 +249,9 @@ class PerformanceEngine:
             "trades_per_day": 0.0,
             "avg_mae": 0.0,
             "avg_mfe": 0.0,
+            "max_consecutive_wins": 0,
+            "max_consecutive_losses": 0,
+            "calmar_ratio": 0.0,
             "initial_capital": float(initial_capital),
             "final_equity": float(initial_capital),
         }

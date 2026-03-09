@@ -6,6 +6,7 @@ from starlette.responses import JSONResponse, Response
 from mcp.server.sse import SseServerTransport
 from backend.api.mcp_session import session_manager
 from backend.api.validation import ValidationMiddleware
+from backend.core.diagnostics import diagnostics, EventLevel, EventCategory
 
 logger = logging.getLogger("QLM.MCP.Transport")
 
@@ -24,16 +25,23 @@ class MCPTransport:
         ASGI Handler for SSE connection (GET).
         """
         if not self.active:
+            diagnostics.record(EventLevel.WARNING, EventCategory.MCP_TRANSPORT,
+                "SSE rejected: MCP service is disabled")
             await self._send_error(scope, receive, send, 503, "MCP Service Disabled")
             return
 
         # Create Session
         session = session_manager.create_session()
-        logger.info(f"New MCP Connection. Session ID: {session.session_id}")
+        diagnostics.record(EventLevel.INFO, EventCategory.MCP_TRANSPORT,
+            f"SSE connection opened",
+            details={"session_id": session.session_id})
 
         try:
             async with self.sse.connect_sse(scope, receive, send) as streams:
                 read_stream, write_stream = streams
+                diagnostics.record(EventLevel.INFO, EventCategory.MCP_TRANSPORT,
+                    f"SSE streams established, running MCP server",
+                    details={"session_id": session.session_id})
                 await mcp_server.run(
                     read_stream,
                     write_stream,
@@ -41,11 +49,19 @@ class MCPTransport:
                 )
 
         except asyncio.CancelledError:
-            logger.info(f"MCP Connection Cancelled (Disconnect). Session: {session.session_id}")
+            diagnostics.record(EventLevel.INFO, EventCategory.MCP_TRANSPORT,
+                f"SSE connection cancelled (client disconnect)",
+                details={"session_id": session.session_id})
         except Exception as e:
-            logger.error(f"MCP Transport Error: {e}")
+            diagnostics.record(EventLevel.ERROR, EventCategory.MCP_TRANSPORT,
+                f"SSE transport crash: {type(e).__name__}: {e}",
+                details={"session_id": session.session_id},
+                error=e)
         finally:
             session_manager.remove_session(session.session_id)
+            diagnostics.record(EventLevel.INFO, EventCategory.MCP_TRANSPORT,
+                f"SSE connection closed, session cleaned up",
+                details={"session_id": session.session_id})
 
     async def handle_messages(self, scope, receive, send):
         """
@@ -53,38 +69,47 @@ class MCPTransport:
         Intercepts and validates JSON-RPC payload.
         """
         if not self.active:
+            diagnostics.record(EventLevel.WARNING, EventCategory.MCP_TRANSPORT,
+                "POST message rejected: MCP service is disabled")
             await self._send_error(scope, receive, send, 503, "MCP Service Disabled")
             return
 
-        # Intercept Body for Validation
-        # NOTE: sse.handle_post_message consumes the body. We need to read it first?
-        # Reading body in ASGI is complex (stream).
-        # The mcp library handles reading.
-        # Ideally, we'd wrap the receive callable.
+        captured_method = None
 
         async def validated_receive():
+            nonlocal captured_method
             message = await receive()
             if message["type"] == "http.request":
                 body = message.get("body", b"")
                 if body:
                     try:
                         payload = json.loads(body)
+                        captured_method = payload.get("method", "unknown")
                         if not ValidationMiddleware.validate_payload(payload):
-                            # We can't easily return error here as 'receive' just returns data.
-                            # But we can log/flag it.
-                            # Or we can modify the body to be empty to force an error downstream?
-                            # Better: We assume mcp library does some validation, but we log warnings.
-                            pass
-                    except Exception:
-                        pass # Let downstream handle invalid JSON
+                            diagnostics.record(EventLevel.WARNING, EventCategory.MCP_TRANSPORT,
+                                f"Invalid JSON-RPC payload received",
+                                details={"method": captured_method, "payload_size": len(body)})
+                    except Exception as e:
+                        diagnostics.record(EventLevel.WARNING, EventCategory.MCP_TRANSPORT,
+                            f"Failed to parse incoming message: {e}",
+                            details={"body_size": len(body)})
             return message
 
         try:
-            # Use validated_receive to validate JSON-RPC payloads before passing to MCP
             await self.sse.handle_post_message(scope, validated_receive, send)
+            diagnostics.record(EventLevel.DEBUG, EventCategory.MCP_TRANSPORT,
+                f"POST message handled successfully",
+                details={"method": captured_method})
         except Exception as e:
-            logger.error(f"MCP Message Error: {e}")
-            await self._send_error(scope, receive, send, 500, str(e))
+            diagnostics.record(EventLevel.ERROR, EventCategory.MCP_TRANSPORT,
+                f"POST message handler crash: {type(e).__name__}: {e}",
+                details={"method": captured_method},
+                error=e)
+            try:
+                await self._send_error(scope, receive, send, 500, str(e))
+            except Exception:
+                diagnostics.record(EventLevel.ERROR, EventCategory.MCP_TRANSPORT,
+                    "Failed to send error response (connection may already be closed)")
 
     async def _send_error(self, scope, receive, send, code: int, msg: str):
         response = JSONResponse({"error": msg}, status_code=code)

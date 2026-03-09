@@ -1,0 +1,162 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.8, pytest-8.0.0, pluggy-1.6.0
+rootdir: C:\Users\prave\Downloads\ANTIGRAVITY\QLM 3
+plugins: anyio-4.12.0, asyncio-0.21.1
+asyncio: mode=Mode.STRICT
+collected 8 items
+
+tests\test_e2e_api_flow.py F                                             [ 12%]
+tests\test_mcp_fuzz.py ...                                               [ 50%]
+tests\test_api_errors.py ....                                            [100%]
+
+================================== FAILURES ===================================
+________________________________ test_e2e_flow ________________________________
+
+    @pytest.mark.asyncio
+    async def test_e2e_flow():
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+    
+            print("\n[E2E] 1. Checking Health...")
+            response = await ac.get("/health")
+            assert response.status_code == 200
+            assert response.json() == {"status": "ok", "system": "QLM"}
+            print("\u2705 Health OK")
+    
+            print("\n[E2E] 2. Checking Data Manager...")
+            # Clean up any existing test data
+            response = await ac.get("/api/data/")
+            for d in response.json():
+                if d['symbol'] == "E2E_TEST":
+                    await ac.delete(f"/api/data/{d['id']}")
+    
+            # Import data from URL (mocking the download to avoid ext net dependency issues inside test env if blocked)
+            # But here we'll try the real endpoint if allowed, or mock it.
+            # Let's try to simulate a file upload which is safer.
+    
+            # Create a dummy CSV
+            os.makedirs("data", exist_ok=True)
+            with open("data/e2e_test.csv", "w") as f:
+                f.write("time,open,high,low,close,volume\n")
+                f.write("2023-01-01 00:00:00,100,105,95,102,1000\n")
+                f.write("2023-01-01 01:00:00,102,108,101,107,1500\n")
+                f.write("2023-01-01 02:00:00,107,110,106,109,1200\n")
+                f.write("2023-01-01 03:00:00,109,112,100,105,1800\n")
+                f.write("2023-01-01 04:00:00,105,108,102,106,1100\n")
+    
+            with open("data/e2e_test.csv", "rb") as f:
+                files = {"file": ("e2e_test.csv", f, "text/csv")}
+                data = {"symbol": "E2E_TEST", "timeframe": "1h"}
+                response = await ac.post("/api/data/upload", files=files, data=data)
+                assert response.status_code == 200
+                data_id = response.json()["data"]["id"]
+                print(f"\u2705 Data Uploaded (ID: {data_id})")
+    
+            # Verify it's in the list
+            response = await ac.get("/api/data/")
+            datasets = response.json()
+            assert any(d['id'] == data_id for d in datasets)
+            print("\u2705 Data Listed")
+    
+            print("\n[E2E] 3. Strategy Lab...")
+            strategy_name = "E2E_Strategy"
+            strategy_code = """
+    from backend.core.strategy import Strategy
+    import pandas as pd
+    
+    class E2E_Strategy(Strategy):
+        def define_variables(self, df):
+            return {}
+        def entry_long(self, df, vars):
+            # Buy on first candle
+            s = pd.Series([False] * len(df))
+            s.iloc[1] = True
+            return s
+        def entry_short(self, df, vars):
+            return pd.Series([False] * len(df))
+        def exit_long_signal(self, df, vars):
+            # Sell on last candle
+            s = pd.Series([False] * len(df))
+            s.iloc[-1] = True
+            return s
+        def exit_short_signal(self, df, vars):
+            return pd.Series([False] * len(df))
+        def exit(self, df, vars, trade):
+            return False
+        def risk_model(self, df, vars):
+            return {}
+    """
+            # Save Strategy
+            response = await ac.post("/api/strategies/", json={"name": strategy_name, "code": strategy_code})
+            assert response.status_code == 200
+            print("\u2705 Strategy Saved")
+    
+            # Validate Strategy
+            response = await ac.post("/api/strategies/validate", json={"name": strategy_name, "code": strategy_code})
+            validation = response.json()
+            assert validation["valid"] is True
+            print("\u2705 Strategy Validated")
+    
+            print("\n[E2E] 4. Backtest Runner...")
+            # Run Backtest
+            payload = {
+                "dataset_id": data_id,
+                "strategy_name": strategy_name,
+                "cash": 10000,
+                "commission": 0.001
+            }
+            response = await ac.post("/api/backtest/run", json=payload)
+            assert response.status_code == 200
+            result = response.json()
+            if result["status"] == "success":
+                assert "results" in result
+                print("\u2705 Backtest Finished Immediately (Small Data)")
+            else:
+                assert result["status"] == "idling" or result.get("job_id")
+                print("\u2705 Backtest Started")
+    
+            # Since backtest is async via websocket usually, the run endpoint might return job ID.
+            # We can check progress via polling if endpoint is available, or just assume start is success for API test.
+            # Let's try to fetch job status if implemented, or just wait a bit.
+    
+            print("\n[E2E] 5. AI Assistant...")
+            # Create Session
+            response = await ac.post("/api/ai/sessions", json={"title": "E2E Test"})
+>           session_id = response.json()["id"]
+E           KeyError: 'id'
+
+tests\test_e2e_api_flow.py:126: KeyError
+---------------------------- Captured stdout call -----------------------------
+\n[E2E] 1. Checking Health...\nHTTP Request: GET http://test/health "HTTP/1.1 200 OK"\n\u2705 Health OK\n\n[E2E] 2. Checking Data Manager...\nHTTP Request: GET http://test/api/data/ "HTTP/1.1 200 OK"\nHTTP Request: DELETE http://test/api/data/71c53c6a-2c44-4431-8d13-036247d58aba "HTTP/1.1 200 OK"\nHTTP Request: POST http://test/api/data/upload "HTTP/1.1 200 OK"\n\u2705 Data Uploaded (ID: 802db020-6492-4493-9b19-b748db5fbc8f)\nHTTP Request: GET http://test/api/data/ "HTTP/1.1 200 OK"\n\u2705 Data Listed\n\n[E2E] 3. Strategy Lab...\nHTTP Request: POST http://test/api/strategies/ "HTTP/1.1 200 OK"\n\u2705 Strategy Saved\nHTTP Request: POST http://test/api/strategies/validate "HTTP/1.1 200 OK"\n\u2705 Strategy Validated\n\n[E2E] 4. Backtest Runner...\nLoaded dataset E2E_TEST with 5 rows.\nHTTP Request: POST http://test/api/backtest/run "HTTP/1.1 200 OK"\n\u2705 Backtest Finished Immediately (Small Data)\n\n[E2E] 5. AI Assistant...\nHTTP Request: POST http://test/api/ai/sessions "HTTP/1.1 405 Method Not Allowed"
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1773 HTTP Request: GET http://test/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1773 HTTP Request: GET http://test/api/data/ "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1773 HTTP Request: DELETE http://test/api/data/71c53c6a-2c44-4431-8d13-036247d58aba "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1773 HTTP Request: POST http://test/api/data/upload "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1773 HTTP Request: GET http://test/api/data/ "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1773 HTTP Request: POST http://test/api/strategies/ "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1773 HTTP Request: POST http://test/api/strategies/validate "HTTP/1.1 200 OK"
+INFO     QLM.Engine:engine.py:117 Loaded dataset E2E_TEST with 5 rows.
+INFO     httpx:_client.py:1773 HTTP Request: POST http://test/api/backtest/run "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1773 HTTP Request: POST http://test/api/ai/sessions "HTTP/1.1 405 Method Not Allowed"
+============================== warnings summary ===============================
+..\..\..\mcp\venv\Lib\site-packages\pydantic\_internal\_config.py:295
+  C:\Users\prave\mcp\venv\Lib\site-packages\pydantic\_internal\_config.py:295: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+..\..\..\mcp\venv\Lib\site-packages\httpx\_client.py:680
+..\..\..\mcp\venv\Lib\site-packages\httpx\_client.py:680
+  C:\Users\prave\mcp\venv\Lib\site-packages\httpx\_client.py:680: DeprecationWarning: The 'app' shortcut is now deprecated. Use the explicit style 'transport=WSGITransport(app=...)' instead.
+    warnings.warn(message, DeprecationWarning)
+
+..\..\..\mcp\venv\Lib\site-packages\starlette\routing.py:758
+  C:\Users\prave\mcp\venv\Lib\site-packages\starlette\routing.py:758: PytestCollectionWarning: cannot collect 'test_router' because it is not a function.
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+
+tests/test_e2e_api_flow.py::test_e2e_flow
+  C:\Users\prave\mcp\venv\Lib\site-packages\httpx\_client.py:1426: DeprecationWarning: The 'app' shortcut is now deprecated. Use the explicit style 'transport=ASGITransport(app=...)' instead.
+    warnings.warn(message, DeprecationWarning)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_e2e_api_flow.py::test_e2e_flow - KeyError: 'id'
+=================== 1 failed, 7 passed, 5 warnings in 5.20s ===================

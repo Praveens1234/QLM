@@ -4,9 +4,6 @@ import os
 import shutil
 import sqlite3
 from backend.database import db
-from backend.ai.config_manager import AIConfigManager
-from backend.ai.memory import JobManager
-from backend.ai.store import ChatStore
 from backend.core.engine import BacktestEngine
 from backend.core.store import MetadataStore
 from backend.core.strategy import StrategyLoader
@@ -36,44 +33,7 @@ def setup_db():
     if os.path.exists(test_db):
         os.remove(test_db)
 
-def test_config_persistence(setup_db):
-    cm = AIConfigManager()
-    cm.add_provider("TestProv", "http://test", "sk-123")
 
-    # Read back directly from DB to verify
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM providers WHERE id='testprov'")
-        row = cursor.fetchone()
-        assert row is not None
-        assert row["base_url"] == "http://test"
-
-def test_job_persistence(setup_db):
-    jm = JobManager()
-    sid = "session_123"
-    jm.start_job(sid, "Win Big")
-    jm.update_job(sid, "Step 1 done")
-
-    ctx = jm.get_job_context(sid)
-    assert "Win Big" in ctx
-    assert "Step 1 done" in ctx
-
-    # Verify DB
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM jobs WHERE session_id=?", (sid,))
-        row = cursor.fetchone()
-        assert row["status"] == "in_progress"
-
-def test_chat_persistence(setup_db):
-    cs = ChatStore()
-    sid = cs.create_session("My Chat")
-
-    cs.add_message(sid, {"role": "user", "content": "Hello"})
-    hist = cs.get_history(sid)
-
-    assert len(hist) == 1
-    assert hist[0]["content"] == "Hello"
 
 def test_backtest_fail_safe(setup_db):
     # We need a dummy dataset and strategy
@@ -91,9 +51,11 @@ def test_backtest_fail_safe(setup_db):
         "created_at": "2023-01-01"
     })
 
-    engine = BacktestEngine()
+    from unittest.mock import patch
+    with patch("backend.core.engine.check_memory", return_value=True):
+        engine = BacktestEngine()
 
-    # Should fail gracefully (return dict with status=failed) not raise
+        # Should fail gracefully (return dict with status=failed) not raise
     # Wait, engine.run catches Exception inside execution, but initialization (load dataset) raises?
     # Let's check engine.run code again.
     # It wraps everything in try...except:

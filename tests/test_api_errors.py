@@ -45,7 +45,7 @@ def test_system_error_handling():
     response = client.get("/api/test_error/system")
     assert response.status_code == 503
     data = response.json()
-    assert data["error"] == "System Error"
+    assert data["error"] == "System Critical Error"
     assert "Simulated System Crash" in data["detail"]
 
 def test_optimization_error_handling():

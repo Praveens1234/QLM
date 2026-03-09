@@ -17,14 +17,37 @@ export class BacktestView {
         const btnBt = document.getElementById('btn-mode-bt');
         const btnOpt = document.getElementById('btn-mode-opt');
         const btnRun = document.getElementById('btn-run-action');
+        const btnRealism = document.getElementById('btn-toggle-realism');
 
         if (btnBt) btnBt.addEventListener('click', () => this.setMode('backtest'));
         if (btnOpt) btnOpt.addEventListener('click', () => this.setMode('optimization'));
         if (btnRun) btnRun.addEventListener('click', () => this.run());
+        if (btnRealism) btnRealism.addEventListener('click', () => this.toggleRealism());
     }
 
     async mount() {
         await this.loadOptions();
+    }
+
+    toggleRealism() {
+        const panel = document.getElementById('realism-config');
+        const chevron = document.getElementById('realism-chevron');
+        if (panel.classList.contains('hidden')) {
+            panel.classList.remove('hidden');
+            chevron.style.transform = 'rotate(180deg)';
+        } else {
+            panel.classList.add('hidden');
+            chevron.style.transform = 'rotate(0deg)';
+        }
+    }
+
+    _getExecConfig() {
+        return {
+            slippage_mode: document.getElementById('bt-slippage-mode')?.value || 'none',
+            slippage_value: parseFloat(document.getElementById('bt-slippage-value')?.value || 0),
+            spread_value: parseFloat(document.getElementById('bt-spread-value')?.value || 0),
+            entry_on_next_bar: document.getElementById('bt-next-bar')?.checked || false,
+        };
     }
 
     setMode(mode) {
@@ -65,12 +88,13 @@ export class BacktestView {
     async run() {
         const datasetId = document.getElementById('bt-dataset').value;
         const strategyName = document.getElementById('bt-strategy').value;
+        const execConfig = this._getExecConfig();
 
         this.resetProgress();
 
         try {
             if (this.mode === 'backtest') {
-                await backtestService.runBacktest(datasetId, strategyName);
+                await backtestService.runBacktest(datasetId, strategyName, execConfig);
             } else {
                 const method = document.getElementById('opt-method').value;
                 const target = document.getElementById('opt-target').value;

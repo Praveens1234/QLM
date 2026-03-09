@@ -340,8 +340,11 @@ class StrategyLoader:
 
         # 3. Runtime Simulation
         import uuid
+        import tempfile
         temp_name = f"temp_validate_{uuid.uuid4().hex}"
-        temp_path = os.path.join(self.strategy_dir, f"{temp_name}.py")
+        # CRITICAL: Use OS temp directory, NOT strategies dir.
+        # Writing .py files to strategies/ triggers uvicorn --reload, causing zombie deadlocks.
+        temp_path = os.path.join(tempfile.gettempdir(), f"{temp_name}.py")
         
         try:
             # Write to temp file

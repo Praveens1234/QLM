@@ -146,13 +146,40 @@ class MCPTools:
                 "type": "function",
                 "function": {
                     "name": "run_backtest",
-                    "description": "Run a backtest for a specific strategy and dataset.",
+                    "description": "Run a basic backtest for a strategy and dataset. For realistic simulation with slippage/spread, use run_backtest_realistic instead.",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "strategy_name": {"type": "string", "description": "Name of the strategy"},
                             "symbol": {"type": "string", "description": "Symbol to test (e.g. XAUUSD)"},
                             "timeframe": {"type": "string", "description": "Timeframe (e.g. 1H)"}
+                        },
+                        "required": ["strategy_name", "symbol", "timeframe"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "run_backtest_realistic",
+                    "description": "Run an advanced backtest with realistic market simulation (slippage, spread, next-bar entry). Simulates real market conditions for accurate results. Use this for production-quality backtests.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "strategy_name": {"type": "string", "description": "Name of the strategy"},
+                            "symbol": {"type": "string", "description": "Symbol to test (e.g. XAUUSD)"},
+                            "timeframe": {"type": "string", "description": "Timeframe (e.g. 1M, 1H, 4H)"},
+                            "mode": {"type": "string", "enum": ["capital", "rrr"], "description": "PnL mode: 'capital' (USD) or 'rrr' (R-multiples). Default: capital"},
+                            "initial_capital": {"type": "number", "description": "Starting capital in USD. Default: 10000"},
+                            "leverage": {"type": "number", "description": "Leverage multiplier. Default: 1.0"},
+                            "position_sizing": {"type": "string", "enum": ["fixed", "percent_equity", "strategy_defined"], "description": "How position size is calculated. Default: fixed"},
+                            "fixed_size": {"type": "number", "description": "Lot/unit size when position_sizing=fixed. Default: 1.0"},
+                            "risk_per_trade": {"type": "number", "description": "Fraction of equity risked per trade (0.01 = 1%). Used when position_sizing=percent_equity. Default: 0.01"},
+                            "slippage_mode": {"type": "string", "enum": ["none", "fixed", "percent", "random"], "description": "Slippage model: none (default), fixed (constant pips), percent (% of price), random (uniform 0 to value)"},
+                            "slippage_value": {"type": "number", "description": "Slippage amount. Interpretation depends on slippage_mode. Default: 0.0"},
+                            "spread_value": {"type": "number", "description": "Bid-ask spread in price units (e.g. 0.20 for XAUUSD). Default: 0.0"},
+                            "entry_on_next_bar": {"type": "boolean", "description": "If true, enter at next bar's open instead of current close. Matches live trading behavior. Default: false"},
+                            "skip_weekend_trades": {"type": "boolean", "description": "If true, skip trades entering/exiting on Saturday/Sunday. Default: true"}
                         },
                         "required": ["strategy_name", "symbol", "timeframe"]
                     }
@@ -432,6 +459,94 @@ class MCPTools:
             finally:
                 request_limiter.release()
 
+        elif tool_name == "run_backtest_realistic":
+            await request_limiter.acquire()
+            try:
+                strat_name = args.get("strategy_name")
+                symbol = args.get("symbol")
+                tf = args.get("timeframe")
+                run_id = str(uuid.uuid4())
+
+                # Realism & execution params (with safe defaults)
+                mode = args.get("mode", "capital")
+                initial_capital = float(args.get("initial_capital", 10000.0))
+                leverage = float(args.get("leverage", 1.0))
+                position_sizing = args.get("position_sizing", "fixed")
+                fixed_size = float(args.get("fixed_size", 1.0))
+                risk_per_trade = float(args.get("risk_per_trade", 0.01))
+                slippage_mode = args.get("slippage_mode", "none")
+                slippage_value = float(args.get("slippage_value", 0.0))
+                spread_value = float(args.get("spread_value", 0.0))
+                entry_on_next_bar = bool(args.get("entry_on_next_bar", False))
+                skip_weekend_trades = bool(args.get("skip_weekend_trades", True))
+
+                def _run_bt_realistic():
+                    # Resolve Dataset ID
+                    datasets = self.metadata_store.list_datasets()
+                    dataset = next((d for d in datasets if d['symbol'].lower() == symbol.lower() and d['timeframe'].lower() == tf.lower()), None)
+
+                    if not dataset:
+                        available = [f"{d['symbol']} ({d['timeframe']})" for d in datasets]
+                        return {"error": f"Dataset {symbol} {tf} not found. Available: {', '.join(available)}"}
+
+                    engine = BacktestEngine()
+
+                    result = engine.run(
+                        dataset['id'], strat_name,
+                        mode=mode,
+                        initial_capital=initial_capital,
+                        leverage=leverage,
+                        position_sizing=position_sizing,
+                        fixed_size=fixed_size,
+                        risk_per_trade=risk_per_trade,
+                        slippage_mode=slippage_mode,
+                        slippage_value=slippage_value,
+                        spread_value=spread_value,
+                        entry_on_next_bar=entry_on_next_bar,
+                        skip_weekend_trades=skip_weekend_trades,
+                    )
+
+                    if result.get("status") == "failed":
+                        return {
+                            "status": "failed",
+                            "error": result.get("error", "Unknown Backtest Failure")
+                        }
+
+                    # Save trades to log file
+                    trade_file = f"trades_{run_id}.csv"
+                    trade_path = os.path.join(self.logs_dir, trade_file)
+
+                    if result['trades']:
+                        pd.DataFrame(result['trades']).to_csv(trade_path, index=False)
+
+                    metrics = result.get('metrics', {})
+
+                    return {
+                        "status": "success",
+                        "run_id": run_id,
+                        "metrics": metrics,
+                        "trade_count": len(result['trades']),
+                        "trade_log": trade_path,
+                        "realism_config": {
+                            "slippage_mode": slippage_mode,
+                            "slippage_value": slippage_value,
+                            "spread_value": spread_value,
+                            "entry_on_next_bar": entry_on_next_bar,
+                            "skip_weekend_trades": skip_weekend_trades,
+                        }
+                    }
+
+                bt_result = await self._run_sync(_run_bt_realistic)
+
+                if bt_result.get("status") == "success" and bt_result.get("trade_count", 0) > 0:
+                    asyncio.create_task(self._upload_ledger_to_catbox(run_id, bt_result["trade_log"]))
+                    bt_result["ledger_upload_status"] = "uploading"
+                    bt_result["message"] = f"Trade ledger is uploading. Use get_backtest_ledger_url with run_id '{run_id}' to retrieve the URL."
+
+                return bt_result
+            finally:
+                request_limiter.release()
+
         elif tool_name == "get_market_data":
             symbol = args.get("symbol")
             tf = args.get("timeframe")
@@ -564,10 +679,11 @@ class MCPTools:
                 return {
                     "status": "online",
                     "system": "QLM",
-                    "version": "2.0.0",
+                    "version": "3.0.0",
                     "os": platform.system(),
                     "cpu_percent": psutil.cpu_percent(),
                     "memory_percent": psutil.virtual_memory().percent,
+                    "features": ["backtest", "realistic_simulation", "slippage", "spread", "next_bar_entry", "mcp", "live_execution"]
                 }
             return await self._run_sync(_status)
 

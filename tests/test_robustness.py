@@ -31,7 +31,7 @@ def setup_bad_data():
     close[20] = np.inf # Inf at index 20
 
     df = pd.DataFrame({
-        "datetime": dates, "dtv": dates.astype(int),
+        "datetime": dates, "dtv": dates.astype('int64') // 10**9,
         "open": close,
         "high": close + 5,
         "low": close - 5,
@@ -106,21 +106,9 @@ def test_backtest_empty_data():
     StrategyLoader.load_strategy_class = lambda self, n, v: RobustnessStrategy
 
     try:
-        # This might raise an error, but it should be a caught error?
-        # The engine usually loads data.
-        # If DF is empty, backtest logic might fail on indexing.
-
-        # We expect a controlled failure or empty result.
-        # Actually, BacktestEngine catches Exceptions and returns dict with error.
-        result = engine.run("empty_ds", "RobustStrat", parameters={})
-
-        # Depending on implementation, empty DF returns empty metrics or failed status
-        # If run catches exception, status is failed.
-        # If run handles empty DF gracefully (len(df)==0 check), status is success with 0 trades.
-
-        assert result['status'] == 'success' or result['status'] == 'failed'
-        if result['status'] == 'success':
-             assert len(result['trades']) == 0
+        # The sanitizer guard should raise ValueError for < 10 rows
+        with pytest.raises(ValueError, match="Minimum 10 required"):
+            engine.run("empty_ds", "RobustStrat", parameters={})
 
     finally:
         StrategyLoader.load_strategy_class = original_load

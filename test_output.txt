@@ -1,0 +1,207 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.8, pytest-8.0.0, pluggy-1.6.0
+rootdir: C:\Users\prave\Downloads\ANTIGRAVITY\QLM 3
+plugins: anyio-4.12.0, asyncio-0.21.1
+asyncio: mode=Mode.STRICT
+collected 44 items
+
+tests\test_api_errors.py ....                                            [  9%]
+tests\test_audit_fixes.py F                                              [ 11%]
+tests\test_audit_ledger.py ...                                           [ 18%]
+tests\test_engine_parity.py .                                            [ 20%]
+tests\test_fees.py .                                                     [ 22%]
+tests\test_full_system.py .                                              [ 25%]
+tests\test_live_execution.py ..                                          [ 29%]
+tests\test_live_execution_mock.py ...                                    [ 36%]
+tests\test_lookahead.py .                                                [ 38%]
+tests\test_mae_mfe.py .                                                  [ 40%]
+tests\test_metrics_advanced.py ...                                       [ 47%]
+tests\test_metrics_basic.py ....                                         [ 56%]
+tests\test_metrics_drawdown.py ...                                       [ 63%]
+tests\test_metrics_risk.py ...                                           [ 70%]
+tests\test_persistence.py ..                                             [ 75%]
+tests\test_quant_core.py ...                                             [ 81%]
+tests\test_r_multiple.py ..                                              [ 86%]
+tests\test_recovery.py ..                                                [ 90%]
+tests\test_robustness.py ..                                              [ 95%]
+tests\test_slippage.py ..                                                [100%]
+
+================================== FAILURES ===================================
+___________________________ test_backtest_fail_safe ___________________________
+
+setup_db = None
+
+    def test_backtest_fail_safe(setup_db):
+        # We need a dummy dataset and strategy
+        # 1. Create dummy dataset
+        ms = MetadataStore()
+        ms.add_dataset({
+            "id": "dummy_ds",
+            "symbol": "TEST",
+            "timeframe": "1H",
+            "detected_tf_sec": 3600,
+            "start_date": "2023-01-01",
+            "end_date": "2023-01-02",
+            "row_count": 100,
+            "file_path": "data/dummy.parquet", # Doesn't exist, should trigger error in load
+            "created_at": "2023-01-01"
+        })
+    
+        engine = BacktestEngine()
+    
+        # Should fail gracefully (return dict with status=failed) not raise
+        # Wait, engine.run catches Exception inside execution, but initialization (load dataset) raises?
+        # Let's check engine.run code again.
+        # It wraps everything in try...except:
+        # except Exception as e: logger.error... raise e
+        # So initialization errors ARE raised.
+        # Execution errors (inside _execute) are caught and return status='failed'.
+    
+        # Let's test initialization error
+        with pytest.raises(Exception):
+            engine.run("dummy_ds", "Strat")
+    
+        # Now let's test execution error (e.g. strategy failure)
+        # We need a real dataframe to pass init
+        # Creating a dummy parquet file
+        import pandas as pd
+        df = pd.DataFrame({
+            "open": [100.0]*10, "high": [105.0]*10, "low": [95.0]*10, "close": [100.0]*10,
+            "volume": [1000]*10, "dtv": [1000000000*i for i in range(10)]
+        })
+        os.makedirs("data", exist_ok=True)
+        df.to_parquet("data/dummy.parquet")
+    
+        # Create a broken strategy
+        sl = StrategyLoader()
+        code = """
+    from backend.core.strategy import Strategy
+    import pandas as pd
+    class BrokenStrategy(Strategy):
+        def define_variables(self, df): return {}
+        def entry_long(self, df, vars): return pd.Series([False]*len(df))
+        def entry_short(self, df, vars): return pd.Series([False]*len(df))
+        def exit(self, df, vars, trade): raise ValueError("Boom")
+        def risk_model(self, df, vars): return {}
+    """
+        sl.save_strategy("BrokenStrat", code)
+    
+        # Run
+        # This should enter _execute, hit the error in exit(), catch it, log it, and continue?
+        # In my code:
+        # except Exception as e: logger.warning(...) continue
+        # So it should NOT fail the backtest status, just that candle/trade.
+    
+        # Let's make it fail in define_variables (which is outside the loop)
+        code_fatal = """
+    from backend.core.strategy import Strategy
+    import pandas as pd
+    class FatalStrategy(Strategy):
+        def define_variables(self, df): raise ValueError("Fatal Boom")
+        def entry_long(self, df, vars): return pd.Series([False]*len(df))
+        def entry_short(self, df, vars): return pd.Series([False]*len(df))
+        def exit(self, df, vars, trade): return False
+        def risk_model(self, df, vars): return {}
+    """
+        sl.save_strategy("FatalStrat", code_fatal)
+    
+        # This should result in status="failed"
+>       result = engine.run("dummy_ds", "FatalStrat")
+
+tests\test_audit_fixes.py:113: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend\core\engine.py:182: in run
+    raise e
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <backend.core.engine.BacktestEngine object at 0x000002288B68C350>
+dataset_id = 'dummy_ds', strategy_name = 'FatalStrat', version = None
+callback = None, use_fast = True, parameters = None, mode = 'capital'
+initial_capital = 10000.0, leverage = 1.0, position_sizing = 'fixed'
+fixed_size = 1.0, risk_per_trade = 0.01
+
+    def run(self, dataset_id: str, strategy_name: str, version: int = None,
+            callback=None, use_fast: bool = True, parameters: Dict[str, Any] = None,
+            mode: str = "capital", initial_capital: float = 10000.0,
+            leverage: float = 1.0, position_sizing: str = "fixed",
+            fixed_size: float = 1.0, risk_per_trade: float = 0.01) -> Dict[str, Any]:
+        """
+        Run a backtest for a given dataset and strategy.
+    
+        Args:
+            mode: "capital" (USD PnL) or "rrr" (R-multiple PnL)
+            initial_capital: Starting capital in USD (capital mode)
+            leverage: Leverage multiplier
+            position_sizing: "fixed", "percent_equity", or "strategy_defined"
+            fixed_size: Lot size for fixed position_sizing
+            risk_per_trade: Fraction of equity risked per trade (percent_equity mode)
+        """
+        try:
+            # 1. System Check
+            if not check_memory(required_mb=256):
+>               raise QLMSystemError("Insufficient memory to run backtest.")
+E               backend.core.exceptions.QLMSystemError: Insufficient memory to run backtest.
+
+backend\core\engine.py:104: QLMSystemError
+---------------------------- Captured stdout setup ----------------------------
+Database initialized at data/test_qlm.db (WAL Mode)
+----------------------------- Captured log setup ------------------------------
+INFO     QLM.Database:database.py:171 Database initialized at data/test_qlm.db (WAL Mode)
+---------------------------- Captured stdout call -----------------------------
+Loaded dataset TEST with 10 rows.
+Backtest Initialization failed: Strategy Strat v1 not found
+Low memory: 252.67MB available, 256MB required.
+Backtest Initialization failed: Insufficient memory to run backtest.
+------------------------------ Captured log call ------------------------------
+INFO     QLM.Engine:engine.py:117 Loaded dataset TEST with 10 rows.
+ERROR    QLM.Engine:engine.py:181 Backtest Initialization failed: Strategy Strat v1 not found
+WARNING  QLM.System:system.py:15 Low memory: 252.67MB available, 256MB required.
+ERROR    QLM.Engine:engine.py:181 Backtest Initialization failed: Insufficient memory to run backtest.
+============================== warnings summary ===============================
+..\..\..\mcp\venv\Lib\site-packages\pydantic\_internal\_config.py:295
+  C:\Users\prave\mcp\venv\Lib\site-packages\pydantic\_internal\_config.py:295: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+..\..\..\mcp\venv\Lib\site-packages\httpx\_client.py:680
+  C:\Users\prave\mcp\venv\Lib\site-packages\httpx\_client.py:680: DeprecationWarning: The 'app' shortcut is now deprecated. Use the explicit style 'transport=WSGITransport(app=...)' instead.
+    warnings.warn(message, DeprecationWarning)
+
+..\..\..\mcp\venv\Lib\site-packages\starlette\routing.py:758
+  C:\Users\prave\mcp\venv\Lib\site-packages\starlette\routing.py:758: PytestCollectionWarning: cannot collect 'test_router' because it is not a function.
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+
+tests/test_live_execution.py::test_live_execution_submit
+tests/test_live_execution.py::test_live_execution_cancel
+  c:\Users\prave\Downloads\ANTIGRAVITY\QLM 3\backend\core\execution_live.py:39: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+    self.exchange.set_sandbox_mode(True)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+tests/test_metrics_basic.py::test_all_loss
+tests/test_metrics_basic.py::test_all_win
+tests/test_metrics_drawdown.py::test_drawdown_calculation
+tests/test_metrics_drawdown.py::test_zero_drawdown
+tests/test_metrics_risk.py::test_sharpe_ratio
+tests/test_metrics_risk.py::test_sharpe_ratio
+tests/test_metrics_risk.py::test_sortino_ratio
+tests/test_metrics_risk.py::test_sortino_ratio
+tests/test_metrics_risk.py::test_sqn_logic
+  c:\Users\prave\Downloads\ANTIGRAVITY\QLM 3\backend\core\metrics.py:122: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+    start_time = pd.to_datetime(df['exit_time'], errors='coerce').min()
+
+tests/test_metrics_basic.py::test_all_loss
+tests/test_metrics_basic.py::test_all_win
+tests/test_metrics_drawdown.py::test_drawdown_calculation
+tests/test_metrics_drawdown.py::test_zero_drawdown
+tests/test_metrics_risk.py::test_sharpe_ratio
+tests/test_metrics_risk.py::test_sharpe_ratio
+tests/test_metrics_risk.py::test_sortino_ratio
+tests/test_metrics_risk.py::test_sortino_ratio
+tests/test_metrics_risk.py::test_sqn_logic
+  c:\Users\prave\Downloads\ANTIGRAVITY\QLM 3\backend\core\metrics.py:123: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+    end_time = pd.to_datetime(df['exit_time'], errors='coerce').max()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_audit_fixes.py::test_backtest_fail_safe - backend.core.exce...
+================= 1 failed, 43 passed, 23 warnings in 22.99s ==================

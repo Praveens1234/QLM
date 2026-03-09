@@ -1,0 +1,2 @@
+entry_time,exit_time,entry_price,exit_price,direction,pnl,gross_pnl,commission,r_multiple,sl,tp,mae,mfe,mae_price,mfe_price,mae_pnl,mfe_pnl,mae_r,mfe_r,duration,exit_reason,size,initial_risk
+2025-01-04 03:00:00,2026-12-01 23:59:00,3143.915,4599.095,short,-1455.18,-1455.18,0.0,0.0,,,1947.48,3143.91,5091.395,0.0,-1947.48,3143.91,0.0,0.0,1003499.0,End of Data,1.0,0.0

@@ -41,7 +41,7 @@ def setup_r_data():
 
     dates = pd.date_range(start="2023-01-01", periods=10, freq="1min")
     df = pd.DataFrame({
-        "datetime": dates, "dtv": dates.astype(int),
+        "datetime": dates, "dtv": dates.astype('int64') // 10**9,
         "open": [100, 110, 120] + [120]*7,
         "high": [105, 115, 125] + [120]*7,
         "low": [95, 105, 115] + [120]*7,

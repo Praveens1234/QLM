@@ -21,7 +21,7 @@ class CommissionStrategy(Strategy):
 
 def test_commission_impact():
     # Setup Data: Price moves from 100 to 110 (+10 profit)
-    dates = pd.date_range(start="2023-01-01", periods=5, freq="1min")
+    dates = pd.date_range(start="2023-01-02", periods=5, freq="1min")
     df = pd.DataFrame({
         "open": [100, 110, 110, 110, 110],
         "high": [100, 110, 110, 110, 110],

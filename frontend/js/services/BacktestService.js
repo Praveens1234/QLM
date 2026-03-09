@@ -26,8 +26,12 @@ export class BacktestService {
     notifyResult(res) { this.resultListeners.forEach(cb => cb(res)); }
     notifyError(err) { this.errorListeners.forEach(cb => cb(err)); }
 
-    async runBacktest(datasetId, strategyName) {
-        return await api.post('/backtest/run', { dataset_id: datasetId, strategy_name: strategyName });
+    async runBacktest(datasetId, strategyName, execConfig = {}) {
+        return await api.post('/backtest/run', {
+            dataset_id: datasetId,
+            strategy_name: strategyName,
+            ...execConfig
+        });
     }
 
     async runOptimization(config) {

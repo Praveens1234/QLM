@@ -44,6 +44,16 @@ async def test_e2e_flow():
             f.write("2023-01-01 02:00:00,107,110,106,109,1200\n")
             f.write("2023-01-01 03:00:00,109,112,100,105,1800\n")
             f.write("2023-01-01 04:00:00,105,108,102,106,1100\n")
+            f.write("2023-01-01 05:00:00,106,111,104,110,1300\n")
+            f.write("2023-01-01 06:00:00,110,115,108,113,1600\n")
+            f.write("2023-01-01 07:00:00,113,118,111,116,1400\n")
+            f.write("2023-01-01 08:00:00,116,120,114,118,1700\n")
+            f.write("2023-01-01 09:00:00,118,122,116,121,1900\n")
+            f.write("2023-01-01 10:00:00,121,125,119,123,2000\n")
+            f.write("2023-01-01 11:00:00,123,127,121,125,1800\n")
+            f.write("2023-01-01 12:00:00,125,128,123,126,1500\n")
+            f.write("2023-01-01 13:00:00,126,130,124,128,1600\n")
+            f.write("2023-01-01 14:00:00,128,132,126,130,1400\n")
 
         with open("data/e2e_test.csv", "rb") as f:
             files = {"file": ("e2e_test.csv", f, "text/csv")}
@@ -120,22 +130,6 @@ class E2E_Strategy(Strategy):
         # We can check progress via polling if endpoint is available, or just assume start is success for API test.
         # Let's try to fetch job status if implemented, or just wait a bit.
         
-        print("\n[E2E] 5. AI Assistant...")
-        # Create Session
-        response = await ac.post("/api/ai/sessions", json={"title": "E2E Test"})
-        session_id = response.json()["id"]
-        
-        # Send Message
-        # Mocking the AI response would be needed for a pure unit test, but this is integration.
-        # If openAI key is missing, this might fail. We'll wrap in try/except.
-        try:
-            print("   (Skipping actual AI call to avoid key dependency, checking session creation only)")
-            # msg_payload = {"session_id": session_id, "message": "Hello"}
-            # response = await ac.post("/api/ai/chat/message", json=msg_payload)
-            # assert response.status_code == 200
-        except Exception:
-            pass
-        print(f"✅ AI Session Created (ID: {session_id})")
 
         print("\n[E2E] 6. MCP Service...")
         # Check Status

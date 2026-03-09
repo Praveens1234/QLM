@@ -214,7 +214,71 @@ Both modes always compute RRR (R-multiple) per trade.
 
 ---
 
-## 10. Trade Ledger Columns
+## 10. Realistic Market Simulation
+
+These features make backtests simulate real market conditions, preventing over-optimistic results.
+All features are **off by default** (backward compatible). Enable via the API request.
+
+### 10.1 Slippage
+
+Slippage worsens your entry/exit prices, just like real order execution.
+
+| Mode | `slippage_mode` | `slippage_value` | Effect |
+|------|----------------|-----------------|--------|
+| None | `"none"` | 0.0 | No slippage (default) |
+| Fixed | `"fixed"` | e.g. `0.5` | Fixed amount added/subtracted from price |
+| Percent | `"percent"` | e.g. `0.01` | Percentage of price |
+| Random | `"random"` | e.g. `1.0` | Random uniform [0, value] per trade |
+
+**Direction rules:**
+- **Long entry**: price + slippage (buy at higher price = worse)
+- **Short entry**: price - slippage (sell at lower price = worse)
+- **SL exit**: slippage worsens further (market order)
+- **TP exit**: NO slippage (limit order, fills at exact price)
+
+### 10.2 Spread (Bid-Ask)
+
+| Parameter | Value | Effect |
+|-----------|-------|--------|
+| `spread_value` | e.g. `0.20` | Full spread in price units |
+
+**Direction rules:**
+- **Long entry**: price + spread/2 (buy at ask)
+- **Short entry**: price - spread/2 (sell at bid)
+- **Long exit**: price - spread/2 (sell at bid)
+- **Short exit**: price + spread/2 (buy at ask)
+
+> **Tip for XAUUSD**: Typical spread is 0.15–0.30. Set `spread_value: 0.20`.
+
+### 10.3 Next-Bar Entry
+
+| Parameter | Value | Effect |
+|-----------|-------|--------|
+| `entry_on_next_bar` | `true` | Enter at next bar's **open** price |
+| `entry_on_next_bar` | `false` | Enter at current bar's **close** price (default) |
+
+> **IMPORTANT**: In live trading, you receive a signal at bar close and execute on the next bar's open.
+> Using `entry_on_next_bar: true` makes backtests match live behavior exactly.
+
+### 10.4 API Example (All Realism Features)
+
+```json
+{
+  "dataset_id": "abc123",
+  "strategy_name": "RSI 2",
+  "mode": "capital",
+  "initial_capital": 10000,
+  "leverage": 10,
+  "slippage_mode": "fixed",
+  "slippage_value": 0.5,
+  "spread_value": 0.20,
+  "entry_on_next_bar": true
+}
+```
+
+---
+
+## 11. Trade Ledger Columns
 
 Every trade record contains:
 
@@ -222,21 +286,31 @@ Every trade record contains:
 |--------|-------------|
 | `entry_time` | Entry datetime |
 | `direction` | `"long"` or `"short"` |
-| `entry_price` | Price at entry |
-| `exit_price` | Price at exit |
+| `entry_price` | Price at entry (includes slippage + spread if enabled) |
+| `exit_price` | Price at exit (includes slippage + spread if enabled) |
 | `exit_time` | Exit datetime |
 | `pnl` | PnL in USD or R (depends on mode) |
+| `gross_pnl` | PnL before commission |
+| `commission` | Total commission (entry + exit) |
 | `r_multiple` | Risk-Reward ratio (always computed) |
 | `sl` | Stop Loss price (null if none) |
 | `tp` | Take Profit price (null if none) |
-| `mae` | Max Adverse Excursion (per-trade max drawdown) |
-| `mfe` | Max Favorable Excursion (per-trade max runup) |
+| `mae` | Max Adverse Excursion (worst drawdown during trade) |
+| `mfe` | Max Favorable Excursion (best runup during trade) |
+| `mae_price` | Price at MAE point |
+| `mfe_price` | Price at MFE point |
+| `mae_pnl` | MAE in PnL units |
+| `mfe_pnl` | MFE in PnL units |
+| `mae_r` | MAE in R-multiples |
+| `mfe_r` | MFE in R-multiples |
 | `duration` | Holding time in minutes |
 | `exit_reason` | `"SL Hit"`, `"TP Hit"`, `"Exit"`, `"End of Data"` |
+| `size` | Position size used |
+| `initial_risk` | Dollar risk at entry |
 
 ---
 
-## 11. Exit Reason (Status) Logic
+## 12. Exit Reason (Status) Logic
 
 | Status | Meaning |
 |--------|---------|
@@ -247,7 +321,7 @@ Every trade record contains:
 
 ---
 
-## 12. Common Mistakes to Avoid
+## 13. Common Mistakes to Avoid
 
 1. **Hardcoding values** — Use `self.parameters.get()` for anything optimizable
 2. **Not returning pd.Series** from signal methods — Always return boolean Series with same index as `df`
@@ -259,7 +333,33 @@ Every trade record contains:
 
 ---
 
-## 13. Complete Example Strategy
+## 14. Performance Metrics
+
+The engine computes these metrics automatically:
+
+| Metric | Description |
+|--------|-------------|
+| `total_trades` | Total number of trades |
+| `win_rate` | Percentage of winning trades |
+| `net_profit` | Total PnL |
+| `profit_factor` | Gross Profit / Gross Loss |
+| `max_drawdown` | Largest peak-to-trough decline |
+| `max_drawdown_pct` | Max drawdown as percentage |
+| `sharpe_ratio` | Risk-adjusted return (per-trade) |
+| `sortino_ratio` | Downside risk-adjusted return |
+| `sqn` | System Quality Number |
+| `expectancy` | Average PnL per trade |
+| `calmar_ratio` | Annualized return / max drawdown |
+| `max_consecutive_wins` | Longest winning streak |
+| `max_consecutive_losses` | Longest losing streak |
+| `avg_mae` | Average MAE across all trades |
+| `avg_mfe` | Average MFE across all trades |
+| `var_95` | Value at Risk (95% confidence) |
+| `trades_per_day` | Average trades per calendar day |
+
+---
+
+## 15. Complete Example Strategy
 
 ```python
 from backend.core.strategy import Strategy

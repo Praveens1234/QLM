@@ -2,7 +2,7 @@ from mcp.server import Server
 from mcp.types import Tool, TextContent, Resource, Prompt, GetPromptResult, PromptMessage
 import asyncio
 import logging
-from backend.ai.tools import AITools
+import time
 from backend.core.store import MetadataStore
 from backend.core.strategy import StrategyLoader
 import os
@@ -11,19 +11,21 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any
 from fastapi import Request
 from backend.api.mcp_session import session_manager
-from fastapi.responses import JSONResponse # Assuming JSONResponse is imported from fastapi.responses
+from fastapi.responses import JSONResponse
+from backend.api.mcp_tools import MCPTools
+from backend.core.diagnostics import diagnostics, EventLevel, EventCategory
 
 logger = logging.getLogger("QLM.MCP")
 
 mcp_server = Server("QLM")
-ai_tools = AITools()
+installed_tools = MCPTools()
 
 @mcp_server.list_tools()
 async def list_tools() -> List[Tool]:
     """
     List available tools for the MCP Client.
     """
-    definitions = ai_tools.get_definitions()
+    definitions = installed_tools.get_definitions()
     tools = []
     for d in definitions:
         func = d["function"]
@@ -38,20 +40,61 @@ async def list_tools() -> List[Tool]:
 async def call_tool(name: str, arguments: dict) -> List[TextContent]:
     """
     Execute a tool call from the MCP Client.
+    Has a hard 180s global timeout to prevent zombie hangs.
     """
+    start_time = time.time()
+    
+    diagnostics.record(EventLevel.INFO, EventCategory.MCP_TOOL_CALL,
+        f"Tool call received: {name}",
+        details={"tool": name, "args_keys": list(arguments.keys())})
+    
     try:
-        result = await ai_tools.execute(name, arguments)
+        result = await asyncio.wait_for(
+            installed_tools.execute(name, arguments),
+            timeout=180.0
+        )
+        
+        elapsed = round((time.time() - start_time) * 1000, 1)
         
         # Format result as text
         if isinstance(result, (dict, list)):
             text = json.dumps(result, indent=2, default=str)
         else:
             text = str(result)
+        
+        # Check for logical errors in result
+        is_error = isinstance(result, dict) and "error" in result
+        
+        diagnostics.record(
+            EventLevel.WARNING if is_error else EventLevel.INFO,
+            EventCategory.MCP_TOOL_RESULT,
+            f"Tool '{name}' completed in {elapsed}ms" + (f" (with error)" if is_error else ""),
+            details={"tool": name, "elapsed_ms": elapsed, "result_size": len(text), "has_error": is_error})
             
         return [TextContent(type="text", text=text)]
+    
+    except asyncio.TimeoutError:
+        elapsed = round((time.time() - start_time) * 1000, 1)
+        diagnostics.record(EventLevel.CRITICAL, EventCategory.MCP_TIMEOUT,
+            f"Tool '{name}' TIMED OUT after {elapsed}ms",
+            details={"tool": name, "elapsed_ms": elapsed, "timeout_limit": 180000})
+        
+        return [TextContent(type="text", text=json.dumps({
+            "error": f"Tool '{name}' timed out after 180 seconds.",
+            "code": -32004,
+            "suggestion": "The operation took too long. Try with a smaller dataset or simpler parameters."
+        }))]
     except Exception as e:
-        logger.error(f"MCP Tool Execution Error: {e}")
-        return [TextContent(type="text", text=f"Error: {str(e)}")]
+        elapsed = round((time.time() - start_time) * 1000, 1)
+        diagnostics.record(EventLevel.CRITICAL, EventCategory.CRASH,
+            f"Tool '{name}' CRASHED after {elapsed}ms: {type(e).__name__}: {e}",
+            details={"tool": name, "elapsed_ms": elapsed},
+            error=e)
+        
+        return [TextContent(type="text", text=json.dumps({
+            "error": f"Internal error: {str(e)}",
+            "code": -32603
+        }))]
 
 async def handle_mcp_sse(scope, receive, send):
     from backend.api.transport import mcp_transport
@@ -74,6 +117,8 @@ async def toggle_mcp(request: Request):
         from backend.api.transport import mcp_transport
         payload = await request.json()
         mcp_transport.active = payload.get("active", True)
+        diagnostics.record(EventLevel.INFO, EventCategory.SERVER,
+            f"MCP service toggled: active={mcp_transport.active}")
         return JSONResponse({"status": "updated", "is_active": mcp_transport.active})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=400)

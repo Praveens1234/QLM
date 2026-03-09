@@ -8,8 +8,7 @@ from backend.core.data import DataManager
 from backend.core.strategy import StrategyLoader
 from backend.core.engine import BacktestEngine
 from backend.core.store import MetadataStore
-from backend.ai.config_manager import AIConfigManager
-from backend.ai.memory import JobManager
+from backend.core.store import MetadataStore
 
 @pytest.fixture(scope="module")
 def setup_system():
@@ -63,7 +62,7 @@ def test_full_flow(setup_system):
         f.write("datetime,open,high,low,close,volume\n")
         # Generate 100 candles
         for i in range(100):
-            dt = pd.Timestamp("2023-01-01") + pd.Timedelta(hours=i)
+            dt = pd.Timestamp("2023-01-02") + pd.Timedelta(hours=i)
             f.write(f"{dt},100,105,95,100,1000\n")
 
     meta = dm.process_upload(csv_path, "TEST", "1H")
@@ -120,11 +119,4 @@ class Broken(Strategy):
     assert fail_result['status'] == 'failed'
     assert "Crash" in fail_result['error']
 
-    # 6. Job Persistence Check
-    jm = JobManager()
-    jm.start_job("session_test", "Audit")
-    jm.update_job("session_test", "Done")
 
-    ctx = jm.get_job_context("session_test")
-    assert "Audit" in ctx
-    assert "Done" in ctx
