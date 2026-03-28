@@ -4,7 +4,6 @@ export class Router {
         this.currentRoute = null;
         this.beforeHooks = [];
         window.addEventListener('hashchange', this.handleHashChange.bind(this));
-        window.addEventListener('load', this.handleHashChange.bind(this));
     }
 
     beforeEach(hook) {
@@ -20,7 +19,7 @@ export class Router {
         // Run hooks
         for (const hook of this.beforeHooks) {
             const result = await hook(routePath);
-            if (result === false) return; // Block navigation
+            if (result === false) return;
             if (typeof result === 'string') {
                 window.location.hash = result;
                 return;
@@ -30,17 +29,27 @@ export class Router {
         const route = this.routes[routePath] || this.routes['dashboard'];
         this.currentRoute = routePath;
 
+        // Update hash without triggering another hashchange
+        if (window.location.hash.slice(1) !== routePath) {
+            history.replaceState(null, '', '#' + routePath);
+        }
+
         // Hide all pages
-        document.querySelectorAll('.page').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.page').forEach(el => {
+            el.classList.add('hidden');
+            el.classList.remove('animate-fade-in');
+        });
 
         // Show target page
         const target = document.getElementById(`page-${routePath}`);
         if (target) {
             target.classList.remove('hidden');
+            // Re-trigger animation
+            void target.offsetWidth; // force reflow
             target.classList.add('animate-fade-in');
         }
 
-        // Update Navigation UI
+        // Update Navigation UI (sidebar + bottom tabs)
         this.updateNav(routePath);
 
         // Execute route callback (controller)
@@ -50,27 +59,32 @@ export class Router {
     }
 
     updateNav(activePath) {
+        // --- Sidebar Nav ---
         document.querySelectorAll('.nav-item').forEach(btn => {
-            // Reset styles
-            btn.classList.remove('bg-indigo-600/10', 'text-indigo-400', 'border-l-2', 'border-indigo-500');
-            btn.classList.add('text-slate-400', 'hover:bg-slate-800');
-
-            const icon = btn.querySelector('i');
-            if(icon) {
-                icon.classList.remove('text-indigo-400');
-                icon.classList.add('text-slate-500');
-            }
+            btn.classList.remove('active-nav');
         });
 
         const activeBtn = document.getElementById(`nav-${activePath}`);
         if (activeBtn) {
-            activeBtn.classList.remove('text-slate-400', 'hover:bg-slate-800');
-            activeBtn.classList.add('bg-indigo-600/10', 'text-indigo-400', 'border-l-2', 'border-indigo-500');
-            const icon = activeBtn.querySelector('i');
-            if(icon) {
-                icon.classList.remove('text-slate-500');
-                icon.classList.add('text-indigo-400');
+            activeBtn.classList.add('active-nav');
+        }
+
+        // --- Mobile Bottom Tab Bar ---
+        document.querySelectorAll('.bottom-tab-item').forEach(tab => {
+            const route = tab.dataset.route;
+            if (route === activePath) {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
             }
+        });
+
+        // For routes that don't have a direct bottom tab (strategies, inspector, mcp, settings),
+        // highlight "More"
+        const directTabs = ['dashboard', 'data', 'chart', 'backtest'];
+        if (!directTabs.includes(activePath)) {
+            const moreTab = document.getElementById('btn-mobile-more');
+            if (moreTab) moreTab.classList.add('active');
         }
     }
 }

@@ -16,6 +16,16 @@ class QLMSystemError(QLMError):
     """System-level errors (DB, file I/O)."""
     pass
 
+class BacktestError(QLMError):
+    """Raised when backtesting execution fails."""
+    def __init__(self, message: str, phase: str = "unknown", details: dict = None):
+        super().__init__(message, details)
+        self.phase = phase
+
+class SanitizationError(QLMError):
+    """Raised when dataset quality is too poor to backtest."""
+    pass
+
 class OptimizationError(QLMError):
     """Raised when optimization fails."""
     pass

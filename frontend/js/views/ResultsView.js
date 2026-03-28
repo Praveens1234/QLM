@@ -431,19 +431,19 @@ export class ResultsView {
 
             return `
             <tr class="hover:bg-white/5 transition-colors border-b border-slate-800 last:border-0 group">
-                <td class="px-6 py-3 whitespace-nowrap text-xs">${entryDisplay}</td>
-                <td class="px-6 py-3"><span class="px-2 py-0.5 rounded text-[9px] font-bold border uppercase ${dirClass}">${t.direction}</span></td>
-                <td class="px-6 py-3 text-right text-white font-mono">${price(t.entry_price)}</td>
-                <td class="px-6 py-3 text-right text-slate-500 font-mono text-xs">${price(t.sl)}</td>
-                <td class="px-6 py-3 text-right text-slate-500 font-mono text-xs">${price(t.tp)}</td>
-                <td class="px-6 py-3 text-right text-white font-mono">${price(t.exit_price)}</td>
-                <td class="px-6 py-3 text-right text-slate-500 font-mono text-xs">${t.exit_time}</td>
-                <td class="px-6 py-3 text-right font-bold ${pnlClass} font-mono">${price(t.pnl)}</td>
-                <td class="px-6 py-3 text-right text-slate-500 font-mono">${showMae}</td>
-                <td class="px-6 py-3 text-right text-slate-500 font-mono">${showMfe}</td>
-                <td class="px-6 py-3 text-right text-slate-300 font-mono text-xs">${price(t.duration)}m</td>
-                <td class="px-6 py-3 text-right text-slate-500 text-[10px] uppercase">${t.exit_reason || '-'}</td>
-                <td class="px-6 py-3 text-center">
+                <td class="px-4 md:px-6 py-3 whitespace-nowrap text-xs">${entryDisplay}</td>
+                <td class="px-4 md:px-6 py-3"><span class="px-2 py-0.5 rounded text-[9px] font-bold border uppercase ${dirClass}">${t.direction}</span></td>
+                <td class="px-4 md:px-6 py-3 text-right text-white font-mono mobile-hide-col">${price(t.entry_price)}</td>
+                <td class="px-4 md:px-6 py-3 text-right text-slate-500 font-mono text-xs mobile-hide-col">${price(t.sl)}</td>
+                <td class="px-4 md:px-6 py-3 text-right text-slate-500 font-mono text-xs mobile-hide-col">${price(t.tp)}</td>
+                <td class="px-4 md:px-6 py-3 text-right text-white font-mono mobile-hide-col">${price(t.exit_price)}</td>
+                <td class="px-4 md:px-6 py-3 text-right text-slate-500 font-mono text-xs mobile-hide-col">${t.exit_time}</td>
+                <td class="px-4 md:px-6 py-3 text-right font-bold ${pnlClass} font-mono">${price(t.pnl)}</td>
+                <td class="px-4 md:px-6 py-3 text-right text-slate-500 font-mono mobile-hide-col">${showMae}</td>
+                <td class="px-4 md:px-6 py-3 text-right text-slate-500 font-mono mobile-hide-col">${showMfe}</td>
+                <td class="px-4 md:px-6 py-3 text-right text-slate-300 font-mono text-xs mobile-hide-col">${price(t.duration)}m</td>
+                <td class="px-4 md:px-6 py-3 text-right text-slate-500 text-[10px] uppercase">${t.exit_reason || '-'}</td>
+                <td class="px-4 md:px-6 py-3 text-center mobile-hide-col">
                     <button class="btn-delete-trade text-slate-600 hover:text-rose-400 transition-colors" data-id="${t._id}" title="Remove Trade">
                         <i class="fa-solid fa-trash text-xs"></i>
                     </button>
@@ -466,19 +466,19 @@ export class ResultsView {
                     <table class="w-full text-left text-sm text-slate-400">
                         <thead class="bg-slate-950 text-[10px] uppercase font-bold text-slate-500 sticky top-0 z-10 shadow-sm">
                             <tr>
-                                <th class="px-6 py-3 tracking-wider">Entry</th>
-                                <th class="px-6 py-3 tracking-wider">Dir</th>
-                                <th class="px-6 py-3 tracking-wider text-right">Entry Px</th>
-                                <th class="px-6 py-3 tracking-wider text-right">SL</th>
-                                <th class="px-6 py-3 tracking-wider text-right">TP</th>
-                                <th class="px-6 py-3 tracking-wider text-right">Exit Px</th>
-                                <th class="px-6 py-3 tracking-wider text-right">Exit Time</th>
-                                <th class="px-6 py-3 tracking-wider text-right">PnL</th>
-                                <th class="px-6 py-3 tracking-wider text-right">MAE (Max Loss)</th>
-                                <th class="px-6 py-3 tracking-wider text-right">MFE (Max Prof)</th>
-                                <th class="px-6 py-3 tracking-wider text-right">Dur</th>
-                                <th class="px-6 py-3 tracking-wider text-right">Reason</th>
-                                <th class="px-6 py-3 tracking-wider text-center">Action</th>
+                                <th class="px-4 md:px-6 py-3 tracking-wider">Entry</th>
+                                <th class="px-4 md:px-6 py-3 tracking-wider">Dir</th>
+                                <th class="px-4 md:px-6 py-3 tracking-wider text-right mobile-hide-col">Entry Px</th>
+                                <th class="px-4 md:px-6 py-3 tracking-wider text-right mobile-hide-col">SL</th>
+                                <th class="px-4 md:px-6 py-3 tracking-wider text-right mobile-hide-col">TP</th>
+                                <th class="px-4 md:px-6 py-3 tracking-wider text-right mobile-hide-col">Exit Px</th>
+                                <th class="px-4 md:px-6 py-3 tracking-wider text-right mobile-hide-col">Exit Time</th>
+                                <th class="px-4 md:px-6 py-3 tracking-wider text-right">PnL</th>
+                                <th class="px-4 md:px-6 py-3 tracking-wider text-right mobile-hide-col">MAE</th>
+                                <th class="px-4 md:px-6 py-3 tracking-wider text-right mobile-hide-col">MFE</th>
+                                <th class="px-4 md:px-6 py-3 tracking-wider text-right mobile-hide-col">Dur</th>
+                                <th class="px-4 md:px-6 py-3 tracking-wider text-right">Reason</th>
+                                <th class="px-4 md:px-6 py-3 tracking-wider text-center mobile-hide-col">Action</th>
                             </tr>
                         </thead>
                         <tbody class="font-mono text-xs divide-y divide-slate-800/50">${rows}</tbody>

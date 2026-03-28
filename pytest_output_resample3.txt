@@ -1,0 +1,34 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.8, pytest-8.0.0, pluggy-1.6.0 -- C:\Users\prave\mcp\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\prave\Downloads\ANTIGRAVITY\QLM 3
+plugins: anyio-4.12.0, asyncio-0.21.1
+asyncio: mode=Mode.STRICT
+collecting ... collected 4 items
+
+tests/test_chart_provider.py::test_valid_timeframes PASSED               [ 25%]
+tests/test_chart_provider.py::test_chart_window_no_resample FAILED       [ 50%]
+tests/test_chart_provider.py::test_chart_window_resampling PASSED        [ 75%]
+tests/test_chart_provider.py::test_chart_cursor_pagination PASSED        [100%]
+
+================================== FAILURES ===================================
+________________________ test_chart_window_no_resample ________________________
+
+mock_dataset_file = ('C:\\Users\\prave\\AppData\\Local\\Temp\\pytest-of-prave\\pytest-8\\test_chart_window_no_resample0\\test_data.parquet...051  159.983051  157.983051  159.483051    10.0
+59  1704070740  160.000000  161.000000  159.000000  160.500000    10.0)
+
+    def test_chart_window_no_resample(mock_dataset_file):
+        file_path, df = mock_dataset_file
+    
+        # Ask for 1m data (base=60, target=60)
+        res = ChartDataProvider.get_chart_window(file_path, 60, limit=30)
+    
+        bars = res['bars']
+        assert len(bars) == 30
+>       assert not res['has_more']
+E       assert not True
+
+tests\test_chart_provider.py:60: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_chart_provider.py::test_chart_window_no_resample - assert n...
+========================= 1 failed, 3 passed in 0.64s =========================

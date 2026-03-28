@@ -106,8 +106,8 @@ def test_backtest_empty_data():
     StrategyLoader.load_strategy_class = lambda self, n, v: RobustnessStrategy
 
     try:
-        # The sanitizer guard should raise ValueError for < 10 rows
-        with pytest.raises(ValueError, match="Minimum 10 required"):
+        from backend.core.exceptions import SanitizationError, BacktestError
+        with pytest.raises((SanitizationError, BacktestError)):
             engine.run("empty_ds", "RobustStrat", parameters={})
 
     finally:

@@ -36,7 +36,7 @@ def test_all_win():
     trades = [{"pnl": 10.0, "exit_time": "1", "duration": 1}] * 5
     metrics = PerformanceEngine.calculate_metrics(trades)
     assert metrics["win_rate"] == 100.0
-    assert metrics["profit_factor"] == float('inf')
+    assert metrics["profit_factor"] == 9999.99  # Capped: no losses
     assert metrics["net_profit"] == 50.0
 
 def test_empty_trades():

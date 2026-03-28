@@ -1,12 +1,21 @@
+"""
+QLM API — Backtest Engine Endpoints.
+
+Provides endpoints for:
+  POST /backtest/run          — Run a backtest
+  POST /backtest/export-csv   — Export trade ledger as CSV
+"""
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from backend.core.engine import BacktestEngine
+from backend.core.exceptions import BacktestError, SanitizationError, QLMSystemError
 from backend.api.ws import manager
 from typing import Optional, Dict, Any, List
 import asyncio
 import io
 import csv
+import math
 from starlette.concurrency import run_in_threadpool
 import logging
 
@@ -15,93 +24,94 @@ logger = logging.getLogger("QLM.API.Engine")
 router = APIRouter()
 engine = BacktestEngine()
 
+
 class BacktestRequest(BaseModel):
     dataset_id: str
     strategy_name: str
     version: Optional[int] = None
-    # --- Capital / RRR Mode ---
-    mode: str = "capital"              # "capital" (USD) or "rrr" (R-multiples)
-    initial_capital: float = 10000.0   # Starting capital in USD (capital mode)
-    leverage: float = 1.0              # Leverage multiplier
-    position_sizing: str = "fixed"     # "fixed", "percent_equity", "strategy_defined"
-    fixed_size: float = 1.0            # Lot/unit size when position_sizing="fixed"
-    risk_per_trade: float = 0.01       # Fraction of equity risked (percent_equity mode)
-    # --- Realistic Market Simulation ---
-    slippage_mode: str = "none"        # "none", "fixed", "percent", "random"
-    slippage_value: float = 0.0        # Slippage amount (pips/percent/max)
-    spread_value: float = 0.0          # Bid-ask spread in price units
-    entry_on_next_bar: bool = False    # True = enter at next bar's open (realistic)
-    skip_weekend_trades: bool = True   # True = skip trades on Saturday/Sunday
+    # Capital / RRR Mode
+    mode: str = "capital"
+    initial_capital: float = 10000.0
+    leverage: float = 1.0
+    position_sizing: str = "fixed"
+    fixed_size: float = 1.0
+    risk_per_trade: float = 0.01
+    # Realistic Market Simulation
+    slippage_mode: str = "none"
+    slippage_value: float = 0.0
+    spread_value: float = 0.0
+    entry_on_next_bar: bool = False
+    skip_weekend_trades: bool = True
 
-class OptimizeRequest(BaseModel):
-    dataset_id: str
-    strategy_name: str
-    method: str = "grid" # grid, genetic
-    target_metric: str = "net_profit"
-    params: Optional[Dict[str, List[Any]]] = None
+    @field_validator("mode")
+    @classmethod
+    def validate_mode(cls, v):
+        if v not in ("capital", "rrr"):
+            raise ValueError("mode must be 'capital' or 'rrr'")
+        return v
+
+    @field_validator("slippage_mode")
+    @classmethod
+    def validate_slippage_mode(cls, v):
+        if v not in ("none", "fixed", "percent", "random"):
+            raise ValueError("slippage_mode must be one of: none, fixed, percent, random")
+        return v
+
+    @field_validator("leverage")
+    @classmethod
+    def validate_leverage(cls, v):
+        if v < 1.0:
+            raise ValueError("leverage must be >= 1.0")
+        return v
+
+    @field_validator("slippage_value", "spread_value")
+    @classmethod
+    def validate_non_negative(cls, v):
+        if v < 0:
+            raise ValueError("Value must be >= 0")
+        return v
+
+    @field_validator("initial_capital")
+    @classmethod
+    def validate_capital(cls, v):
+        if v <= 0:
+            raise ValueError("initial_capital must be > 0")
+        return v
+
 
 class ExportRequest(BaseModel):
     trades: List[Dict[str, Any]]
-    mode: str = "capital"  # affects PnL column label
+    mode: str = "capital"
 
-@router.post("/optimize")
-async def run_optimization(request: OptimizeRequest):
-    try:
-        # Default Param Grid for Demo if not provided
-        # In a real app, frontend would inspect strategy and build this.
-        param_grid = request.params
-        if not param_grid:
-            # Simple demo grid
-            param_grid = {
-                "ma_fast": [5, 10, 20],
-                "ma_slow": [30, 50, 100],
-                "rsi_period": [14, 21],
-                "rsi_overbought": [70, 80],
-                "rsi_oversold": [20, 30]
-            }
 
-        if request.method == "genetic":
-            result = await run_in_threadpool(
-                optimize_strategy_genetic,
-                request.strategy_name,
-                request.dataset_id,
-                param_grid,
-                population_size=20,
-                generations=5,
-                target_metric=request.target_metric
-            )
-        else:
-            result = await run_in_threadpool(
-                optimize_strategy,
-                request.strategy_name,
-                request.dataset_id,
-                param_grid,
-                request.target_metric
-            )
+def _sanitize_json(obj):
+    """Recursively replace NaN/Inf with None for JSON serialisation."""
+    if isinstance(obj, dict):
+        return {k: _sanitize_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_sanitize_json(item) for item in obj]
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    return obj
 
-        return {"status": "success", "results": result}
-
-    except Exception as e:
-        logger.error(f"Optimization API Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/run")
 async def run_backtest(request: BacktestRequest):
     loop = asyncio.get_running_loop()
-    
+
     def sync_callback(pct: float, msg: str, data: Dict[str, Any]):
-        # Schedule the async broadcast on the main event loop
         payload = {
             "type": "progress",
             "dataset_id": request.dataset_id,
             "progress": round(pct, 2),
             "message": msg,
-            "data": data
+            "data": data or {},
         }
         asyncio.run_coroutine_threadsafe(manager.broadcast(payload), loop)
 
     try:
-        # Run CPU-bound backtest in threadpool
         results = await run_in_threadpool(
             engine.run,
             dataset_id=request.dataset_id,
@@ -120,34 +130,34 @@ async def run_backtest(request: BacktestRequest):
             entry_on_next_bar=request.entry_on_next_bar,
             skip_weekend_trades=request.skip_weekend_trades,
         )
-        
+
+        # Sanitise for JSON (no NaN/Inf)
+        results = _sanitize_json(results)
+
         status = results.get("status", "success")
 
         if status == "failed":
             error_msg = results.get("error", "Unknown execution error")
-            logger.error(f"Backtest failed gracefully: {error_msg}")
-
-            # Broadcast failure
+            logger.error(f"Backtest failed: {error_msg}")
             await manager.broadcast({
                 "type": "error",
                 "dataset_id": request.dataset_id,
                 "message": "Backtest Execution Failed",
-                "details": error_msg
+                "details": error_msg,
             })
-
-            # Still return partial results? Or error?
-            # Let's return the results (which contain empty trades) but with status
             return {"status": "failed", "error": error_msg, "results": results}
-        
         else:
-            # Broadcast completion
             await manager.broadcast({
                 "type": "finished",
                 "dataset_id": request.dataset_id,
-                "results": results
+                "results": results,
             })
             return {"status": "success", "results": results}
-        
+
+    except (BacktestError, SanitizationError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except QLMSystemError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -159,10 +169,7 @@ async def run_backtest(request: BacktestRequest):
 
 @router.post("/export-csv")
 async def export_trades_csv(request: ExportRequest):
-    """
-    Export trade ledger as a downloadable CSV file.
-    Columns: Entry DT, DIR, Entry Price, Exit Price, Exit DT, PnL, RRR, SL, TP, Max DD, Max Runup, Holding Time, Status
-    """
+    """Export trade ledger as a downloadable CSV file."""
     try:
         trades = request.trades
         if not trades:
@@ -173,11 +180,10 @@ async def export_trades_csv(request: ExportRequest):
         output = io.StringIO()
         writer = csv.writer(output)
 
-        # Header
         writer.writerow([
             "Entry DT", "DIR", "Entry Price", "Exit Price", "Exit DT",
-            pnl_label, "RRR", "SL", "TP", "Max DD", "Max Runup",
-            "Holding Time (min)", "Status"
+            pnl_label, "RRR", "SL", "TP", "MAE", "MFE",
+            "Holding Time (min)", "Status",
         ])
 
         for t in trades:
@@ -194,14 +200,14 @@ async def export_trades_csv(request: ExportRequest):
                 round(t.get("mae", 0), 2),
                 round(t.get("mfe", 0), 2),
                 round(t.get("duration", 0), 2),
-                t.get("exit_reason", "")
+                t.get("exit_reason", ""),
             ])
 
         output.seek(0)
         return StreamingResponse(
             iter([output.getvalue()]),
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=trade_ledger.csv"}
+            headers={"Content-Disposition": "attachment; filename=trade_ledger.csv"},
         )
 
     except HTTPException:

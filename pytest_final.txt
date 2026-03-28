@@ -1,0 +1,14 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.8, pytest-8.0.0, pluggy-1.6.0 -- C:\Users\prave\mcp\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\prave\Downloads\ANTIGRAVITY\QLM 3
+plugins: anyio-4.12.0, asyncio-0.21.1
+asyncio: mode=Mode.STRICT
+collecting ... collected 4 items
+
+tests/test_chart_provider.py::test_valid_timeframes PASSED               [ 25%]
+tests/test_chart_provider.py::test_chart_window_no_resample PASSED       [ 50%]
+tests/test_chart_provider.py::test_chart_window_resampling PASSED        [ 75%]
+tests/test_chart_provider.py::test_chart_cursor_pagination PASSED        [100%]
+
+============================== 4 passed in 0.68s ==============================

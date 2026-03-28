@@ -146,7 +146,8 @@ class TestSanitizeDataset:
         for i in range(11):
             df.loc[i, 'open'] = 0
 
-        with pytest.raises(ValueError, match="critically corrupted"):
+        from backend.core.exceptions import SanitizationError
+        with pytest.raises(SanitizationError, match="critically corrupted"):
             self.engine._sanitize_dataset(df)
 
     def test_open_close_clamped_within_high_low(self):

@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>QLM - QuantLogic Framework</title>
+    <meta name="description" content="QLM QuantLogic Framework — professional quantitative trading strategy development, backtesting, and data analysis platform.">
+    <meta name="theme-color" content="#020617">
 
     <!-- Error Handler (Debug) -->
     <script src="/js/errorhandler.js"></script>
@@ -101,6 +103,13 @@
                 <i
                     class="fa-solid fa-code w-5 text-center text-slate-500 group-hover:text-amber-400 transition-colors"></i>
                 <span class="font-medium">Strategy Lab</span>
+            </button>
+
+            <button onclick="router.navigate('chart')" id="nav-chart" aria-label="Trading Chart"
+                class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+                <i
+                    class="fa-solid fa-chart-candlestick w-5 text-center text-slate-500 group-hover:text-fuchsia-400 transition-colors"></i>
+                <span class="font-medium">Chart Viewer</span>
             </button>
 
             <button onclick="router.navigate('backtest')" id="nav-backtest" aria-label="Backtest Runner"
@@ -544,6 +553,96 @@
                 </div>
             </section>
 
+            <!-- Chart Viewer -->
+            <section id="page-chart"
+                class="page hidden animate-fade-in flex flex-col h-[calc(100dvh-8rem)] md:h-[calc(100vh-6rem)] w-full max-w-[1920px] mx-auto gap-2 md:gap-4">
+                <!-- Chart Header (hidden on mobile via CSS for max chart space) -->
+                <div class="flex items-center justify-between flex-shrink-0 mb-1 px-1">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="h-8 w-8 rounded-lg bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                            <i class="fa-solid fa-chart-line text-indigo-400"></i>
+                        </div>
+                        <h2
+                            class="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 tracking-tight">
+                            Market Analytics</h2>
+                    </div>
+                </div>
+
+                <div
+                    class="glass-panel border border-slate-800 rounded-xl md:rounded-xl rounded-none flex-1 flex flex-col overflow-hidden shadow-sm relative">
+                    <!-- Top Toolbar: Row 1 — Dataset + Indicators -->
+                    <div class="chart-toolbar flex flex-wrap items-center px-3 md:px-4 py-2 gap-3 md:gap-4 border-b border-slate-800 bg-slate-900/50 hide-scrollbar">
+                        <!-- Dataset Selector -->
+                        <div class="flex items-center gap-2 flex-shrink-0 w-full md:w-auto md:min-w-[220px]">
+                            <i class="fa-solid fa-database text-slate-500 text-xs hidden md:inline"></i>
+                            <select id="chart-dataset-select"
+                                class="bg-slate-950 border border-slate-700 text-sm text-slate-200 rounded-lg px-3 py-2 focus:border-indigo-500 focus:outline-none w-full appearance-none pr-8 font-mono">
+                                <option value="" disabled selected>Select Dataset...</option>
+                            </select>
+                        </div>
+                        <!-- Timeframe Buttons -->
+                        <div id="chart-tf-container" class="flex items-center gap-1 font-mono flex-shrink-0 overflow-x-auto hide-scrollbar order-3 md:order-none w-full md:w-auto">
+                            <span class="text-xs text-slate-600 px-2 italic whitespace-nowrap">Select dataset first</span>
+                        </div>
+                        <!-- Indicators Button (click-based, not hover) -->
+                        <div class="relative ml-auto flex-shrink-0 order-2 md:order-none" id="indicator-btn-wrap">
+                            <button id="btn-toggle-indicators"
+                                class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-2 transition-colors border border-slate-700 focus:outline-none"
+                                aria-label="Toggle Indicators">
+                                <i class="fa-solid fa-layer-group"></i>
+                                <span class="hidden md:inline">Indicators</span>
+                                <i class="fa-solid fa-chevron-down text-[10px] transition-transform" id="indicator-chevron"></i>
+                            </button>
+                            <!-- Desktop Indicator Dropdown (click toggled) -->
+                            <div id="indicator-dropdown" class="indicator-dropdown hidden md:block">
+                                <label class="flex items-center gap-2 p-2 hover:bg-slate-800 rounded cursor-pointer text-xs text-slate-300">
+                                    <input type="checkbox" id="ind-sma50" class="indicator-toggle accent-indigo-500"> SMA (50)
+                                </label>
+                                <label class="flex items-center gap-2 p-2 hover:bg-slate-800 rounded cursor-pointer text-xs text-slate-300">
+                                    <input type="checkbox" id="ind-ema20" class="indicator-toggle accent-indigo-500"> EMA (20)
+                                </label>
+                                <label class="flex items-center gap-2 p-2 hover:bg-slate-800 rounded cursor-pointer text-xs text-slate-300">
+                                    <input type="checkbox" id="ind-ema50" class="indicator-toggle accent-indigo-500"> EMA (50)
+                                </label>
+                                <label class="flex items-center gap-2 p-2 hover:bg-slate-800 rounded cursor-pointer text-xs text-slate-300">
+                                    <input type="checkbox" id="ind-ema200" class="indicator-toggle accent-indigo-500"> EMA (200)
+                                </label>
+                                <div class="h-px bg-slate-800 my-1"></div>
+                                <label class="flex items-center gap-2 p-2 hover:bg-slate-800 rounded cursor-pointer text-xs text-slate-300">
+                                    <input type="checkbox" id="ind-bb" class="indicator-toggle accent-indigo-500"> Bollinger Bands
+                                </label>
+                                <label class="flex items-center gap-2 p-2 hover:bg-slate-800 rounded cursor-pointer text-xs text-slate-300">
+                                    <input type="checkbox" id="ind-rsi" class="indicator-toggle accent-indigo-500"> RSI (14)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Chart Area -->
+                    <div class="relative flex-1 bg-[#020617]">
+                        <!-- OHLCV Price Legend -->
+                        <div id="chart-ohlcv-legend" class="chart-legend">
+                            <span class="font-semibold text-white" id="legend-symbol"></span>
+                            <span><span class="legend-label">O</span><span id="legend-open">—</span></span>
+                            <span><span class="legend-label">H</span><span id="legend-high">—</span></span>
+                            <span><span class="legend-label">L</span><span id="legend-low">—</span></span>
+                            <span><span class="legend-label">C</span><span id="legend-close">—</span></span>
+                            <span><span class="legend-label">V</span><span id="legend-vol">—</span></span>
+                        </div>
+                        <div id="chart-container" class="absolute inset-0"></div>
+                        <div id="chart-initial-loading"
+                            class="absolute inset-0 z-20 bg-slate-950/80 backdrop-blur-sm hidden flex-col items-center justify-center">
+                            <i class="fa-solid fa-circle-notch fa-spin text-indigo-500 text-3xl mb-3"></i>
+                            <span class="text-sm font-medium text-slate-300 tracking-wide">Querying Engine...</span>
+                        </div>
+                        <div id="chart-loading"
+                            class="hidden absolute left-4 top-14 md:top-4 z-10 bg-indigo-600/90 text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 backdrop-blur-md border border-indigo-400/30">
+                            <i class="fa-solid fa-spinner fa-spin"></i> Loading...
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Page: Data Inspector -->
             <section id="page-inspector" class="page hidden animate-fade-in max-w-7xl mx-auto space-y-6">
                 <header class="flex justify-between items-end border-b border-slate-800 pb-4">
@@ -702,11 +801,14 @@
                                         <i class="fa-solid fa-chart-area text-amber-400"></i>
                                         Realistic Simulation
                                     </span>
-                                    <i id="realism-chevron" class="fa-solid fa-chevron-down text-[8px] transition-transform"></i>
+                                    <i id="realism-chevron"
+                                        class="fa-solid fa-chevron-down text-[8px] transition-transform"></i>
                                 </button>
                                 <div id="realism-config" class="hidden space-y-4 pt-3 animate-fade-in">
                                     <div>
-                                        <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Slippage Mode</label>
+                                        <label
+                                            class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Slippage
+                                            Mode</label>
                                         <select id="bt-slippage-mode"
                                             class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono">
                                             <option value="none">None (Default)</option>
@@ -716,24 +818,34 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Slippage Value</label>
+                                        <label
+                                            class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Slippage
+                                            Value</label>
                                         <input type="number" id="bt-slippage-value" value="0" step="0.01" min="0"
                                             class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono">
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Spread (Price Units)</label>
+                                        <label
+                                            class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Spread
+                                            (Price Units)</label>
                                         <input type="number" id="bt-spread-value" value="0" step="0.01" min="0"
                                             placeholder="e.g. 0.20 for XAUUSD"
                                             class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono placeholder-slate-600">
                                     </div>
                                     <div class="flex items-center justify-between">
-                                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Next-Bar Entry</label>
+                                        <label
+                                            class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Next-Bar
+                                            Entry</label>
                                         <label class="relative inline-flex items-center cursor-pointer">
                                             <input type="checkbox" id="bt-next-bar" class="sr-only peer">
-                                            <div class="w-9 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
+                                            <div
+                                                class="w-9 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500">
+                                            </div>
                                         </label>
                                     </div>
-                                    <p class="text-[10px] text-slate-600 leading-tight">Enable slippage & spread to simulate real market conditions. Next-bar entry matches live trading behavior.</p>
+                                    <p class="text-[10px] text-slate-600 leading-tight">Enable slippage & spread to
+                                        simulate real market conditions. Next-bar entry matches live trading behavior.
+                                    </p>
                                 </div>
                             </div>
 
@@ -841,8 +953,79 @@
             <!-- Settings -->
             <section id="page-settings" class="page hidden animate-fade-in max-w-3xl mx-auto space-y-6">
                 <h2 class="text-2xl font-bold text-white tracking-tight mb-6">Settings</h2>
-                <div class="glass-panel xl p-6 text-slate-400 text-sm text-center">
-                    No settings available at this time.
+
+                <!-- About -->
+                <div class="glass-panel rounded-xl p-6 space-y-4">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide border-b border-slate-800 pb-2">About</h3>
+                    <div class="flex items-center gap-4">
+                        <div class="h-12 w-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20 ring-1 ring-white/10">
+                            <i class="fa-solid fa-layer-group text-white text-lg"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-white font-bold text-lg">QLM</h4>
+                            <p class="text-slate-400 text-xs">QuantLogic Framework v3.0.0</p>
+                        </div>
+                    </div>
+                    <p class="text-slate-500 text-sm leading-relaxed">
+                        Professional quantitative trading framework for strategy development, backtesting, and market data analysis.
+                    </p>
+                </div>
+
+                <!-- API Configuration -->
+                <div class="glass-panel rounded-xl p-6 space-y-4">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide border-b border-slate-800 pb-2">
+                        <i class="fa-solid fa-server mr-1.5"></i>API Configuration
+                    </h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wide">Backend URL</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="settings-api-url" value="http://localhost:8010"
+                                    class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-indigo-300 font-mono focus:outline-none focus:border-indigo-500 transition-colors">
+                                <button class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-4 py-2 rounded-lg transition-colors border border-slate-700 text-xs font-bold"
+                                    onclick="if(window.Toast) window.Toast.success('API URL saved')">
+                                    <i class="fa-solid fa-check"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between py-2">
+                            <div>
+                                <span class="text-sm text-slate-300 font-medium">Connection Status</span>
+                                <p class="text-[10px] text-slate-500 mt-0.5">WebSocket real-time updates</p>
+                            </div>
+                            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950 border border-slate-800 text-xs text-slate-400 font-mono">
+                                <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                Connected
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Appearance -->
+                <div class="glass-panel rounded-xl p-6 space-y-4">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wide border-b border-slate-800 pb-2">
+                        <i class="fa-solid fa-palette mr-1.5"></i>Appearance
+                    </h3>
+                    <div class="flex items-center justify-between py-2">
+                        <div>
+                            <span class="text-sm text-slate-300 font-medium">Dark Mode</span>
+                            <p class="text-[10px] text-slate-500 mt-0.5">Optimized for extended trading sessions</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" checked disabled class="sr-only peer">
+                            <div class="w-9 h-5 bg-indigo-500 rounded-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full opacity-60"></div>
+                        </label>
+                    </div>
+                    <div class="flex items-center justify-between py-2">
+                        <div>
+                            <span class="text-sm text-slate-300 font-medium">Chart Animations</span>
+                            <p class="text-[10px] text-slate-500 mt-0.5">Smooth transitions on chart updates</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" checked class="sr-only peer" id="settings-chart-anims">
+                            <div class="w-9 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
+                        </label>
+                    </div>
                 </div>
             </section>
 
@@ -851,7 +1034,66 @@
         </div>
     </main>
 
-    <script type="module" src="/js/app.js?v=2"></script>
+    <!-- Mobile Bottom Tab Bar -->
+    <div class="bottom-tab-bar" id="bottom-tab-bar">
+        <nav>
+            <button class="bottom-tab-item active" data-route="dashboard" onclick="router.navigate('dashboard')">
+                <i class="fa-solid fa-chart-pie"></i>
+                <span>Home</span>
+            </button>
+            <button class="bottom-tab-item" data-route="data" onclick="router.navigate('data')">
+                <i class="fa-solid fa-database"></i>
+                <span>Data</span>
+            </button>
+            <button class="bottom-tab-item" data-route="chart" onclick="router.navigate('chart')">
+                <i class="fa-solid fa-chart-line"></i>
+                <span>Chart</span>
+            </button>
+            <button class="bottom-tab-item" data-route="backtest" onclick="router.navigate('backtest')">
+                <i class="fa-solid fa-play"></i>
+                <span>Backtest</span>
+            </button>
+            <button class="bottom-tab-item" data-route="more" id="btn-mobile-more">
+                <i class="fa-solid fa-ellipsis"></i>
+                <span>More</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Mobile Indicator Sheet (slide-up panel for touch) -->
+    <div id="indicator-sheet-backdrop" class="indicator-sheet-backdrop"></div>
+    <div id="indicator-sheet" class="indicator-sheet">
+        <div class="sheet-handle"></div>
+        <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-layer-group text-indigo-400"></i> Indicators
+        </h3>
+        <div class="space-y-1">
+            <label class="flex items-center gap-3 p-3 hover:bg-slate-800/50 rounded-lg cursor-pointer text-sm text-slate-300">
+                <input type="checkbox" data-sync="ind-sma50" class="indicator-sheet-toggle accent-indigo-500 w-4 h-4"> SMA (50)
+            </label>
+            <label class="flex items-center gap-3 p-3 hover:bg-slate-800/50 rounded-lg cursor-pointer text-sm text-slate-300">
+                <input type="checkbox" data-sync="ind-ema20" class="indicator-sheet-toggle accent-indigo-500 w-4 h-4"> EMA (20)
+            </label>
+            <label class="flex items-center gap-3 p-3 hover:bg-slate-800/50 rounded-lg cursor-pointer text-sm text-slate-300">
+                <input type="checkbox" data-sync="ind-ema50" class="indicator-sheet-toggle accent-indigo-500 w-4 h-4"> EMA (50)
+            </label>
+            <label class="flex items-center gap-3 p-3 hover:bg-slate-800/50 rounded-lg cursor-pointer text-sm text-slate-300">
+                <input type="checkbox" data-sync="ind-ema200" class="indicator-sheet-toggle accent-indigo-500 w-4 h-4"> EMA (200)
+            </label>
+            <div class="h-px bg-slate-700 my-2"></div>
+            <label class="flex items-center gap-3 p-3 hover:bg-slate-800/50 rounded-lg cursor-pointer text-sm text-slate-300">
+                <input type="checkbox" data-sync="ind-bb" class="indicator-sheet-toggle accent-indigo-500 w-4 h-4"> Bollinger Bands
+            </label>
+            <label class="flex items-center gap-3 p-3 hover:bg-slate-800/50 rounded-lg cursor-pointer text-sm text-slate-300">
+                <input type="checkbox" data-sync="ind-rsi" class="indicator-sheet-toggle accent-indigo-500 w-4 h-4"> RSI (14)
+            </label>
+        </div>
+    </div>
+
+    <script type="module" src="/js/app.js?v=3"></script>
 </body>
 
 </html>

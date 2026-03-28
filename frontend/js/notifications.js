@@ -1,54 +1,103 @@
-export class ToastSystem {
+/**
+ * QLM Toast Notification System
+ * Premium toast notifications with auto-dismiss progress bar.
+ */
+
+const ICONS = {
+    success: 'fa-solid fa-circle-check',
+    error:   'fa-solid fa-circle-xmark',
+    warning: 'fa-solid fa-triangle-exclamation',
+    info:    'fa-solid fa-circle-info',
+};
+
+const DURATIONS = {
+    success: 3000,
+    error:   5000,
+    warning: 4000,
+    info:    3500,
+};
+
+class ToastManager {
     constructor() {
-        this.container = document.createElement('div');
-        this.container.className = 'fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none';
-        document.body.appendChild(this.container);
+        this.container = null;
+        this.toasts = [];
+        this._ensureContainer();
     }
 
-    show(message, type = 'info') {
+    _ensureContainer() {
+        this.container = document.getElementById('toast-container');
+        if (!this.container) {
+            this.container = document.createElement('div');
+            this.container.id = 'toast-container';
+            this.container.className = 'toast-container';
+            document.body.appendChild(this.container);
+        }
+    }
+
+    _show(type, message, duration) {
+        this._ensureContainer();
+
+        const id = 'toast-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+        const durationMs = duration || DURATIONS[type] || 3500;
+
         const toast = document.createElement('div');
-        toast.className = `
-            pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg
-            transform transition-all duration-300 translate-x-10 opacity-0
-            min-w-[300px] max-w-md border backdrop-blur-md
+        toast.id = id;
+        toast.className = `toast toast-${type}`;
+        toast.style.setProperty('--toast-duration', durationMs + 'ms');
+
+        toast.innerHTML = `
+            <div class="toast-icon">
+                <i class="${ICONS[type] || ICONS.info}"></i>
+            </div>
+            <div class="toast-body">${this._escapeHtml(message)}</div>
+            <button class="toast-close" aria-label="Dismiss">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="toast-progress"></div>
         `;
 
-        // Colors based on type
-        if (type === 'success') {
-            toast.className += ' bg-emerald-900/80 border-emerald-500/30 text-emerald-100';
-            toast.innerHTML = `<i class="fa-solid fa-check-circle text-emerald-400"></i>`;
-        } else if (type === 'error') {
-            toast.className += ' bg-rose-900/80 border-rose-500/30 text-rose-100';
-            toast.innerHTML = `<i class="fa-solid fa-circle-exclamation text-rose-400"></i>`;
-        } else {
-            toast.className += ' bg-slate-800/90 border-slate-600/30 text-slate-100';
-            toast.innerHTML = `<i class="fa-solid fa-info-circle text-indigo-400"></i>`;
-        }
-
-        const text = document.createElement('span');
-        text.className = 'text-sm font-medium';
-        text.innerText = message;
-        toast.appendChild(text);
-
-        this.container.appendChild(toast);
-
-        // Animate In
-        requestAnimationFrame(() => {
-            toast.classList.remove('translate-x-10', 'opacity-0');
+        // Close button
+        toast.querySelector('.toast-close').addEventListener('click', () => {
+            this._dismiss(id);
         });
 
-        // Auto Dismiss
-        setTimeout(() => {
-            toast.classList.add('opacity-0', 'translate-x-10');
-            setTimeout(() => toast.remove(), 300);
-        }, 4000);
+        this.container.appendChild(toast);
+        this.toasts.push(id);
+
+        // Auto-dismiss
+        setTimeout(() => this._dismiss(id), durationMs);
+
+        // Limit to 5 visible toasts
+        while (this.toasts.length > 5) {
+            this._dismiss(this.toasts[0]);
+        }
     }
 
-    success(msg) { this.show(msg, 'success'); }
-    error(msg) { this.show(msg, 'error'); }
-    info(msg) { this.show(msg, 'info'); }
+    _dismiss(id) {
+        const toast = document.getElementById(id);
+        if (!toast) return;
+
+        toast.classList.add('closing');
+        toast.addEventListener('animationend', () => {
+            toast.remove();
+            this.toasts = this.toasts.filter(t => t !== id);
+        });
+    }
+
+    _escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    success(msg, duration) { this._show('success', msg, duration); }
+    error(msg, duration)   { this._show('error', msg, duration); }
+    warning(msg, duration) { this._show('warning', msg, duration); }
+    info(msg, duration)    { this._show('info', msg, duration); }
 }
 
-export const toast = new ToastSystem();
-// Backwards compatibility for now
+// Singleton
+export const toast = new ToastManager();
+
+// Expose globally for legacy onclick handlers and views
 window.Toast = toast;
