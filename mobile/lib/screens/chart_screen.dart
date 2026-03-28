@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../providers/chart_provider.dart';
 import '../providers/data_provider.dart';
 import '../widgets/candlestick_chart.dart';
-import '../models/dataset.dart';
+
 
 class ChartScreen extends StatefulWidget {
   const ChartScreen({super.key});

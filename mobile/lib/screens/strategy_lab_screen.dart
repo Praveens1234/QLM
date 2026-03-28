@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/strategy_provider.dart';
-import '../widgets/glass_card.dart';
+
 import '../widgets/code_editor.dart';
 import '../widgets/toast.dart';
-import '../models/strategy.dart';
+
 
 class StrategyLabScreen extends StatefulWidget {
   const StrategyLabScreen({super.key});

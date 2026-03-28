@@ -60,7 +60,7 @@ class MetricsGrid extends StatelessWidget {
   List<_MetricItem> _buildItems() {
     final netProfit = (metrics['net_profit'] as num?)?.toDouble() ?? 0;
     final maxDd = (metrics['max_drawdown'] as num?)?.toDouble() ?? 0;
-    final maxDdPct = (metrics['max_drawdown_pct'] as num?)?.toDouble() ?? 0;
+
     final winRate = (metrics['win_rate'] as num?)?.toDouble() ?? 0;
     final pf = (metrics['profit_factor'] as num?)?.toDouble() ?? 0;
     final totalTrades = (metrics['total_trades'] as num?)?.toInt() ?? 0;

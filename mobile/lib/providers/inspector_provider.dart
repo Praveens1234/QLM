@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide DataRow;
 import '../core/api_client.dart';
 import '../models/dataset.dart';
 

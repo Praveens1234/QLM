@@ -45,7 +45,7 @@ class _LoadingShimmerState extends State<LoadingShimmer>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AnimatedBuilder(
-      animation: _animation,
+      listenable: _animation,
       builder: (context, _) {
         return Container(
           width: widget.width,

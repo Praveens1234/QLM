@@ -278,7 +278,7 @@ class _CandlestickChartState extends State<CandlestickChart> {
   }
 
   void _updateCrosshair(Offset localPos) {
-    final renderWidth = (context.size?.width ?? 300) - _priceScaleWidth;
+
     final x = localPos.dx + _scrollOffset;
     final idx = (x / _candleWidth).floor();
 

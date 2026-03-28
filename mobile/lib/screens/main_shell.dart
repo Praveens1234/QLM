@@ -140,7 +140,7 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final server = context.watch<ServerProvider>();
 
     return Scaffold(
