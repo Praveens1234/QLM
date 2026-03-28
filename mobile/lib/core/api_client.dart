@@ -95,19 +95,15 @@ class ApiClient {
 
   // ─── Health Check ─────────────────────────────────────
   Future<bool> healthCheck(String serverUrl) async {
-    try {
-      final url = serverUrl.endsWith('/') ? serverUrl.substring(0, serverUrl.length - 1) : serverUrl;
-      final response = await _client
-          .get(Uri.parse('$url/health'))
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['status'] == 'ok' && data['system'] == 'QLM';
-      }
-      return false;
-    } catch (e) {
-      return false;
+    final url = serverUrl.endsWith('/') ? serverUrl.substring(0, serverUrl.length - 1) : serverUrl;
+    final response = await _client
+        .get(Uri.parse('$url/health'))
+        .timeout(const Duration(seconds: 10));
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['status'] == 'ok' && data['system'] == 'QLM';
     }
+    return false;
   }
 
   // ─── Response Handler ─────────────────────────────────
