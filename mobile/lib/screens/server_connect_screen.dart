@@ -103,7 +103,7 @@ class _ServerConnectScreenState extends State<ServerConnectScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'QuantLogic Mobile',
+                  'QuantLogic Mobile v1.0.1',
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w400,

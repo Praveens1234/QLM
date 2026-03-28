@@ -39,6 +39,16 @@ jobs:
         working-directory: ./mobile
         run: flutter create --project-name qlm_mobile --platforms android .
 
+      # Step 4.5: Patch Android to allow Cleartext HTTP (Local IPs) and Internet Access
+      - name: Patch AndroidManifest
+        working-directory: ./mobile/android/app/src/main
+        run: |
+          python3 -c "
+          with open('AndroidManifest.xml', 'r') as f: data = f.read()
+          data = data.replace('<application', '<uses-permission android:name=\"android.permission.INTERNET\"/>\n    <application android:usesCleartextTraffic=\"true\"', 1)
+          with open('AndroidManifest.xml', 'w') as f: f.write(data)
+          "
+
       # Step 5: Install dependencies
       - name: Install dependencies
         working-directory: ./mobile
