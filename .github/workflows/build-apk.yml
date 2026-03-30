@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     name: Build APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout code
@@ -18,10 +18,10 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.16.0'
+        flutter-version: '3.19.6'
         channel: 'stable'
         cache: true
-        cache-key: 'flutter-3.16.0'
+        cache-key: 'flutter-3.19.6'
 
     - name: Setup Java
       uses: actions/setup-java@v3
@@ -39,7 +39,7 @@ jobs:
     - name: Create placeholder files
       run: |
         touch assets/animations/connection.json
-        cat << EOF > assets/images/readme.txt
+        cat << 'EOF' > assets/images/readme.txt
         Add any required images here to make the build pass.
         This is a placeholder file to ensure the assets directory is created.
         EOF
@@ -58,7 +58,7 @@ jobs:
       run: flutter build apk --release --no-tree-shake-icons
 
     - name: Upload APK artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: qlm-mobile-apk
         path: build/app/outputs/flutter-apk/app-release.apk
@@ -78,15 +78,14 @@ jobs:
         # Create GitHub Release (requires GH_TOKEN)
         gh release create "$TAG_NAME" \
           build/app/outputs/flutter-apk/app-release.apk \
-          --title "QLM Mobile Build - $TAG_NAME" \
+          --title "QLM Mobile Build $TAG_NAME" \
           --notes "Automated build from GitHub Actions"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   lint:
     name: Lint
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-22.04
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -94,7 +93,7 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.16.0'
+        flutter-version: '3.19.6'
         channel: 'stable'
         cache: true
 
@@ -109,7 +108,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout code
@@ -118,7 +117,7 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.16.0'
+        flutter-version: '3.19.6'
         channel: 'stable'
         cache: true
 
@@ -130,7 +129,7 @@ jobs:
       continue-on-error: true
 
     - name: Upload test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-results
