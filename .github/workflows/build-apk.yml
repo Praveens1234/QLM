@@ -8,6 +8,9 @@ on:
 
 jobs:
   build:
+    defaults:
+      run:
+        working-directory: qlm_mobile/qlm_mobile
     name: Build APK
     runs-on: ubuntu-22.04
 
