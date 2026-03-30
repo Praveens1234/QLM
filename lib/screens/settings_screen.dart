@@ -62,14 +62,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: [
         _buildListTile(
           context,
-          icon: Icons.language_rounded,
+          icon: Icons.language,
           title: "Language",
           subtitle: "English",
           onTap: () => _showComingSoon(context),
         ),
         _buildSwitchTile(
           context,
-          icon: Icons.biometric_icon,
+          icon: Icons.fingerprint,
           title: "Biometric Authentication",
           subtitle: "Use fingerprint or face ID",
           value: false,
@@ -77,7 +77,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         _buildListTile(
           context,
-          icon: Icons.data_saver_on_rounded,
+          icon: Icons.data_saver_on,
           title: "Data Saver",
           subtitle: "Reduce data usage",
           onTap: () => _showComingSoon(context),
@@ -93,7 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             _buildListTile(
               context,
-              icon: Icons.dark_mode_rounded,
+              icon: Icons.brightness_6,
               title: "Theme",
               subtitle: themeProvider.themeModeOption == ThemeModeOption.light
                   ? "Light Mode"
@@ -104,7 +104,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             _buildSwitchTile(
               context,
-              icon: Icons.animation_rounded,
+              icon: Icons.animation,
               title: "Animations",
               subtitle: "Enable smooth animations",
               value: true,
@@ -123,7 +123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             _buildListTile(
               context,
-              icon: Icons.link_rounded,
+              icon: Icons.link,
               title: "Server URL",
               subtitle: serverProvider.serverUrl.isNotEmpty
                   ? serverProvider.serverUrl
@@ -132,21 +132,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             _buildListTile(
               context,
-              icon: Icons.dns_rounded,
+              icon: Icons.dns,
               title: "Connection Status",
               subtitle: serverProvider.isConnected ? "Connected" : "Disconnected",
               onTap: () => {},
               trailing: Icon(
                 serverProvider.isConnected
-                    ? Icons.check_circle_rounded
-                    : Icons.error_rounded,
+                    ? Icons.check_circle
+                    : Icons.error,
                 color: serverProvider.isConnected ? Colors.green : Colors.red,
               ),
             ),
             if (serverProvider.isConnected)
               _buildListTile(
                 context,
-                icon: Icons.refresh_rounded,
+                icon: Icons.refresh,
                 title: "Reconnect",
                 subtitle: "Reconnect to server",
                 onTap: () => serverProvider.reconnect(),
@@ -162,7 +162,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: [
         _buildSwitchTile(
           context,
-          icon: Icons.notifications_active_rounded,
+          icon: Icons.notifications_active,
           title: "Push Notifications",
           subtitle: "Receive trade alerts",
           value: true,
@@ -170,7 +170,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         _buildSwitchTile(
           context,
-          icon: Icons.email_rounded,
+          icon: Icons.email,
           title: "Email Notifications",
           subtitle: "Daily summary emails",
           value: false,
@@ -178,7 +178,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         _buildSwitchTile(
           context,
-          icon: Icons.sms_rounded,
+          icon: Icons.sms,
           title: "SMS Alerts",
           subtitle: "Important trade notifications",
           value: false,
@@ -193,28 +193,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: [
         _buildListTile(
           context,
-          icon: Icons.info_rounded,
+          icon: Icons.info,
           title: "Version",
           subtitle: "QLM Mobile v1.0.0",
           onTap: () {},
         ),
         _buildListTile(
           context,
-          icon: Icons.article_rounded,
+          icon: Icons.article,
           title: "Terms of Service",
           subtitle: "View terms and conditions",
           onTap: () => _openUrl(context, "terms"),
         ),
         _buildListTile(
           context,
-          icon: Icons.privacy_tip_rounded,
+          icon: Icons.privacy_tip,
           title: "Privacy Policy",
           subtitle: "How we protect your data",
           onTap: () => _openUrl(context, "privacy"),
         ),
         _buildListTile(
           context,
-          icon: Icons.headset_mic_rounded,
+          icon: Icons.headset_mic,
           title: "Support",
           subtitle: "Get help and report issues",
           onTap: () => _openUrl(context, "support"),
@@ -235,7 +235,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
       title: Text(title),
       subtitle: Text(subtitle),
-      trailing: trailing ?? Icon(Icons.arrow_forward_rounded),
+      trailing: trailing ?? Icon(Icons.arrow_forward),
       onTap: onTap,
     );
   }
@@ -331,7 +331,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 serverProvider.disconnect();
                 Navigator.pushReplacementNamed(context, '/connection');
               },
-              icon: const Icon(Icons.link_rounded),
+              icon: Icon(Icons.link),
               label: const Text('Change Server'),
             ),
           ],
@@ -367,5 +367,5 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
 // Mock icon for biometric
 class Icons {
-  static const biometric_icon =Icons.fingerprint;
+  IconData get biometric_icon => Icons.fingerprint;
 }

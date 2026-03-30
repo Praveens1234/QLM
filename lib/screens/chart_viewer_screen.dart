@@ -321,7 +321,8 @@ class _ChartViewerScreenState extends State<ChartViewerScreen> {
         open: 290 + (index * 2.5),
         high: 298 + (index * 2.5),
         low: 287 + (index * 2.5),
-        close: 295 + (index * 2.5),volume: 1000000 + (index * 50000).toInt(),
+        close: 295 + (index * 2.5),
+        volume: (1000000 + (index * 50000)),
         time:
 DateTime.now().subtract(Duration(minutes: 50 - index)),
       );
