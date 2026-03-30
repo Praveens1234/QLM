@@ -1,0 +1,104 @@
+# Flutter/Dart specific
+**/doc/api/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins-dependencies
+.sentry*
+
+# Android specific
+**/android/
+!**/android/app/src/
+!**/android/app/proguard-rules.pro
+.gradle/
+**/build/
+**/local.properties
+**/gradle-wrapper.jar
+.fvm/
+
+# iOS specific
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework/
+**/ios/Flutter/Flutter.podspec
+**/ios/.vagrant/
+**/ios/Flutter/App.framework/
+**/ios/Flutter/ephemeral
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/app.zip
+**/ios/Flutter/flutter_assets/
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+
+# Web specific
+**/web/bower_components/
+**/web/build/
+**/web/.dart_tool/
+
+# IDE specific
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+.atom/
+.history/
+
+# Test coverage
+coverage/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Firebase
+.firebase/
+firestore.indexes.json
+firestore.rules
+
+# Flutter specific
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+.fvm/flutter_sdk
+.fvm/.gitignore
+.fvm/fvm_config.json
+/lib/generated/
+/lib/l10n/app_localizations*.dart
+
+# Android keystore
+*.keystore
+*.jks
+key.properties
+android/key.properties
+android/app/key.properties
+
+# Proguard
+proguard/
+mapping.txt
+
+# Coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
