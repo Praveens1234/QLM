@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
-import '../themes/app_theme.dart';
 
 class ChartViewerScreen extends StatefulWidget {
   const ChartViewerScreen({super.key});
