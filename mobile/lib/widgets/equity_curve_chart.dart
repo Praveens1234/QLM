@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -52,7 +53,6 @@ class _EquityPainter extends CustomPainter {
     }
 
     final eqRange = math.max(1.0, maxEq - minEq);
-    final ddRange = math.max(1.0, minDd.abs());
 
     // Padding for equity scale
     minEq -= eqRange * 0.05;
@@ -148,7 +148,7 @@ class _EquityPainter extends CustomPainter {
   void _drawText(Canvas canvas, String text, Offset offset, TextStyle style) {
     final tp = TextPainter(
       text: TextSpan(text: text, style: style),
-      textDirection: TextDirection.ltr,
+      textDirection: ui.TextDirection.ltr,
     );
     tp.layout();
     tp.paint(canvas, offset);

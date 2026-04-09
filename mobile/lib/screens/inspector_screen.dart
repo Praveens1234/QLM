@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../providers/data_provider.dart';
 import '../providers/inspector_provider.dart';
-import '../models/dataset.dart' as model;
 import '../widgets/glass_card.dart';
 
 class InspectorScreen extends StatefulWidget {

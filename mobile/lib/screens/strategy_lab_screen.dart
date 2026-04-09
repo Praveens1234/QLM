@@ -168,7 +168,6 @@ class _StrategyLabScreenState extends State<StrategyLabScreen> {
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Padding(
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -200,7 +199,7 @@ class _StrategyLabScreenState extends State<StrategyLabScreen> {
                     value: selectedTemplate,
                     items: [
                       const DropdownMenuItem(value: null, child: Text('Blank Strategy')),
-                      ...provider.templates.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                      ...provider.templates.map((t) => DropdownMenuItem(value: t, child: Text(t))),
                     ],
                     onChanged: (v) => setStateSB(() => selectedTemplate = v),
                   );
