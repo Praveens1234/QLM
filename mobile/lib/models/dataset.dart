@@ -56,7 +56,7 @@ class Discrepancy {
   }
 }
 
-class DataRow {
+class DatasetRow {
   final int index;
   final String datetime;
   final double open;
@@ -65,7 +65,7 @@ class DataRow {
   final double close;
   final double volume;
 
-  DataRow({
+  DatasetRow({
     required this.index,
     required this.datetime,
     required this.open,
@@ -75,8 +75,8 @@ class DataRow {
     required this.volume,
   });
 
-  factory DataRow.fromJson(Map<String, dynamic> json) {
-    return DataRow(
+  factory DatasetRow.fromJson(Map<String, dynamic> json) {
+    return DatasetRow(
       index: (json['index'] as num?)?.toInt() ?? 0,
       datetime: json['datetime']?.toString() ?? '',
       open: (json['open'] as num?)?.toDouble() ?? 0.0,

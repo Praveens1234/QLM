@@ -1,14 +1,14 @@
-import 'package:flutter/material.dart' hide DataRow;
+import 'package:flutter/material.dart';
 import '../core/api_client.dart';
 import '../models/dataset.dart';
 
 class InspectorProvider extends ChangeNotifier {
-  List<DataRow> _results = [];
+  List<DatasetRow> _results = [];
   int? _targetIndex;
   bool _loading = false;
   String? _error;
 
-  List<DataRow> get results => _results;
+  List<DatasetRow> get results => _results;
   int? get targetIndex => _targetIndex;
   bool get loading => _loading;
   String? get error => _error;
@@ -32,7 +32,7 @@ class InspectorProvider extends ChangeNotifier {
         final windowRes = await apiClient.get('/data/$datasetId/window/$targetIdx');
         final list = (windowRes['data'] as List<dynamic>?) ?? [];
         _results = list
-            .map((e) => DataRow.fromJson(Map<String, dynamic>.from(e as Map)))
+            .map((e) => DatasetRow.fromJson(Map<String, dynamic>.from(e as Map)))
             .toList();
       }
     } catch (e) {

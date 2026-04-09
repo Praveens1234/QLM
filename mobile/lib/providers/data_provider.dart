@@ -1,18 +1,18 @@
-import 'package:flutter/material.dart' hide DataRow;
+import 'package:flutter/material.dart';
 import '../core/api_client.dart';
 import '../models/dataset.dart';
 
 class DataProvider extends ChangeNotifier {
   List<Dataset> _datasets = [];
   List<Discrepancy> _discrepancies = [];
-  List<DataRow> _windowData = [];
+  List<DatasetRow> _windowData = [];
   bool _loading = false;
   bool _uploading = false;
   String? _error;
 
   List<Dataset> get datasets => _datasets;
   List<Discrepancy> get discrepancies => _discrepancies;
-  List<DataRow> get windowData => _windowData;
+  List<DatasetRow> get windowData => _windowData;
   bool get loading => _loading;
   bool get uploading => _uploading;
   String? get error => _error;
@@ -127,7 +127,7 @@ class DataProvider extends ChangeNotifier {
       final res = await apiClient.get('/data/$datasetId/window/$index');
       final list = (res['data'] as List<dynamic>?) ?? [];
       _windowData = list
-          .map((e) => DataRow.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map((e) => DatasetRow.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
       notifyListeners();
     } catch (e) {
