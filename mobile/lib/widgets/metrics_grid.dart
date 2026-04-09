@@ -58,31 +58,54 @@ class MetricsGrid extends StatelessWidget {
   }
 
   List<_MetricItem> _buildItems() {
-    final netProfit = (metrics['net_profit'] as num?)?.toDouble() ?? 0;
-    final maxDd = (metrics['max_drawdown'] as num?)?.toDouble() ?? 0;
-
-    final winRate = (metrics['win_rate'] as num?)?.toDouble() ?? 0;
-    final pf = (metrics['profit_factor'] as num?)?.toDouble() ?? 0;
-    final totalTrades = (metrics['total_trades'] as num?)?.toInt() ?? 0;
-    final sharpe = (metrics['sharpe_ratio'] as num?)?.toDouble() ?? 0;
-    final sqn = (metrics['sqn'] as num?)?.toDouble() ?? 0;
-    final expectancy = (metrics['expectancy'] as num?)?.toDouble() ?? 0;
-
-    return [
-      _MetricItem('NET PROFIT', '\$${netProfit.toStringAsFixed(2)}',
-          color: netProfit >= 0 ? const Color(0xFF10B981) : const Color(0xFFF43F5E)),
-      _MetricItem('MAX DRAWDOWN', '\$${maxDd.toStringAsFixed(2)}',
-          color: const Color(0xFFF43F5E)),
-      _MetricItem('WIN RATE', '${winRate.toStringAsFixed(1)}%'),
-      _MetricItem('PROFIT FACTOR', pf.toStringAsFixed(2)),
-      _MetricItem('TOTAL TRADES', totalTrades.toString()),
-      _MetricItem('SHARPE RATIO', sharpe.toStringAsFixed(2),
-          color: const Color(0xFF6366F1)),
-      _MetricItem('SQN', sqn.toStringAsFixed(2),
-          color: const Color(0xFF06B6D4)),
-      _MetricItem('EXPECTANCY', '\$${expectancy.toStringAsFixed(2)}',
-          color: expectancy >= 0 ? const Color(0xFF10B981) : const Color(0xFFF43F5E)),
+    final List<_MetricItem> items = [];
+    
+    final prioritizedKeys = [
+      'net_profit', 'max_drawdown', 'win_rate', 'profit_factor', 
+      'total_trades', 'sharpe_ratio', 'sqn', 'expected_payoff' // or expectancy
     ];
+    
+    void addItem(String key, dynamic value) {
+      if (value == null || value is! num) return;
+      final val = value.toDouble();
+      
+      String label = key.replaceAll('_', ' ').toUpperCase();
+      String valStr;
+      Color? color;
+
+      if (key.contains('profit') || key.contains('loss') || key == 'max_drawdown' || key == 'expected_payoff') {
+        valStr = '\$${val.toStringAsFixed(2)}';
+        if (val > 0) color = const Color(0xFF10B981);
+        if (val < 0) color = const Color(0xFFF43F5E);
+      } else if (key.contains('rate') || key.contains('pct') || key.contains('percent')) {
+        valStr = '${val.toStringAsFixed(1)}%';
+      } else if (key == 'total_trades' || key.contains('cons_')) {
+        valStr = val.toInt().toString();
+      } else {
+        valStr = val.toStringAsFixed(2);
+      }
+      
+      // Override specific colors
+      if (key == 'sharpe_ratio') color = const Color(0xFF6366F1);
+      if (key == 'sqn') color = const Color(0xFF06B6D4);
+      if (key == 'max_drawdown' || key == 'max_dd_pct') color = const Color(0xFFF43F5E);
+
+      items.add(_MetricItem(label, valStr, color: color));
+    }
+
+    // Process prioritized
+    for (final key in prioritizedKeys) {
+      if (metrics.containsKey(key)) addItem(key, metrics[key]);
+    }
+    
+    // Process remaining
+    for (final entry in metrics.entries) {
+      if (!prioritizedKeys.contains(entry.key) && entry.key != 'equity_curve' && entry.key != 'trades') {
+        addItem(entry.key, entry.value);
+      }
+    }
+    
+    return items;
   }
 }
 

@@ -34,7 +34,7 @@ class CandlestickChart extends StatefulWidget {
   State<CandlestickChart> createState() => _CandlestickChartState();
 }
 
-class _CandlestickChartState extends State<CandlestickChart> {
+class _CandlestickChartState extends State<CandlestickChart> with SingleTickerProviderStateMixin {
   // View state
   double _scrollOffset = 0;
   double _candleWidth = 8.0;
@@ -44,6 +44,8 @@ class _CandlestickChartState extends State<CandlestickChart> {
   // Gesture tracking
   double _lastScale = 1.0;
   double _lastFocalX = 0;
+  late AnimationController _scrollController;
+  Animation<double>? _scrollAnimation;
 
   static const double _minCandleWidth = 3.0;
   static const double _maxCandleWidth = 24.0;
@@ -53,30 +55,45 @@ class _CandlestickChartState extends State<CandlestickChart> {
   @override
   void initState() {
     super.initState();
-    // Scroll to latest data (right side)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widget.bars.isNotEmpty) {
-        final renderWidth = (context.size?.width ?? 300) - _priceScaleWidth;
-        final totalWidth = widget.bars.length * _candleWidth;
-        if (totalWidth > renderWidth) {
-          setState(() {
-            _scrollOffset = totalWidth - renderWidth;
-          });
-        }
+    _scrollController = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+    _scrollController.addListener(() {
+      if (_scrollAnimation != null) {
+        setState(() {
+          _scrollOffset = _scrollAnimation!.value.clamp(0.0, _maxScroll);
+        });
       }
     });
+
+    // Scroll to latest data (right side)
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToEnd(animated: false));
+  }
+
+  void _scrollToEnd({bool animated = true}) {
+    if (widget.bars.isEmpty) return;
+    final target = _maxScroll;
+    if (animated) {
+      _scrollAnimation = Tween<double>(begin: _scrollOffset, end: target).animate(
+        CurvedAnimation(parent: _scrollController, curve: Curves.easeOutCubic)
+      );
+      _scrollController.forward(from: 0);
+    } else {
+      setState(() => _scrollOffset = target);
+    }
   }
 
   @override
   void didUpdateWidget(CandlestickChart oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.bars.length != widget.bars.length && widget.bars.isNotEmpty) {
-      final renderWidth = (context.size?.width ?? 300) - _priceScaleWidth;
-      final totalWidth = widget.bars.length * _candleWidth;
-      if (totalWidth > renderWidth) {
-        _scrollOffset = totalWidth - renderWidth;
-      }
+      // Auto-pin to new data right edge securely
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToEnd(animated: true));
     }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -102,72 +119,84 @@ class _CandlestickChartState extends State<CandlestickChart> {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return GestureDetector(
-      onScaleStart: _onScaleStart,
-      onScaleUpdate: _onScaleUpdate,
-      onLongPressStart: _onLongPressStart,
-      onLongPressMoveUpdate: _onLongPressMoveUpdate,
-      onLongPressEnd: (_) => setState(() {
-        _crosshairIndex = null;
-        _crosshairPos = null;
-      }),
-      onHorizontalDragUpdate: (details) {
-        setState(() {
-          _scrollOffset -= details.delta.dx;
-          _scrollOffset = _scrollOffset.clamp(0, _maxScroll);
-        });
-      },
-      child: Column(
-        children: [
-          // OHLCV Legend
-          if (_crosshairIndex != null && _crosshairIndex! < widget.bars.length)
-            _buildLegend(widget.bars[_crosshairIndex!], isDark),
-          // Main Chart
-          Expanded(
-            flex: widget.rsi.isNotEmpty ? 3 : 1,
-            child: ClipRect(
-              child: CustomPaint(
-                size: Size.infinite,
-                painter: _CandlestickPainter(
-                  bars: widget.bars,
-                  scrollOffset: _scrollOffset,
-                  candleWidth: _candleWidth,
-                  crosshairIndex: _crosshairIndex,
-                  crosshairPos: _crosshairPos,
-                  isDark: isDark,
-                  showVolume: widget.showVolume,
-                  sma50: widget.sma50,
-                  ema20: widget.ema20,
-                  ema50: widget.ema50,
-                  ema200: widget.ema200,
-                  bollingerBands: widget.bollingerBands,
-                  priceScaleWidth: _priceScaleWidth,
-                  timeScaleHeight: _timeScaleHeight,
-                ),
-              ),
-            ),
-          ),
-          // RSI Pane
-          if (widget.rsi.isNotEmpty)
-            Expanded(
-              flex: 1,
-              child: ClipRect(
-                child: CustomPaint(
-                  size: Size.infinite,
-                  painter: _RSIPainter(
-                    bars: widget.bars,
-                    rsi: widget.rsi,
-                    scrollOffset: _scrollOffset,
-                    candleWidth: _candleWidth,
-                    isDark: isDark,
-                    priceScaleWidth: _priceScaleWidth,
-                    crosshairIndex: _crosshairIndex,
+    return Stack(
+      children: [
+        GestureDetector(
+          onScaleStart: _onScaleStart,
+          onScaleUpdate: _onScaleUpdate,
+          onScaleEnd: _onScaleEnd,
+          onLongPressStart: _onLongPressStart,
+          onLongPressMoveUpdate: _onLongPressMoveUpdate,
+          onLongPressEnd: (_) => setState(() {
+            _crosshairIndex = null;
+            _crosshairPos = null;
+          }),
+          child: Column(
+            children: [
+              // OHLCV Legend
+              if (_crosshairIndex != null && _crosshairIndex! < widget.bars.length)
+                _buildLegend(widget.bars[_crosshairIndex!], isDark),
+              // Main Chart
+              Expanded(
+                flex: widget.rsi.isNotEmpty ? 3 : 1,
+                child: ClipRect(
+                  child: CustomPaint(
+                    size: Size.infinite,
+                    painter: _CandlestickPainter(
+                      bars: widget.bars,
+                      scrollOffset: _scrollOffset,
+                      candleWidth: _candleWidth,
+                      crosshairIndex: _crosshairIndex,
+                      crosshairPos: _crosshairPos,
+                      isDark: isDark,
+                      showVolume: widget.showVolume,
+                      sma50: widget.sma50,
+                      ema20: widget.ema20,
+                      ema50: widget.ema50,
+                      ema200: widget.ema200,
+                      bollingerBands: widget.bollingerBands,
+                      priceScaleWidth: _priceScaleWidth,
+                      timeScaleHeight: _timeScaleHeight,
+                    ),
                   ),
                 ),
               ),
+              // RSI Pane
+              if (widget.rsi.isNotEmpty)
+                Expanded(
+                  flex: 1,
+                  child: ClipRect(
+                    child: CustomPaint(
+                      size: Size.infinite,
+                      painter: _RSIPainter(
+                        bars: widget.bars,
+                        rsi: widget.rsi,
+                        scrollOffset: _scrollOffset,
+                        candleWidth: _candleWidth,
+                        isDark: isDark,
+                        priceScaleWidth: _priceScaleWidth,
+                        crosshairIndex: _crosshairIndex,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        // Overlay Reset FAB
+        if (_scrollOffset < _maxScroll - 50)
+          Positioned(
+            bottom: widget.rsi.isNotEmpty ? MediaQuery.of(context).size.height / 5 : 24,
+            right: _priceScaleWidth + 16,
+            child: FloatingActionButton.small(
+              backgroundColor: isDark ? const Color(0xFF334155) : Colors.white,
+              foregroundColor: isDark ? Colors.white : Colors.black87,
+              elevation: 4,
+              onPressed: () => _scrollToEnd(animated: true),
+              child: const Icon(Icons.arrow_forward_ios, size: 16),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 
@@ -249,24 +278,45 @@ class _CandlestickChartState extends State<CandlestickChart> {
 
   void _onScaleStart(ScaleStartDetails details) {
     _lastScale = 1.0;
-    _lastFocalX = details.focalPoint.dx;
+    _lastFocalX = details.localFocalPoint.dx;
+    _scrollController.stop(); // Intercept active fling
   }
 
   void _onScaleUpdate(ScaleUpdateDetails details) {
     setState(() {
-      // Pinch zoom
+      // Precise pinch-to-zoom centered on focal point
       if (details.scale != 1.0) {
         final scaleDelta = details.scale / _lastScale;
+        final focalTimeX = details.localFocalPoint.dx + _scrollOffset;
+        final focalIdx = focalTimeX / _candleWidth;
+        
         _candleWidth = (_candleWidth * scaleDelta).clamp(_minCandleWidth, _maxCandleWidth);
         _lastScale = details.scale;
+        
+        _scrollOffset = (focalIdx * _candleWidth) - details.localFocalPoint.dx;
       }
 
-      // Pan
-      final dx = details.focalPoint.dx - _lastFocalX;
-      _lastFocalX = details.focalPoint.dx;
+      // Smooth Panning
+      final dx = details.localFocalPoint.dx - _lastFocalX;
+      _lastFocalX = details.localFocalPoint.dx;
       _scrollOffset -= dx;
       _scrollOffset = _scrollOffset.clamp(0, _maxScroll);
     });
+  }
+
+  void _onScaleEnd(ScaleEndDetails details) {
+    final velocity = details.velocity.pixelsPerSecond.dx;
+    if (velocity.abs() > 300) {
+      final double distance = velocity * 0.4;
+      _scrollAnimation = Tween<double>(
+        begin: _scrollOffset,
+        end: (_scrollOffset - distance).clamp(0, _maxScroll),
+      ).animate(CurvedAnimation(
+        parent: _scrollController,
+        curve: Curves.easeOutCubic,
+      ));
+      _scrollController.forward(from: 0);
+    }
   }
 
   void _onLongPressStart(LongPressStartDetails details) {

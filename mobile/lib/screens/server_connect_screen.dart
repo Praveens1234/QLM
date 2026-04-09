@@ -24,17 +24,34 @@ class _ServerConnectScreenState extends State<ServerConnectScreen>
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
-    // Pre-fill saved URL
+    // Pre-fill saved URL and listen for auto-connect
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final server = context.read<ServerProvider>();
       if (server.serverUrl.isNotEmpty) {
         _urlController.text = server.serverUrl;
       }
+      
+      // Auto-redirect if already connected (or when it connects)
+      if (server.isConnected) {
+        Navigator.of(context).pushReplacementNamed('/main');
+      }
+      server.addListener(_serverListener);
     });
+  }
+
+  void _serverListener() {
+    if (!mounted) return;
+    final server = context.read<ServerProvider>();
+    if (server.isConnected) {
+      server.removeListener(_serverListener);
+      Navigator.of(context).pushReplacementNamed('/main');
+    }
   }
 
   @override
   void dispose() {
+    final server = context.read<ServerProvider>();
+    server.removeListener(_serverListener);
     _urlController.dispose();
     _pulseController.dispose();
     super.dispose();

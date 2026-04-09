@@ -13,6 +13,7 @@ class BacktestRequest {
   final double spreadValue;
   final bool entryOnNextBar;
   final bool skipWeekendTrades;
+  final double transactionFees;
 
   BacktestRequest({
     required this.datasetId,
@@ -29,6 +30,7 @@ class BacktestRequest {
     this.spreadValue = 0.0,
     this.entryOnNextBar = false,
     this.skipWeekendTrades = true,
+    this.transactionFees = 0.0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -46,6 +48,7 @@ class BacktestRequest {
         'spread_value': spreadValue,
         'entry_on_next_bar': entryOnNextBar,
         'skip_weekend_trades': skipWeekendTrades,
+        'transaction_fees': transactionFees,
       };
 }
 

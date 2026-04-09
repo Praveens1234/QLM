@@ -24,8 +24,12 @@ dependencies:
   intl: ^0.19.0
   # Syntax Highlighting
   flutter_highlight: ^0.7.0
-  # File Picking
+  # File Picking & Sharing
   file_picker: ^6.1.1
+  share_plus: ^10.1.2
+  path_provider: ^2.1.5
+  # Export Utilities
+  csv: ^6.0.0
 
 dev_dependencies:
   flutter_test:

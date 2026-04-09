@@ -8,6 +8,7 @@ import '../models/backtest.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/metrics_grid.dart';
 import '../widgets/trade_ledger.dart';
+import '../widgets/equity_curve_chart.dart';
 
 class BacktestScreen extends StatefulWidget {
   const BacktestScreen({super.key});
@@ -20,6 +21,11 @@ class _BacktestScreenState extends State<BacktestScreen> {
   String? _datasetId;
   String? _strategyName;
   final _capitalCtrl = TextEditingController(text: '10000');
+  
+  String _mode = 'capital';
+  final _marginRatioCtrl = TextEditingController(text: '1.0');
+  final _feesCtrl = TextEditingController(text: '0.0');
+  final _slippageCtrl = TextEditingController(text: '0.0');
   
   @override
   void initState() {
@@ -37,7 +43,10 @@ class _BacktestScreenState extends State<BacktestScreen> {
       datasetId: _datasetId!,
       strategyName: _strategyName!,
       initialCapital: double.tryParse(_capitalCtrl.text) ?? 10000.0,
-      mode: 'capital',
+      mode: _mode,
+      leverage: double.tryParse(_marginRatioCtrl.text) ?? 1.0,
+      transactionFees: double.tryParse(_feesCtrl.text) ?? 0.0,
+      slippageValue: double.tryParse(_slippageCtrl.text) ?? 0.0,
     );
     
     context.read<BacktestProvider>().runBacktest(req);
@@ -91,6 +100,62 @@ class _BacktestScreenState extends State<BacktestScreen> {
             decoration: const InputDecoration(labelText: 'Initial Capital'),
             keyboardType: TextInputType.number,
           ),
+          const SizedBox(height: 12),
+
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: Text('Advanced Simulation', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600)),
+              children: [
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(labelText: 'Backtest Mode'),
+                  value: _mode,
+                  items: const [
+                    DropdownMenuItem(value: 'capital', child: Text('Capital (Spot)')),
+                    DropdownMenuItem(value: 'margin', child: Text('Margin (Derivatives)')),
+                  ],
+                  onChanged: (v) => setState(() => _mode = v!),
+                ),
+                if (_mode == 'margin') ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _marginRatioCtrl,
+                    decoration: const InputDecoration(labelText: 'Leverage Factor (e.g. 5.0)'),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _feesCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Fee (%)',
+                          hintText: '0.1',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _slippageCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Slippage (%)',
+                          hintText: '0.05',
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+          
           const SizedBox(height: 24),
           
           Consumer<BacktestProvider>(
@@ -137,6 +202,19 @@ class _BacktestScreenState extends State<BacktestScreen> {
 
         return Column(
           children: [
+            if (res.equityCurve.isNotEmpty) ...[
+              GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('Equity & Drawdown', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 16),
+                    EquityCurveChart(data: res.equityCurve),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             MetricsGrid(metrics: res.metrics),
             const SizedBox(height: 16),
             TradeLedger(trades: res.trades),

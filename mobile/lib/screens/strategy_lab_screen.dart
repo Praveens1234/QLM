@@ -21,7 +21,9 @@ class _StrategyLabScreenState extends State<StrategyLabScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<StrategyProvider>().loadStrategies();
+      final p = context.read<StrategyProvider>();
+      p.loadStrategies();
+      p.loadTemplates();
     });
   }
 
@@ -83,10 +85,7 @@ class _StrategyLabScreenState extends State<StrategyLabScreen> {
                           ),
                           IconButton(
                             icon: const Icon(Icons.add),
-                            onPressed: () {
-                              provider.createNew();
-                              _nameController.clear();
-                            },
+                            onPressed: () => _showNewStrategySheet(context, provider),
                             tooltip: 'New Strategy',
                           ),
                           IconButton(
@@ -160,13 +159,126 @@ class _StrategyLabScreenState extends State<StrategyLabScreen> {
     );
   }
 
+  void _showNewStrategySheet(BuildContext context, StrategyProvider provider) {
+    final nameCtrl = TextEditingController();
+    String? selectedTemplate;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 24, right: 24, top: 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Create New Strategy', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Strategy Name',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              if (provider.templates.isNotEmpty) StatefulBuilder(
+                builder: (context, setStateSB) {
+                  return DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: 'Start from Template',
+                      border: OutlineInputBorder(),
+                    ),
+                    value: selectedTemplate,
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Blank Strategy')),
+                      ...provider.templates.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                    ],
+                    onChanged: (v) => setStateSB(() => selectedTemplate = v),
+                  );
+                }
+              ),
+              const SizedBox(height: 24),
+              
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                child: const Text('CREATE'),
+                onPressed: () {
+                  if (nameCtrl.text.trim().isEmpty) {
+                    AppToast.warning(context, 'Name required');
+                    return;
+                  }
+                  if (selectedTemplate != null) {
+                    provider.applyTemplate(selectedTemplate!);
+                    provider.setName(nameCtrl.text.trim());
+                  } else {
+                    provider.createNew();
+                    provider.setName(nameCtrl.text.trim());
+                  }
+                  Navigator.pop(context);
+                },
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _validate(StrategyProvider provider) async {
+    // Show loading barrier
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
     final result = await provider.validate();
-    if (result != null && result['valid'] == true) {
-      if (mounted) AppToast.success(context, 'Strategy syntax is valid!');
-    } else {
-      if (mounted) AppToast.error(context, result?['error'] ?? 'Validation failed');
-    }
+    if (mounted) Navigator.pop(context); // Remove loading
+
+    if (!mounted) return;
+
+    final isValid = result != null && result['valid'] == true;
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(isValid ? Icons.check_circle : Icons.error, 
+                color: isValid ? Colors.green : Colors.red),
+              const SizedBox(width: 8),
+              Text(isValid ? 'Validation Passed' : 'Validation Failed'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Text(
+              result?['error'] ?? (isValid ? 'Syntax is perfect.' : 'Unknown error'),
+              style: GoogleFonts.jetBrainsMono(
+                fontSize: 12,
+                color: isValid ? Colors.green.shade700 : Colors.red.shade400,
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            )
+          ],
+        );
+      }
+    );
   }
 
   Future<void> _save(StrategyProvider provider) async {
