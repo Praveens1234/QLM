@@ -18,9 +18,6 @@ jobs:
     name: Build & Analyze Flutter App
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: ./mobile
 
     steps:
       # Step 1: Checkout the code from the repo
@@ -48,79 +45,112 @@ jobs:
         with:
           path: |
             ~/.pub-cache
-            mobile/.dart_tool
-          key: ${{ runner.os }}-pub-${{ hashFiles('mobile/pubspec.lock') }}
+            ./mobile/.dart_tool
+          key: ${{ runner.os }}-pub-${{ hashFiles('./mobile/pubspec.lock') }}
           restore-keys: |
             ${{ runner.os }}-pub-
 
-      # Step 5: Scaffold Android files (only if missing)
-      - name: Scaffold Android
+      # Step 5: Check project structure and scaffold Android if needed
+      - name: Scaffold Android Project
         run: |
+          cd mobile
+          echo "Current directory: $(pwd)"
+          echo "Checking if android directory exists..."
+          
           if [ ! -d "android" ]; then
             echo "Android directory missing. Running flutter create..."
+            # Run flutter create without overwriting existing files
             flutter create --project-name qlm_mobile --platforms android . --overwrite
+            
+            echo "Checking if AndroidManifest.xml was created..."
+            if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
+              echo "AndroidManifest.xml created successfully"
+            else
+              echo "ERROR: AndroidManifest.xml not found after flutter create!"
+              ls -la android/app/src/main/ || echo "Directory listing failed"
+              exit 1
+            fi
           else
             echo "Android directory exists. Skipping flutter create."
           fi
 
       # Step 6: Configure Android Build Settings for CI
       - name: Configure Android Build
-        run: yes | flutter doctor --android-licenses || true
+        run: |
+          cd mobile
+          yes | flutter doctor --android-licenses || true
 
       # Step 7: Patch AndroidManifest with robust error handling
       - name: Patch AndroidManifest
-        working-directory: ./mobile/android/app/src/main
         run: |
+          echo "Patching AndroidManifest.xml..."
+          cd mobile/android/app/src/main
+          
           if [ -f "AndroidManifest.xml" ]; then
+            echo "AndroidManifest.xml found, checking contents..."
+            cat AndroidManifest.xml
+            
             python3 << 'PYEOF'
           import sys
           try:
-            with open('AndroidManifest.xml', 'r') as f:
-                data = f.read()
-            # Check if already patched
-            if 'android.permission.INTERNET' not in data:
-                if '<application' in data:
-                    data = data.replace(
-                        '<application',
-                        '<uses-permission android:name="android.permission.INTERNET"/>\n    <application android:usesCleartextTraffic="true"',
-                        1
-                    )
-                    with open('AndroidManifest.xml', 'w') as f:
-                        f.write(data)
-                    print("AndroidManifest patched successfully")
-                else:
-                    print("Warning: <application tag not found, cannot patch", file=sys.stderr)
-            else:
-                print("Internet permission already present, skipping")
+              with open('AndroidManifest.xml', 'r') as f:
+                  data = f.read()
+              
+              # Check if already patched
+              if 'android.permission.INTERNET' not in data:
+                  if '<application' in data:
+                      data = data.replace(
+                          '<application',
+                          '<uses-permission android:name="android.permission.INTERNET"/>\n    <application android:usesCleartextTraffic="true"',
+                          1
+                      )
+                      with open('AndroidManifest.xml', 'w') as f:
+                          f.write(data)
+                      print("AndroidManifest patched successfully")
+                  else:
+                      print("Warning: <application tag not found", file=sys.stderr)
+                      sys.exit(1)
+              else:
+                  print("Internet permission already present, skipping")
           except Exception as e:
-            print(f"Warning: Could not patch AndroidManifest: {e}", file=sys.stderr)
-            sys.exit(0)  # Don't fail the build for manifest patching
+              print(f"Error patching AndroidManifest: {e}", file=sys.stderr)
+              sys.exit(1)
           PYEOF
           else
-            echo "AndroidManifest.xml not found"
+            echo "ERROR: AndroidManifest.xml not found at expected path!"
             exit 1
           fi
 
       # Step 8: Run Flutter doctor (verbose)
       - name: Flutter Doctor
-        run: flutter doctor -v
+        run: |
+          cd mobile
+          flutter doctor -v
 
       # Step 9: Install dependencies
       - name: Install dependencies
-        run: flutter pub get
+        run: |
+          cd mobile
+          flutter pub get
 
-      # Step 10: Analyze the code (remove --no-fatal-infos for strict analysis)
+      # Step 10: Analyze the code (strict mode)
       - name: Analyze Dart code
-        run: flutter analyze
+        run: |
+          cd mobile
+          flutter analyze --no-fatal-infos
 
       # Step 11: Run widget tests
       - name: Run widget tests
         continue-on-error: true
-        run: flutter test
+        run: |
+          cd mobile
+          flutter test
 
       # Step 12: Build the Android APK
       - name: Build APK
-        run: flutter build apk --release
+        run: |
+          cd mobile
+          flutter build apk --release
 
       # Step 13: Upload the built APK as a workflow artifact
       - name: Upload APK artifact
@@ -130,15 +160,3 @@ jobs:
           name: QLM_Mobile_Release_APK
           path: mobile/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
-
-      # Step 14: Save pub cache for next run
-      - name: Save pub cache
-        if: always()
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pub-cache
-            mobile/.dart_tool
-          key: ${{ runner.os }}-pub-${{ hashFiles('mobile/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
