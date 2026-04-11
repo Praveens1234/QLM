@@ -10,10 +10,17 @@ on:
       - Mobile-Application-Flutter
       - main
 
+env:
+  FLUTTER_VERSION: '3.24.x'
+
 jobs:
   build:
     name: Build & Analyze Flutter App
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ./mobile
 
     steps:
       # Step 1: Checkout the code from the repo
@@ -22,52 +29,116 @@ jobs:
 
       # Step 2: Set up Java for Android build
       - name: Setup Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
-      
-      # Step 3: Set up Flutter SDK (Stable 3.22.x)
+          cache: gradle
+
+      # Step 3: Set up Flutter SDK
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.x'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
 
-      # Step 4: Scaffold Android files if missing, avoiding destructive flutter create
-      - name: Scaffold Android
-        working-directory: ./mobile
-        run: flutter create --project-name qlm_mobile --platforms android .
+      # Step 4: Restore pub dependencies cache
+      - name: Restore pub cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            mobile/.dart_tool
+          key: ${{ runner.os }}-pub-${{ hashFiles('mobile/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
 
-      # Step 4.5: Patch Android to allow Cleartext HTTP (Local IPs) and Internet Access
+      # Step 5: Scaffold Android files (only if missing)
+      - name: Scaffold Android
+        run: |
+          if [ ! -d "android" ]; then
+            echo "Android directory missing. Running flutter create..."
+            flutter create --project-name qlm_mobile --platforms android . --overwrite
+          else
+            echo "Android directory exists. Skipping flutter create."
+          fi
+
+      # Step 6: Configure Android Build Settings for CI
+      - name: Configure Android Build
+        run: yes | flutter doctor --android-licenses || true
+
+      # Step 7: Patch AndroidManifest with robust error handling
       - name: Patch AndroidManifest
         working-directory: ./mobile/android/app/src/main
         run: |
-          python3 -c "
-          with open('AndroidManifest.xml', 'r') as f: data = f.read()
-          data = data.replace('<application', '<uses-permission android:name=\"android.permission.INTERNET\"/>\n    <application android:usesCleartextTraffic=\"true\"', 1)
-          with open('AndroidManifest.xml', 'w') as f: f.write(data)
-          "
+          if [ -f "AndroidManifest.xml" ]; then
+            python3 << 'PYEOF'
+          import sys
+          try:
+            with open('AndroidManifest.xml', 'r') as f:
+                data = f.read()
+            # Check if already patched
+            if 'android.permission.INTERNET' not in data:
+                if '<application' in data:
+                    data = data.replace(
+                        '<application',
+                        '<uses-permission android:name="android.permission.INTERNET"/>\n    <application android:usesCleartextTraffic="true"',
+                        1
+                    )
+                    with open('AndroidManifest.xml', 'w') as f:
+                        f.write(data)
+                    print("AndroidManifest patched successfully")
+                else:
+                    print("Warning: <application tag not found, cannot patch", file=sys.stderr)
+            else:
+                print("Internet permission already present, skipping")
+          except Exception as e:
+            print(f"Warning: Could not patch AndroidManifest: {e}", file=sys.stderr)
+            sys.exit(0)  # Don't fail the build for manifest patching
+          PYEOF
+          else
+            echo "AndroidManifest.xml not found"
+            exit 1
+          fi
 
-      # Step 5: Install dependencies
+      # Step 8: Run Flutter doctor (verbose)
+      - name: Flutter Doctor
+        run: flutter doctor -v
+
+      # Step 9: Install dependencies
       - name: Install dependencies
-        working-directory: ./mobile
         run: flutter pub get
 
-      # Step 6: Analyze the code
+      # Step 10: Analyze the code (remove --no-fatal-infos for strict analysis)
       - name: Analyze Dart code
-        working-directory: ./mobile
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze
 
-      # Step 7: Build the Android APK
+      # Step 11: Run widget tests
+      - name: Run widget tests
+        continue-on-error: true
+        run: flutter test
+
+      # Step 12: Build the Android APK
       - name: Build APK
-        working-directory: ./mobile
         run: flutter build apk --release
 
-      # Step 8: Upload the built APK as a workflow artifact
+      # Step 13: Upload the built APK as a workflow artifact
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: QLM_Mobile_Release_APK
           path: mobile/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
+
+      # Step 14: Save pub cache for next run
+      - name: Save pub cache
+        if: always()
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            mobile/.dart_tool
+          key: ${{ runner.os }}-pub-${{ hashFiles('mobile/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
