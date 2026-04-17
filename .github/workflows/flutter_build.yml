@@ -58,8 +58,20 @@ jobs:
           
           if [ ! -d "android" ]; then
             echo "Android directory missing. Running flutter create..."
-            # Run flutter create without overwriting existing files
+            # Backup project files that flutter create --overwrite would replace
+            cp pubspec.yaml pubspec.yaml.bak
+            cp analysis_options.yaml analysis_options.yaml.bak
+            cp -r lib lib.bak
+            cp -r test test.bak
+            
             flutter create --project-name qlm_mobile --platforms android . --overwrite
+            
+            # Restore original project files
+            cp pubspec.yaml.bak pubspec.yaml
+            cp analysis_options.yaml.bak analysis_options.yaml
+            rm -rf lib && mv lib.bak lib
+            rm -rf test && mv test.bak test
+            rm -f pubspec.yaml.bak analysis_options.yaml.bak
             
             echo "Checking if AndroidManifest.xml was created..."
             if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
