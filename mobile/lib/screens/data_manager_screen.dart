@@ -149,7 +149,7 @@ class _DataManagerScreenState extends State<DataManagerScreen> with SingleTicker
   void _showAddDialog() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,

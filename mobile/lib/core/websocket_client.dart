@@ -5,7 +5,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 /// WebSocket client for receiving real-time backtest progress updates.
 class WSClient {
   WebSocketChannel? _channel;
-  StreamSubscription? _subscription;
+  StreamSubscription<dynamic>? _subscription;
   String _serverUrl = '';
   bool _connected = false;
 

@@ -33,7 +33,7 @@ class _MainShellState extends State<MainShell> {
   void _openMoreMenu() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: const RoundedRectangleBorder(
@@ -134,7 +134,7 @@ class _MainShellState extends State<MainShell> {
   void _navigateToMore(Widget screen) {
     Navigator.of(context).pop(); // Close sheet
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => screen),
+      MaterialPageRoute<void>(builder: (_) => screen),
     );
   }
 

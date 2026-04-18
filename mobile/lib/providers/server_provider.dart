@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api_client.dart';
@@ -75,7 +77,7 @@ class ServerProvider extends ChangeNotifier {
 
   Future<void> disconnect() async {
     _status = ServerStatus.disconnected;
-    wsClient.disconnect();
+    unawaited(wsClient.disconnect());
     notifyListeners();
   }
 

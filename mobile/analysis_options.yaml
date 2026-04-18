@@ -52,10 +52,10 @@ linter:
     file_names: true
     hash_and_equals: true
     implementation_imports: true
-    iterable_contains_unrelated_type: true
+    # iterable_contains_unrelated_type: removed in Dart 3.3.0
     library_names: true
     library_prefixes: true
-    list_remove_unrelated_type: true
+    # list_remove_unrelated_type: removed in Dart 3.3.0
     literal_only_boolean_expressions: true
     no_adjacent_strings_in_list: true
     no_duplicate_case_values: true
@@ -104,7 +104,7 @@ linter:
     unnecessary_await_in_return: true
     unnecessary_brace_in_string_interps: true
     unnecessary_const: true
-    unnecessary_constructor_call: true
+    # unnecessary_constructor_call: not a recognized lint rule
     unnecessary_getters_setters: true
     unnecessary_late: true
     unnecessary_new: true

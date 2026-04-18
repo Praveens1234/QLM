@@ -123,7 +123,7 @@ class _StrategyLabScreenState extends State<StrategyLabScreen> {
   }
 
   void _showStrategyList(BuildContext context, StrategyProvider provider) {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
@@ -163,7 +163,7 @@ class _StrategyLabScreenState extends State<StrategyLabScreen> {
     final nameCtrl = TextEditingController();
     String? selectedTemplate;
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -235,7 +235,7 @@ class _StrategyLabScreenState extends State<StrategyLabScreen> {
 
   Future<void> _validate(StrategyProvider provider) async {
     // Show loading barrier
-    showDialog(
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator()),
@@ -248,7 +248,7 @@ class _StrategyLabScreenState extends State<StrategyLabScreen> {
 
     final isValid = result != null && result['valid'] == true;
     
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (context) {
         return AlertDialog(
@@ -262,7 +262,7 @@ class _StrategyLabScreenState extends State<StrategyLabScreen> {
           ),
           content: SingleChildScrollView(
             child: Text(
-              result?['error'] ?? (isValid ? 'Syntax is perfect.' : 'Unknown error'),
+              (result?['error'] as String?) ?? (isValid ? 'Syntax is perfect.' : 'Unknown error'),
               style: GoogleFonts.jetBrainsMono(
                 fontSize: 12,
                 color: isValid ? Colors.green.shade700 : Colors.red.shade400,
