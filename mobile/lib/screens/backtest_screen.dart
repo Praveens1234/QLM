@@ -36,6 +36,15 @@ class _BacktestScreenState extends State<BacktestScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _capitalCtrl.dispose();
+    _marginRatioCtrl.dispose();
+    _feesCtrl.dispose();
+    _slippageCtrl.dispose();
+    super.dispose();
+  }
+
   void _runBacktest() {
     if (_datasetId == null || _strategyName == null) return;
     

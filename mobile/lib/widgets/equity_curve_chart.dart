@@ -81,7 +81,9 @@ class _EquityPainter extends CustomPainter {
       final yEq = eqHeight - ((eq - minEq) / (maxEq - minEq)) * eqHeight;
       // Drawdown starts from the top of the DD pane (0) and goes down
       // Actually, dd is negative, so minDd is the bottom.
-      final yDd = size.height - ddHeight + (-dd / minDd.abs()) * ddHeight;
+      final yDd = minDd.abs() < 1e-10
+          ? size.height - ddHeight
+          : size.height - ddHeight + (-dd / minDd.abs()) * ddHeight;
 
       if (i == 0) {
         eqPath.moveTo(x, yEq);

@@ -21,6 +21,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -32,22 +39,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Header
-              Text(
-                'Dashboard',
-                style: GoogleFonts.inter(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'System Overview',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                ),
+              // Greeting Header
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _greeting(),
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Dashboard',
+                          style: GoogleFonts.inter(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Refresh button
+                  IconButton(
+                    onPressed: dash.loading ? null : () => dash.refresh(),
+                    icon: dash.loading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(
+                            Icons.refresh_rounded,
+                            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                          ),
+                  ),
+                ],
               ),
               const SizedBox(height: 20),
 
@@ -92,16 +125,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              // Live Status
+              // Live Status Card
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: isDark
                       ? Colors.white.withOpacity(0.04)
                       : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: isDark
                         ? Colors.white.withOpacity(0.06)
@@ -111,21 +144,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Row(
                   children: [
                     Container(
-                      width: 40,
-                      height: 40,
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
                         color: (dash.liveStatus == 'online'
                                 ? AppConstants.statusOnline
                                 : AppConstants.statusOffline)
                             .withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         Icons.bolt,
                         color: dash.liveStatus == 'online'
                             ? AppConstants.statusOnline
                             : AppConstants.statusOffline,
-                        size: 20,
+                        size: 22,
                       ),
                     ),
                     const SizedBox(width: 14),
@@ -136,15 +169,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Text(
                             'Live Engine',
                             style: GoogleFonts.inter(
-                              fontSize: 14,
+                              fontSize: 15,
                               fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : Colors.black87,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
                             ),
                           ),
+                          const SizedBox(height: 2),
                           Text(
                             dash.liveStatus == 'online'
                                 ? 'Connected & Monitoring'
-                                : 'Offline',
+                                : 'Offline — not connected',
                             style: GoogleFonts.inter(
                               fontSize: 12,
                               color: const Color(0xFF64748B),
@@ -174,6 +208,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
 
+              const SizedBox(height: 20),
+
+              // Quick Actions
+              Text(
+                'Quick Actions',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _buildQuickAction(
+                    context,
+                    icon: Icons.upload_file,
+                    label: 'Upload\nData',
+                    color: const Color(0xFF6366F1),
+                    onTap: () {
+                      // Navigate to Data tab (index 1)
+                      final shell = context.findAncestorStateOfType<State>();
+                      if (shell != null) {
+                        // Use bottom nav to switch to Data tab
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                  _buildQuickAction(
+                    context,
+                    icon: Icons.candlestick_chart,
+                    label: 'View\nCharts',
+                    color: const Color(0xFF10B981),
+                    onTap: () {},
+                  ),
+                  const SizedBox(width: 12),
+                  _buildQuickAction(
+                    context,
+                    icon: Icons.rocket_launch,
+                    label: 'Run\nBacktest',
+                    color: const Color(0xFFF59E0B),
+                    onTap: () {},
+                  ),
+                ],
+              ),
+
               if (dash.error != null) ...[
                 const SizedBox(height: 16),
                 Container(
@@ -181,13 +261,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFFF43F5E).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    dash.error!,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: const Color(0xFFF43F5E),
+                    border: Border.all(
+                      color: const Color(0xFFF43F5E).withOpacity(0.2),
                     ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          color: Color(0xFFF43F5E), size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          dash.error!,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: const Color(0xFFF43F5E),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -195,6 +287,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildQuickAction(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          decoration: BoxDecoration(
+            color: isDark
+                ? color.withOpacity(0.08)
+                : color.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: color.withOpacity(0.15),
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 26),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

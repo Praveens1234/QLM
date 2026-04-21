@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 class AppConstants {
   static const String appName = 'QLM';
   static const String appFullName = 'QuantLogic Mobile';
-  static const String appVersion = '1.0.0';
+  static const String appVersion = '1.0.1';
 
   // ─── Spacing ────────────────────────────────────────────
   static const double spacingXs = 4.0;

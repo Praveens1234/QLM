@@ -17,8 +17,14 @@ class DataManagerScreen extends StatefulWidget {
 
 class _DataManagerScreenState extends State<DataManagerScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final _symbolController = TextEditingController();
-  final _tfController = TextEditingController(text: '1m');
+
+  // File upload tab controllers
+  final _fileSymbolController = TextEditingController();
+  final _fileTfController = TextEditingController(text: '1m');
+
+  // URL import tab controllers
+  final _urlSymbolController = TextEditingController();
+  final _urlTfController = TextEditingController(text: '1m');
   final _urlController = TextEditingController();
 
   PlatformFile? _selectedFile;
@@ -35,8 +41,10 @@ class _DataManagerScreenState extends State<DataManagerScreen> with SingleTicker
   @override
   void dispose() {
     _tabController.dispose();
-    _symbolController.dispose();
-    _tfController.dispose();
+    _fileSymbolController.dispose();
+    _fileTfController.dispose();
+    _urlSymbolController.dispose();
+    _urlTfController.dispose();
     _urlController.dispose();
     super.dispose();
   }
@@ -65,8 +73,8 @@ class _DataManagerScreenState extends State<DataManagerScreen> with SingleTicker
       return;
     }
 
-    final symbol = _symbolController.text.trim().toUpperCase();
-    final timeframe = _tfController.text.trim().toLowerCase();
+    final symbol = _fileSymbolController.text.trim().toUpperCase();
+    final timeframe = _fileTfController.text.trim().toLowerCase();
 
     if (symbol.isEmpty || timeframe.isEmpty) {
       AppToast.warning(context, 'Symbol and Timeframe are required');
@@ -85,7 +93,7 @@ class _DataManagerScreenState extends State<DataManagerScreen> with SingleTicker
       AppToast.success(context, 'Dataset uploaded successfully');
       setState(() {
         _selectedFile = null;
-        _symbolController.clear();
+        _fileSymbolController.clear();
       });
     } else if (mounted) {
       AppToast.error(context, provider.error ?? 'Upload failed');
@@ -94,8 +102,8 @@ class _DataManagerScreenState extends State<DataManagerScreen> with SingleTicker
 
   Future<void> _importUrl() async {
     final url = _urlController.text.trim();
-    final symbol = _symbolController.text.trim().toUpperCase();
-    final timeframe = _tfController.text.trim().toLowerCase();
+    final symbol = _urlSymbolController.text.trim().toUpperCase();
+    final timeframe = _urlTfController.text.trim().toLowerCase();
 
     if (url.isEmpty || symbol.isEmpty || timeframe.isEmpty) {
       AppToast.warning(context, 'URL, Symbol, and Timeframe are required');
@@ -112,7 +120,7 @@ class _DataManagerScreenState extends State<DataManagerScreen> with SingleTicker
     if (success && mounted) {
       AppToast.success(context, 'Dataset imported successfully');
       _urlController.clear();
-      _symbolController.clear();
+      _urlSymbolController.clear();
     } else if (mounted) {
       AppToast.error(context, provider.error ?? 'Import failed');
     }
@@ -199,14 +207,14 @@ class _DataManagerScreenState extends State<DataManagerScreen> with SingleTicker
               children: [
                 Expanded(
                   child: TextField(
-                    controller: _symbolController,
+                    controller: _fileSymbolController,
                     decoration: const InputDecoration(labelText: 'Symbol', hintText: 'EURUSD'),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextField(
-                    controller: _tfController,
+                    controller: _fileTfController,
                     decoration: const InputDecoration(labelText: 'Timeframe', hintText: '1m'),
                   ),
                 ),
@@ -268,14 +276,14 @@ class _DataManagerScreenState extends State<DataManagerScreen> with SingleTicker
           children: [
             Expanded(
               child: TextField(
-                controller: _symbolController,
+                controller: _urlSymbolController,
                 decoration: const InputDecoration(labelText: 'Symbol', hintText: 'EURUSD'),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: TextField(
-                controller: _tfController,
+                controller: _urlTfController,
                 decoration: const InputDecoration(labelText: 'Timeframe', hintText: '1m'),
               ),
             ),

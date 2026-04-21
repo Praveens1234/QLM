@@ -33,7 +33,14 @@ class _ChartScreenState extends State<ChartScreen> {
         // Controls Row
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            border: Border(
+              bottom: BorderSide(
+                color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE2E8F0),
+              ),
+            ),
+          ),
           child: Row(
             children: [
               // Dataset Selector
@@ -44,13 +51,18 @@ class _ChartScreenState extends State<ChartScreen> {
                       child: DropdownButton<String>(
                         isExpanded: true,
                         value: _selectedDatasetId,
-                        hint: const Text('Select Dataset'),
+                        hint: Text(
+                          'Select Dataset',
+                          style: GoogleFonts.inter(
+                            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                          ),
+                        ),
                         items: dataProv.datasets.map((d) {
                           return DropdownMenuItem(
                             value: d.id,
                             child: Text(
                               '${d.symbol} (${d.timeframe})',
-                              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                              style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
                             ),
                           );
                         }).toList(),
@@ -72,20 +84,27 @@ class _ChartScreenState extends State<ChartScreen> {
                 builder: (context, chartProv, _) {
                   if (chartProv.meta == null || _selectedDatasetId == null) return const SizedBox();
                   
-                  return DropdownButtonHideUnderline(
-                    child: DropdownButton<int>(
-                      value: chartProv.currentTfSec,
-                      items: chartProv.meta!.validTimeframes.map((tf) {
-                        return DropdownMenuItem(
-                          value: tf.sec,
-                          child: Text(tf.label, style: GoogleFonts.inter()),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          chartProv.switchTimeframe(_selectedDatasetId!, val);
-                        }
-                      },
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        value: chartProv.currentTfSec,
+                        items: chartProv.meta!.validTimeframes.map((tf) {
+                          return DropdownMenuItem(
+                            value: tf.sec,
+                            child: Text(tf.label, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500)),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            chartProv.switchTimeframe(_selectedDatasetId!, val);
+                          }
+                        },
+                      ),
                     ),
                   );
                 },
@@ -96,6 +115,7 @@ class _ChartScreenState extends State<ChartScreen> {
                 builder: (context, chartProv, _) {
                   return PopupMenuButton<String>(
                     icon: const Icon(Icons.show_chart),
+                    tooltip: 'Indicators',
                     itemBuilder: (context) => [
                       CheckedPopupMenuItem(value: 'sma50', checked: chartProv.showSma50, child: const Text('SMA 50')),
                       CheckedPopupMenuItem(value: 'ema20', checked: chartProv.showEma20, child: const Text('EMA 20')),
@@ -108,7 +128,7 @@ class _ChartScreenState extends State<ChartScreen> {
                       chartProv.toggleIndicator(val);
                     },
                   );
-                }
+                },
               ),
             ],
           ),

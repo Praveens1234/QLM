@@ -38,86 +38,95 @@ class _StrategyLabScreenState extends State<StrategyLabScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: Row(
-        children: [
-          // Sidebar (Strategies List) - Hidden on small screens, can use a drawer later, 
-          // but for simplicity we'll show it or make it collapsible.
-          // In mobile, a side menu per screen or bottom sheet is better.
-          // Let's use a bottom sheet for selecting strategy on mobile.
-          Expanded(
-            child: Consumer<StrategyProvider>(
-              builder: (context, provider, _) {
-                if (_nameController.text != provider.currentName) {
-                  _nameController.text = provider.currentName;
-                }
-                
-                return Column(
-                  children: [
-                    // Toolbar
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                        border: Border(bottom: BorderSide(color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade200)),
-                      ),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.list),
-                            onPressed: () => _showStrategyList(context, provider),
-                            tooltip: 'Load Strategy',
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextField(
-                              controller: _nameController,
-                              onChanged: provider.setName,
-                              decoration: const InputDecoration(
-                                hintText: 'Strategy Name',
-                                isDense: true,
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                filled: false,
-                              ),
-                              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.add),
-                            onPressed: () => _showNewStrategySheet(context, provider),
-                            tooltip: 'New Strategy',
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.check_circle_outline),
-                            onPressed: () => _validate(provider),
-                            color: Colors.green,
-                            tooltip: 'Validate',
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.save),
-                            onPressed: () => _save(provider),
-                            color: const Color(0xFF6366F1),
-                            tooltip: 'Save',
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    // Editor
-                    Expanded(
-                      child: CodeEditorWidget(
-                        code: provider.currentCode,
-                        onChanged: provider.setCode,
-                        readOnly: false,
-                      ),
-                    ),
-                  ],
-                );
-              },
+      appBar: AppBar(
+        title: Text('Strategy Lab', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+        actions: [
+          Consumer<StrategyProvider>(
+            builder: (context, provider, _) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline),
+                  onPressed: () => _showNewStrategySheet(context, provider),
+                  tooltip: 'New Strategy',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.check_circle_outline),
+                  onPressed: () => _validate(provider),
+                  color: const Color(0xFF10B981),
+                  tooltip: 'Validate',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.save_outlined),
+                  onPressed: () => _save(provider),
+                  color: const Color(0xFF6366F1),
+                  tooltip: 'Save',
+                ),
+              ],
             ),
           ),
         ],
+      ),
+      body: Consumer<StrategyProvider>(
+        builder: (context, provider, _) {
+          if (_nameController.text != provider.currentName) {
+            _nameController.text = provider.currentName;
+          }
+          
+          return Column(
+            children: [
+              // Strategy name + load toolbar
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  border: Border(
+                    bottom: BorderSide(
+                      color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.folder_open_outlined, size: 20),
+                      onPressed: () => _showStrategyList(context, provider),
+                      tooltip: 'Load Strategy',
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: TextField(
+                        controller: _nameController,
+                        onChanged: provider.setName,
+                        decoration: InputDecoration(
+                          hintText: 'Strategy Name',
+                          isDense: true,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          filled: false,
+                          hintStyle: GoogleFonts.inter(
+                            color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+                          ),
+                        ),
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Editor
+              Expanded(
+                child: CodeEditorWidget(
+                  code: provider.currentCode,
+                  onChanged: provider.setCode,
+                  readOnly: false,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

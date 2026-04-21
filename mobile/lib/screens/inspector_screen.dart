@@ -38,18 +38,20 @@ class _InspectorScreenState extends State<InspectorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Query Controls
-          GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('Data Inspector', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Data Inspector', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Query Controls
+            GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                 
                 Consumer<DataProvider>(
                   builder: (context, dataProv, _) => DropdownButtonFormField<String>(
@@ -162,7 +164,8 @@ class _InspectorScreenState extends State<InspectorScreen> {
               );
             },
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

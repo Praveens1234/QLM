@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/server_provider.dart';
 
-
 class ServerConnectScreen extends StatefulWidget {
   const ServerConnectScreen({super.key});
 
@@ -15,6 +14,7 @@ class _ServerConnectScreenState extends State<ServerConnectScreen>
     with SingleTickerProviderStateMixin {
   final _urlController = TextEditingController();
   late AnimationController _pulseController;
+  ServerProvider? _serverRef;
 
   @override
   void initState() {
@@ -24,34 +24,30 @@ class _ServerConnectScreenState extends State<ServerConnectScreen>
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
-    // Pre-fill saved URL and listen for auto-connect
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final server = context.read<ServerProvider>();
-      if (server.serverUrl.isNotEmpty) {
-        _urlController.text = server.serverUrl;
+      if (!mounted) return;
+      _serverRef = context.read<ServerProvider>();
+      if (_serverRef!.serverUrl.isNotEmpty) {
+        _urlController.text = _serverRef!.serverUrl;
       }
-      
-      // Auto-redirect if already connected (or when it connects)
-      if (server.isConnected) {
+      if (_serverRef!.isConnected) {
         Navigator.of(context).pushReplacementNamed('/main');
       }
-      server.addListener(_serverListener);
+      _serverRef!.addListener(_serverListener);
     });
   }
 
   void _serverListener() {
     if (!mounted) return;
-    final server = context.read<ServerProvider>();
-    if (server.isConnected) {
-      server.removeListener(_serverListener);
+    if (_serverRef?.isConnected ?? false) {
+      _serverRef?.removeListener(_serverListener);
       Navigator.of(context).pushReplacementNamed('/main');
     }
   }
 
   @override
   void dispose() {
-    final server = context.read<ServerProvider>();
-    server.removeListener(_serverListener);
+    _serverRef?.removeListener(_serverListener);
     _urlController.dispose();
     _pulseController.dispose();
     super.dispose();
@@ -83,11 +79,11 @@ class _ServerConnectScreenState extends State<ServerConnectScreen>
               children: [
                 // Logo / Brand
                 AnimatedBuilder(
-                  listenable: _pulseController,
+                  animation: _pulseController,
                   builder: (context, _) {
                     return Container(
-                      width: 80,
-                      height: 80,
+                      width: 90,
+                      height: 90,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
@@ -100,32 +96,32 @@ class _ServerConnectScreenState extends State<ServerConnectScreen>
                       ),
                       child: const Icon(
                         Icons.candlestick_chart,
-                        size: 36,
+                        size: 40,
                         color: Color(0xFF6366F1),
                       ),
                     );
                   },
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
 
                 // Title
                 Text(
                   'QLM',
                   style: GoogleFonts.inter(
-                    fontSize: 36,
+                    fontSize: 38,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 4,
-                    color: isDark ? Colors.white : Colors.black87,
+                    letterSpacing: 6,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
-                  'QuantLogic Mobile v1.0.1',
+                  'QuantLogic Mobile',
                   style: GoogleFonts.inter(
                     fontSize: 14,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: FontWeight.w500,
                     color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                    letterSpacing: 1,
+                    letterSpacing: 2,
                   ),
                 ),
                 const SizedBox(height: 48),
@@ -234,13 +230,44 @@ class _ServerConnectScreenState extends State<ServerConnectScreen>
                 const SizedBox(height: 32),
 
                 // Hint
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.white.withOpacity(0.03)
+                        : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 18,
+                        color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Enter the URL of your QLM server running on your local network or cloud.',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Version
                 Text(
-                  'Enter the URL of your QLM server\nrunning on your local network or cloud',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8),
-                    height: 1.5,
+                  'v1.0.1',
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 11,
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
                   ),
                 ),
               ],
@@ -250,12 +277,4 @@ class _ServerConnectScreenState extends State<ServerConnectScreen>
       ),
     );
   }
-}
-
-/// Reusable AnimatedBuilder
-class AnimatedBuilder extends AnimatedWidget {
-  final Widget Function(BuildContext context, Widget? child) builder;
-  const AnimatedBuilder({super.key, required super.listenable, required this.builder});
-  @override
-  Widget build(BuildContext context) => builder(context, null);
 }

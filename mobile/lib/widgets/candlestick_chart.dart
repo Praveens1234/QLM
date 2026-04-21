@@ -99,17 +99,20 @@ class _CandlestickChartState extends State<CandlestickChart> with SingleTickerPr
   @override
   Widget build(BuildContext context) {
     if (widget.bars.isEmpty) {
+      final emptyColor = Theme.of(context).brightness == Brightness.dark
+          ? Colors.white
+          : Colors.black87;
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.candlestick_chart, size: 48, color: Colors.white.withOpacity(0.1)),
+            Icon(Icons.candlestick_chart, size: 48, color: emptyColor.withOpacity(0.15)),
             const SizedBox(height: 12),
             Text(
               'Select a dataset to view chart',
               style: GoogleFonts.inter(
                 fontSize: 13,
-                color: Colors.white.withOpacity(0.3),
+                color: emptyColor.withOpacity(0.4),
               ),
             ),
           ],

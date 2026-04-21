@@ -24,7 +24,7 @@ class DashboardProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final results = await Future.wait([
+      final results = await Future.wait<dynamic>([
         apiClient.get('/data/'),
         apiClient.get('/strategies/'),
         apiClient.get('/live/status').catchError((_) => <String, dynamic>{
@@ -35,19 +35,25 @@ class DashboardProvider extends ChangeNotifier {
       ]);
 
       // Datasets
-      final datasets = results[0] as List<dynamic>;
-      _datasetCount = datasets.length;
+      final datasetsRaw = results[0];
+      if (datasetsRaw is List) {
+        _datasetCount = datasetsRaw.length;
+      }
 
       // Strategies
-      final strategies = results[1] as List<dynamic>;
-      _strategyCount = strategies.length;
+      final strategiesRaw = results[1];
+      if (strategiesRaw is List) {
+        _strategyCount = strategiesRaw.length;
+      }
 
       // Live status
-      final live = results[2] as Map<String, dynamic>;
-      final orders = live['active_orders'] as List<dynamic>? ?? [];
-      _activeOrders = orders.length;
-      _totalPnl = (live['total_pnl'] as num?)?.toDouble() ?? 0.0;
-      _liveStatus = live['status']?.toString() ?? 'offline';
+      final live = results[2];
+      if (live is Map<String, dynamic>) {
+        final orders = live['active_orders'];
+        _activeOrders = orders is List ? orders.length : 0;
+        _totalPnl = (live['total_pnl'] as num?)?.toDouble() ?? 0.0;
+        _liveStatus = live['status']?.toString() ?? 'offline';
+      }
     } catch (e) {
       _error = e.toString();
     }
